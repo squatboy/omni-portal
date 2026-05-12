@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: omni
+  namespace: omni
+  labels:
+    app.kubernetes.io/name: omni
+    app.kubernetes.io/part-of: omni
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: omni
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: omni
+        app.kubernetes.io/part-of: omni
+    spec:
+      serviceAccountName: omni-reader
+      containers:
+        - name: omni
+          image: ghcr.io/squatboy/omni:REPLACE_WITH_FULL_COMMIT_SHA
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+              name: http
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              add: ["NET_RAW"]
+          env:
+            - name: NODE_ENV
+              value: production
+            - name: GITLAB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: omni-secrets
+                  key: GITLAB_TOKEN
+            - name: ARGOCD_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: omni-secrets
+                  key: ARGOCD_TOKEN
+          volumeMounts:
+            - name: inventory
+              mountPath: /app/config/inventory.json
+              subPath: inventory.json
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /api/health/ready
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: inventory
+          configMap:
+            name: omni-inventory
+            items:
+              - key: inventory.json
+                path: inventory.json

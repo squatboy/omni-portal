@@ -1,0 +1,15 @@
+.git
+.github
+.graphify
+.graphify_*.json
+.graphify_python
+.next
+coverage
+graphify-out
+node_modules
+npm-debug.log*
+Dockerfile
+.env
+.env*.local
+config/inventory.json
+*.tsbuildinfo

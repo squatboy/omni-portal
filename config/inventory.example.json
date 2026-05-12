@@ -1,0 +1,35 @@
+{
+  "nexus": {
+    "url": "https://nexus.example.internal"
+  },
+  "gitlab": {
+    "baseUrl": "https://gitlab.example.internal",
+    "projects": [
+      {
+        "name": "example-app",
+        "path": "group/example-app",
+        "defaultBranch": "main"
+      }
+    ]
+  },
+  "argocd": {
+    "baseUrl": "https://argocd.example.internal"
+  },
+  "kubernetes": {
+    "clusterName": "example-cluster",
+    "namespaces": [
+      "example-namespace"
+    ],
+    "appNamespaces": [
+      "example-namespace"
+    ]
+  },
+  "vms": [
+    {
+      "id": "vm-01",
+      "name": "VM 01",
+      "address": "192.0.2.10",
+      "description": "Example VM"
+    }
+  ]
+}
