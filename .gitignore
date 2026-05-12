@@ -47,4 +47,3 @@ next-env.d.ts
 graphify-out/
 .graphify_*.json
 .graphify_python
-k8s/app/ingress.yaml

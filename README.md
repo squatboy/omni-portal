@@ -35,20 +35,13 @@ docker build --platform linux/amd64 -t omni:test .
 
 Runtime manifests live in `k8s/app/`. The Argo CD bootstrap manifest lives in
 `k8s/argocd/application.yaml`.
-The ingress manifest defines host routing only. HTTPS smoke checks assume TLS
-termination for `omni.example.internal` is already handled by the cluster/front
-proxy path.
-
-First-time bootstrap:
-
-```bash
-kubectl apply -n argocd -f k8s/argocd/application.yaml
-```
+The ingress manifest defines HTTP host routing for host only.
+Add a TLS Secret and Ingress `tls` block separately if HTTPS is required.
 
 Before Argo sync, create runtime-only config and secrets:
 
 ```bash
-kubectl create namespace omni --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f k8s/app/namespace.yaml
 kubectl -n omni create configmap omni-inventory \
   --from-file=inventory.json=config/inventory.json \
   --dry-run=client -o yaml | kubectl apply -f -
@@ -58,13 +51,34 @@ kubectl -n omni create secret generic omni-secrets \
   --dry-run=client -o yaml | kubectl apply -f -
 ```
 
-Release a built image by replacing the image in
-`k8s/app/deployment.yaml` with the full commit SHA tag, then commit and push.
+First-time Argo CD bootstrap:
+
+```bash
+kubectl apply -n argocd -f k8s/argocd/application.yaml
+```
+
+On `main` pushes, GitHub Actions builds and pushes
+`ghcr.io/squatboy/omni:<full-commit-sha>`, then commits the matching image tag
+to `k8s/app/deployment.yaml` with `[skip ci]`.
+
+RBAC checks:
+
+```bash
+kubectl auth can-i list nodes --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list pods --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list services --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list persistentvolumeclaims --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list deployments.apps --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list ingresses.networking.k8s.io --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list nodes.metrics.k8s.io --as=system:serviceaccount:omni:omni-reader
+```
 
 Smoke checks:
 
 ```bash
-kubectl -n omni get pods,svc,ingress
-curl -fsS https://omni.example.internal/
-curl -fsS https://omni.example.internal/api/collect/snapshot
+kubectl -n omni get deploy,pod,svc,ingress
+kubectl -n omni logs deploy/omni
+curl -fsS http://omni.internal/api/health/ready
+curl -fsS http://omni.internal/api/collect/snapshot
 ```
