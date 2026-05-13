@@ -7,6 +7,7 @@ import {
   Boxes,
   ExternalLink,
   GitBranch,
+  HeartPulse,
   LayoutDashboard,
   Package,
   RefreshCw,
@@ -178,6 +179,12 @@ export function OmniDashboard() {
               active={activeTab === "overview"}
               onClick={() => setActiveTab("overview")}
             />
+            <SidebarItem
+              icon={HeartPulse}
+              label="Platform Health"
+              active={activeTab === "health"}
+              onClick={() => setActiveTab("health")}
+            />
             {sourceOrder.map((source) => {
               const summary = sources.find((item) => item.source === source)
               const Icon = sourceIcons[source]
@@ -339,7 +346,6 @@ function DashboardContent({
       >
         <TabsList className="w-full justify-start overflow-x-auto overflow-y-hidden">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="health">Platform Health</TabsTrigger>
           <TabsTrigger value="kubernetes">Kubernetes</TabsTrigger>
           <TabsTrigger value="pods">Pods</TabsTrigger>
           <TabsTrigger value="vms">VM Inventory</TabsTrigger>
