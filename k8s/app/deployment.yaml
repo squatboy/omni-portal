@@ -20,7 +20,7 @@ spec:
       serviceAccountName: omni-reader
       containers:
         - name: omni
-          image: ghcr.io/squatboy/omni:3e3879630b845fd482cb256b073a4509408e02ec
+          image: ghcr.io/squatboy/omni:39a4acdfc367c60f593cc1255eb4f1e91cd71a95
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 3000
