@@ -29,10 +29,15 @@ export async function collectNexus(
 
     const reachable = response.ok
     return {
-      status: "ok",
+      status: reachable ? "ok" : "down",
       collectedAt: now,
       stale: false,
-      error: null,
+      error: reachable
+        ? null
+        : {
+            code: "CONNECTION_FAILED",
+            message: `Nexus health check failed with status ${response.status}`,
+          },
       data: {
         url: nexusUrl,
         reachable,

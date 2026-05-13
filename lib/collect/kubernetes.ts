@@ -328,8 +328,11 @@ export async function collectKubernetes(
       (pvc) => pvc.status?.phase?.toLowerCase() === "pending"
     ).length
 
+    const notReadyPods = Math.max(0, pods.length - readyPods)
+    const isStale = notReadyPods > 0 || restartingPods > 0 || pendingPvcCount > 0
+
     return {
-      status: "ok",
+      status: isStale ? "stale" : "ok",
       collectedAt,
       stale: false,
       error: null,
@@ -342,7 +345,7 @@ export async function collectKubernetes(
         pods: {
           total: pods.length,
           ready: readyPods,
-          notReady: Math.max(0, pods.length - readyPods),
+          notReady: notReadyPods,
           restarting: restartingPods,
         },
         services: {

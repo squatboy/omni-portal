@@ -79,7 +79,7 @@ describe("collectArgoCd", () => {
 
     const result = await collectArgoCd(new AbortController().signal)
 
-    expect(result.status).toBe("ok")
+    expect(result.status).toBe("stale")
     expect(result.error).toBeNull()
     expect(result.data.applications).toHaveLength(2)
     expect(result.data.applications[0]).toMatchObject({

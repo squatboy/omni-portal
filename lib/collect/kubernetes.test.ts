@@ -258,7 +258,7 @@ describe("collectKubernetes", () => {
 
     const result = await collectKubernetes(new AbortController().signal)
 
-    expect(result.status).toBe("ok")
+    expect(result.status).toBe("stale")
     expect(result.error).toBeNull()
     expect(result.data.clusterName).toBe("sth-prod-cluster")
     expect(result.data.namespaces).toEqual([

@@ -106,8 +106,14 @@ export async function collectGitLab(
 
     const projectsData = await Promise.all(projectPromises)
 
+    const isStale = projectsData.some(
+      (project) =>
+        project.latestPipeline?.status === "failed" ||
+        project.latestPipeline?.status === "canceled"
+    )
+
     return {
-      status: "ok",
+      status: isStale ? "stale" : "ok",
       collectedAt: now,
       stale: false,
       error: null,

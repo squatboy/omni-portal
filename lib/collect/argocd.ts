@@ -86,8 +86,15 @@ export async function collectArgoCd(
       toApplication(item, baseUrl)
     )
 
+    const isStale = applications.some(
+      (app) =>
+        app.syncStatus !== "Synced" ||
+        app.healthStatus === "Degraded" ||
+        app.healthStatus === "Unknown"
+    )
+
     return {
-      status: "ok",
+      status: isStale ? "stale" : "ok",
       collectedAt,
       stale: false,
       error: null,
