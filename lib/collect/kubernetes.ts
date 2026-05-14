@@ -329,7 +329,7 @@ export async function collectKubernetes(
     ).length
 
     const notReadyPods = Math.max(0, pods.length - readyPods)
-    const isStale = notReadyPods > 0 || restartingPods > 0 || pendingPvcCount > 0
+    const isStale = notReadyPods > 0 || pendingPvcCount > 0
 
     return {
       status: isStale ? "stale" : "ok",

@@ -101,7 +101,14 @@ export function KubernetesPanel({
                     </div>
                   </TableCell>
                   <TableCell>
-                    {workload.readyReplicas}/{workload.desiredReplicas}
+                    <StatusBadge
+                      status={
+                        workload.readyReplicas === workload.desiredReplicas
+                          ? "ok"
+                          : "stale"
+                      }
+                      label={`${workload.readyReplicas}/${workload.desiredReplicas}`}
+                    />
                   </TableCell>
                   <TableCell className="font-mono">
                     {workload.restartCount}
