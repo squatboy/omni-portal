@@ -34,7 +34,7 @@ docker build --platform linux/amd64 -t omni:test .
 ## VM Docker Compose Deploy
 
 Omni is deployed on an external VM with Docker Compose, not inside the
-Kubernetes cluster. If the cluster fails, the observer UI and collector must not
+Kubernetes cluster. If the cluster fails, collector must not
 fail with it.
 
 CI only verifies the app and publishes `ghcr.io/squatboy/omni:<full-commit-sha>`.
@@ -92,13 +92,13 @@ network. Make sure the VM firewall allows inbound TCP `3000`.
 Do not deploy the Omni app to Kubernetes. Kubernetes only needs read-only
 credentials for the external collector.
 
-Create `namespace omni-observer`, `ServiceAccount omni-reader`,
+Create `namespace omni`, `ServiceAccount omni-reader`,
 `ClusterRole/ClusterRoleBinding`, and a service-account-token Secret named
 `omni-reader-token`:
 
 ```bash
-kubectl create namespace omni-observer --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n omni-observer create serviceaccount omni-reader --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace omni --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n omni create serviceaccount omni-reader --dry-run=client -o yaml | kubectl apply -f -
 ```
 
 Create the Secret with this shape:
@@ -108,7 +108,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: omni-reader-token
-  namespace: omni-observer
+  namespace: omni
   annotations:
     kubernetes.io/service-account.name: omni-reader
 type: kubernetes.io/service-account-token
@@ -120,12 +120,12 @@ and a trusted cluster CA. Plain HTTP is not supported.
 RBAC checks:
 
 ```bash
-kubectl auth can-i list nodes --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list pods --all-namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list services --all-namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list persistentvolumeclaims --all-namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list deployments.apps --all-namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list ingresses.networking.k8s.io --all-namespaces --as=system:serviceaccount:omni-observer:omni-reader
-kubectl auth can-i list nodes.metrics.k8s.io --as=system:serviceaccount:omni-observer:omni-reader
+kubectl auth can-i list nodes --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list pods --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list services --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list persistentvolumeclaims --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list deployments.apps --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list ingresses.networking.k8s.io --all-namespaces --as=system:serviceaccount:omni:omni-reader
+kubectl auth can-i list nodes.metrics.k8s.io --as=system:serviceaccount:omni:omni-reader
 ```
