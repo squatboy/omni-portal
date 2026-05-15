@@ -110,12 +110,13 @@ async function collectSource<TSource extends RuntimeCollectSource>(
   adapter: CollectAdapter<TSource>,
   attemptedAt: string
 ): Promise<SourceEnvelope<TSource>> {
+  const startedAt = Date.now()
   const previous = runtime.snapshot[adapter.source] as SourceEnvelope<TSource>
 
   try {
     const result = await collectWithTimeout(adapter)
 
-    return {
+    const envelope = {
       source: adapter.source,
       status: result.status,
       attemptedAt,
@@ -126,9 +127,48 @@ async function collectSource<TSource extends RuntimeCollectSource>(
       error: result.error,
       data: result.data,
     }
+
+    logCollectResult(envelope, Date.now() - startedAt)
+
+    return envelope
   } catch (error) {
-    return buildFailureEnvelope(previous, attemptedAt, error)
+    const envelope = buildFailureEnvelope(previous, attemptedAt, error)
+
+    logCollectResult(envelope, Date.now() - startedAt)
+
+    return envelope
   }
+}
+
+function logCollectResult<TSource extends RuntimeCollectSource>(
+  envelope: SourceEnvelope<TSource>,
+  durationMs: number
+) {
+  const parts = [
+    `[omni.collect] source=${envelope.source}`,
+    `result=${envelope.error === null ? "success" : "failure"}`,
+    `status=${envelope.status}`,
+    `stale=${String(envelope.stale)}`,
+    `durationMs=${durationMs}`,
+    `attemptedAt=${envelope.attemptedAt}`,
+    `collectedAt=${envelope.collectedAt ?? "null"}`,
+  ]
+
+  if (envelope.error) {
+    parts.push(
+      `errorCode=${envelope.error.code}`,
+      `errorMessage=${JSON.stringify(envelope.error.message)}`
+    )
+  }
+
+  const logLine = parts.join(" ")
+
+  if (envelope.error === null) {
+    console.info(logLine)
+    return
+  }
+
+  console.error(logLine)
 }
 
 function collectWithTimeout<TSource extends RuntimeCollectSource>(
