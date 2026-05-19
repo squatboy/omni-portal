@@ -1,5 +1,6 @@
 # dependencies
 /node_modules
+frontend/node_modules/
 /.pnp
 .pnp.*
 .yarn/*
@@ -10,20 +11,25 @@
 
 # testing
 /coverage
+frontend/coverage/
 
 # next.js
 /.next/
 /out/
+frontend/.next/
+frontend/out/
 
 # production
 /build
+frontend/build/
 
 # misc
 .DS_Store
 *.pem
 
-.gemini
-docs/
+.gemini/
+.codex/
+.copilot/
 
 # debug
 npm-debug.log*
@@ -47,3 +53,14 @@ next-env.d.ts
 graphify-out/
 .graphify_*.json
 .graphify_python
+kubernetes-ca.crt
+
+# test files
+*.a
+*.test
+*.out
+
+# go
+vendor/
+go.work
+go.work.sum

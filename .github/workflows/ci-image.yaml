@@ -7,17 +7,23 @@ on:
   push:
     branches:
       - main
+    tags:
+      - "v*"
 
 permissions:
   contents: read
   packages: write
 
 env:
-  IMAGE_NAME: ghcr.io/squatboy/omni
+  FRONTEND_IMAGE_NAME: ghcr.io/squatboy/omni-frontend
+  BACKEND_IMAGE_NAME: ghcr.io/squatboy/omni-backend
 
 jobs:
-  verify:
+  frontend-verify:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,6 +33,7 @@ jobs:
         with:
           node-version: 24
           cache: npm
+          cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -43,9 +50,32 @@ jobs:
       - name: Build
         run: npm run build
 
+  backend-verify:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: go build ./cmd/server
+
   image:
-    if: github.event_name == 'push'
-    needs: verify
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs:
+      - frontend-verify
+      - backend-verify
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -61,10 +91,20 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push frontend image
         uses: docker/build-push-action@v6
         with:
-          context: .
+          context: ./frontend
+          file: ./frontend/Dockerfile
           platforms: linux/amd64
           push: true
-          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          tags: ${{ env.FRONTEND_IMAGE_NAME }}:${{ github.ref_name }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ${{ env.BACKEND_IMAGE_NAME }}:${{ github.ref_name }}

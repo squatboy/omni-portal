@@ -1,131 +1,112 @@
-# Omni
+# Omni Dashboard
 
-Internal infrastructure dashboard built as a single Next.js app.
+Omni is an internal infrastructure dashboard that centralizes the status of virtual machines, Kubernetes clusters, and development tools (GitLab, ArgoCD, Nexus) into a single, unified view.
 
-## Local checks
+## Features
+- **Centralized Dashboard**: View the health and metrics of all your infrastructure components in one place.
+- **Agentless Collection**: The Go backend securely collects data via APIs and SSH without requiring any agents installed on your target systems.
+- **Resilient Architecture**: Designed to run externally from your clusters so it remains accessible even during major outages.
 
-```bash
-npm ci
-npm run test
-npm run typecheck
-npm run lint
-npm run build
-```
+## Self-Hosted Deployment Guide
 
-## Image
+Omni is deployed on an external VM using Docker Compose and prebuilt GHCR images.
+Release images are published only when a `v*` Git tag is pushed. Use an explicit release tag for `OMNI_VERSION`; do not use `latest`.
+The Compose file pulls `ghcr.io/squatboy/omni-frontend:${OMNI_VERSION}` and `ghcr.io/squatboy/omni-backend:${OMNI_VERSION}`.
 
-GitHub Actions publishes only immutable full-SHA images on pushes to `main`.
-No `latest` tag is produced.
-If the package is created as private, change GHCR package visibility to public
-before deploying without image pull credentials.
+### Prerequisites
+- Docker and Docker Compose installed on the host VM.
+- Network access from the host VM to your Kubernetes API, GitLab, ArgoCD, Nexus, and monitored VMs.
 
-Image format:
+### Step 1: Preparation
+
+Prepare only the deploy bundle on the host VM. The full repository is not required for production deployment.
 
 ```text
-ghcr.io/squatboy/omni:<full-commit-sha>
+/opt/omni-portal/deploy/
+  docker-compose.yml
+  .env
+  config/inventory.json
+  certs/kubernetes-ca.crt   # only when the Kubernetes API uses a private/self-signed CA
 ```
 
-Local build check:
+Copy `deploy/docker-compose.yml`, create `.env`, and place the inventory file under `config/inventory.json`.
+
+### Step 2: Configuration
+
+**1. Create the Environment File**
+
+Use `deploy/.env.example` from the repository as a template, then place the completed `.env` in the deploy bundle:
+
+Required environment variables:
+- `OMNI_VERSION`: One release version tag used by both frontend and backend images (e.g., `v1.0.1`).
+- `KUBERNETES_API_URL`: Your cluster's API endpoint.
+- `KUBERNETES_BEARER_TOKEN`: A read-only token for the cluster.
+- `GITLAB_TOKEN`: Personal Access Token for GitLab.
+- `ARGOCD_TOKEN`: Authentication token for ArgoCD.
+
+**2. Configure the Infrastructure Inventory**
+
+Define the VMs and services you want to monitor:
 
 ```bash
-docker build --platform linux/amd64 -t omni:test .
+# From /opt/omni-portal/deploy
+mkdir -p config
+vi config/inventory.json
 ```
 
-## VM Docker Compose Deploy
+Use `config/inventory.example.json` from the repository as the starting template when preparing the deploy bundle.
 
-Omni is deployed on an external VM with Docker Compose, not inside the
-Kubernetes cluster. If the cluster fails, collector must not
-fail with it.
+**3. Set Up Kubernetes Credentials**
 
-CI only verifies the app and publishes `ghcr.io/squatboy/omni:<full-commit-sha>`.
-To deploy a new version, update `deploy/.env` on the VM:
-
-```dotenv
-OMNI_IMAGE_TAG=<full-commit-sha>
-KUBERNETES_API_URL=<kubernetes-api-url>
-KUBERNETES_BEARER_TOKEN=<omni-reader-token>
-NODE_EXTRA_CA_CERTS=/run/secrets/kubernetes-ca.crt
-GITLAB_TOKEN=<set-gitlab-token>
-ARGOCD_TOKEN=<set-argocd-token>
-```
-
-Compose baseline:
-
-```yaml
-services:
-  omni:
-    image: ghcr.io/squatboy/omni:${OMNI_IMAGE_TAG}
-    restart: unless-stopped
-    cap_add:
-      - NET_RAW
-    ports:
-      - "3000:3000"
-    environment:
-      NODE_ENV: production
-      KUBERNETES_API_URL: ${KUBERNETES_API_URL}
-      KUBERNETES_BEARER_TOKEN: ${KUBERNETES_BEARER_TOKEN}
-      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS}
-      GITLAB_TOKEN: ${GITLAB_TOKEN}
-      ARGOCD_TOKEN: ${ARGOCD_TOKEN}
-    volumes:
-      - ./config/inventory.json:/app/config/inventory.json:ro
-      - ./certs/kubernetes-ca.crt:/run/secrets/kubernetes-ca.crt:ro
-```
-
-Apply on the VM:
+Omni requires read-only Kubernetes access. Apply the provided RBAC manifest to the target cluster from the repository checkout or from a copied manifest file:
 
 ```bash
-cd deploy
-mkdir -p config certs
+kubectl apply -f deploy/kubernetes/readonly-rbac.yaml
+```
+
+Extract the generated token and place it in `.env` as `KUBERNETES_BEARER_TOKEN`:
+
+```bash
+kubectl -n omni get secret omni-reader-token \
+  -o jsonpath='{.data.token}' | base64 -d
+```
+
+If the Kubernetes API uses a private or self-signed CA, copy the CA certificate to `certs/kubernetes-ca.crt`.
+
+### Step 3: Deploy
+
+Pull the tagged release images and start the services:
+
+```bash
+cd /opt/omni-portal/deploy
 docker compose pull
 docker compose up -d
+```
+
+Verify the containers are running:
+```bash
 docker compose ps
-curl -fsS http://<VM-IP>:3000/api/health/ready
-curl -fsS http://<VM-IP>:3000/api/collect/snapshot
 ```
 
-After the container is running, open `http://<VM-IP>:3000` from the internal
-network. Make sure the VM firewall allows inbound TCP `3000`.
+## Usage
 
-## Kubernetes Read-Only Credential
+Once the containers are running, access the Omni portal via your web browser:
+`http://<Server-IP>:3000`
 
-Do not deploy the Omni app to Kubernetes. Kubernetes only needs read-only
-credentials for the external collector.
+External access should use the frontend on port 3000.
+The backend is an internal Compose service and is reached by the frontend through `http://backend:8080`.
 
-Create `namespace omni`, `ServiceAccount omni-reader`,
-`ClusterRole/ClusterRoleBinding`, and a service-account-token Secret named
-`omni-reader-token`:
+Ensure your VM's firewall allows inbound TCP traffic on port 3000.
+
+## Local Image Verification
+
+Use a full repository clone only when you need to validate local image builds or Dockerfile changes.
 
 ```bash
-kubectl create namespace omni --dry-run=client -o yaml | kubectl apply -f -
-kubectl -n omni create serviceaccount omni-reader --dry-run=client -o yaml | kubectl apply -f -
+git clone https://github.com/squatboy/omni-portal.git
+cd omni-portal
+docker build -f frontend/Dockerfile -t omni-frontend:local frontend
+docker build -f backend/Dockerfile -t omni-backend:local backend
 ```
 
-Create the Secret with this shape:
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: omni-reader-token
-  namespace: omni
-  annotations:
-    kubernetes.io/service-account.name: omni-reader
-type: kubernetes.io/service-account-token
-```
-
-The VM collector connects to the Kubernetes API with HTTPS, the bearer token,
-and a trusted cluster CA. Plain HTTP is not supported.
-
-RBAC checks:
-
-```bash
-kubectl auth can-i list nodes --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list pods --all-namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list services --all-namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list persistentvolumeclaims --all-namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list deployments.apps --all-namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list ingresses.networking.k8s.io --all-namespaces --as=system:serviceaccount:omni:omni-reader
-kubectl auth can-i list nodes.metrics.k8s.io --as=system:serviceaccount:omni:omni-reader
-```
+This is a local verification path, not the production deployment flow.

@@ -1,5 +1,7 @@
 # AGENTS.md
 
+Omni is a web portal that centralizes infrastructure resource(vm, kubernetes, etc.) and dev tools status in one place.
+
 ## Scope
 Working Guide & Rules for 'omni' infrastructure dashboard project
 
@@ -20,7 +22,7 @@ Common rules and each rule when working on frontend & backend
 ### Do
 - Always test after code fix & update
 - Commit on appropriate unit after code fix
-- update docs/ .md files if things changed
+- update .md files in @/docs folder if things changed
 
 ### Don't
 - Do not git push, commit only
@@ -33,8 +35,13 @@ Common rules and each rule when working on frontend & backend
 
 ### Backend Rules
 
-### Test Guide
-- Use `npm run test` for collector/cache unit tests.
-- Use `npm run typecheck` and `npm run lint` before finishing code changes.
-- Collector tests should cover success, timeout, stale fallback, and one-source failure isolation.
-- API routes should stay thin: start the collector if needed, then return the cached envelope only.
+## Test Guide
+- Use subagent for test & verification.
+- After frontend code changes, run in `frontend/`:
+  - `npm run test`
+  - `npm run typecheck`
+  - `npm run lint`
+  - `npm run build`
+- After backend code changes, run in `backend/`:
+  - `go test ./...`
+  - `go build ./cmd/server`

@@ -1,18 +1,28 @@
 services:
   omni:
-    image: ghcr.io/squatboy/omni:${OMNI_IMAGE_TAG:?set OMNI_IMAGE_TAG}
+    image: ghcr.io/squatboy/omni-frontend:${OMNI_VERSION:?set OMNI_VERSION}
     restart: unless-stopped
-    cap_add:
-      - NET_RAW
     ports:
       - "3000:3000"
     environment:
       NODE_ENV: production
+      API_URL: http://backend:8080
+    depends_on:
+      - backend
+
+  backend:
+    image: ghcr.io/squatboy/omni-backend:${OMNI_VERSION:?set OMNI_VERSION}
+    restart: unless-stopped
+    cap_add:
+      - NET_RAW
+    expose:
+      - "8080"
+    environment:
       KUBERNETES_API_URL: ${KUBERNETES_API_URL:?set KUBERNETES_API_URL}
       KUBERNETES_BEARER_TOKEN: ${KUBERNETES_BEARER_TOKEN:?set KUBERNETES_BEARER_TOKEN}
-      NODE_EXTRA_CA_CERTS: ${NODE_EXTRA_CA_CERTS:-/run/secrets/kubernetes-ca.crt}
       GITLAB_TOKEN: ${GITLAB_TOKEN:?set GITLAB_TOKEN}
       ARGOCD_TOKEN: ${ARGOCD_TOKEN:?set ARGOCD_TOKEN}
+      INVENTORY_PATH: /app/config/inventory.json
     volumes:
       - ./config/inventory.json:/app/config/inventory.json:ro
       - ./certs/kubernetes-ca.crt:/run/secrets/kubernetes-ca.crt:ro
