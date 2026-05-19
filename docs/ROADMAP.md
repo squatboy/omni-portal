@@ -77,14 +77,13 @@
 ### 9. MVP 안정화 및 Kubernetes 수집 보강
 
 - 상태: 진행 중
-- Go Kubernetes adapter의 세부 fetching logic 보강 (현재 skeleton 구현).
-- 전체 시스템 통합 테스트 및 안정화.
+- Go Kubernetes adapter의 세부 fetching logic 구현 완료 (`2026-05-19`).
+- 전체 시스템 통합 테스트 및 안정화는 후속 진행.
 
 ## 우선순위
 
-1. Go 백엔드 안정화 및 Kubernetes logic 완성
-2. 배포 가이드 최신화 및 배포 검증
-3. UI 피드백 반영 및 버그 수정
+1. 배포 가이드 최신화 및 배포 검증
+2. UI 피드백 반영 및 버그 수정
 
 ## 후속 backlog
 

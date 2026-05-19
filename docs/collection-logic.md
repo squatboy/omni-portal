@@ -9,14 +9,15 @@ This document describes the logic used by the Omni dashboard (implemented in the
 - **Interval**: 30초 주기로 백그라운드에서 모든 resource 상태를 갱신함
 
 ### Kubernetes
-- Kubernetes API를 통해 Nodes, Namespaces, Workloads, Services, Ingresses, PVCs 등 클러스터 전반의 리소스 정보를 조회함
+- Kubernetes API를 통해 Nodes, inventory namespace 범위의 Workloads, Pods, Services, Ingresses, PVCs 정보를 조회함
 - `/apis/metrics.k8s.io/v1beta1/nodes` 엔드포인트를 호출하여 각 노드의 CPU 및 메모리 실제 사용량(Usage) 메트릭을 수집함
 - 수집된 사용량 데이터를 노드의 `allocatable` 자원량과 비교하여 백분율(%)로 계산하여 표시함
+- metrics API가 없거나 metrics 권한만 부족한 경우 Kubernetes source 전체 실패로 보지 않고 노드 사용량만 비워 둠
 - Omni 백엔드는 Kubernetes cluster 외부 VM에서 실행되며, `KUBERNETES_API_URL`, `KUBERNETES_BEARER_TOKEN`, 전용 CA 인증서를 사용하여 HTTPS로 접속함
 - Kubernetes source 장애는 `down`/`timeout`/`stale`로 격리하며, 장애 중 Kubernetes 세부 수집 지속 보장은 v1 범위 밖임
 
 ### Pods
-- `/api/v1/pods` 엔드포인트를 호출하여 개별 Pod의 상세 상태 데이터를 가져옴
+- namespace별 `/api/v1/namespaces/{namespace}/pods` 엔드포인트를 호출하여 개별 Pod의 상세 상태 데이터를 가져옴
 - `status.conditions` 배열에서 `Ready` 타입의 상태값이 `true`인지를 체크하여 실제 서비스 가능 여부를 판단함
 - `status.containerStatuses`에 기록된 `restartCount`를 합산하여 컨테이너의 비정상 종료 및 재시작 횟수를 수집함
 - **워크로드 연결**: ReplicaSet의 `ownerReferences`를 추적하여 특정 Pod의 재시작 횟수를 상위 Deployment 또는 StatefulSet 단위로 합산하여 표시함
