@@ -40,6 +40,7 @@ This document describes the logic used by the Omni dashboard (implemented in the
 ### GitLab
 - GitLab API를 사용하여 설정된 프로젝트의 최신 커밋(Commit) 정보와 파이프라인(Pipeline) 상태를 조회함
 - 각 프로젝트별로 `/repository/commits` 및 `/pipelines` 엔드포인트를 호출하여 개별 프로젝트의 건강 상태를 판단함
+- `baseUrl`, token, project 설정이 없거나 GitLab API 인증/응답/파싱이 실패하면 test connection과 collector source 상태를 실패로 처리함
 - Manage에 등록된 token을 복호화해 API 권한을 획득함
 - 여러 GitLab integration이 있으면 project 항목에 integration 이름을 포함함
 

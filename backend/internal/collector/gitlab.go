@@ -3,6 +3,7 @@ package collector
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"omni-backend/internal/models"
@@ -30,15 +31,15 @@ func CollectGitLab(ctx context.Context, targets []models.GitLabCollectTarget) mo
 	now := time.Now().Format(time.RFC3339)
 
 	if len(targets) == 0 {
-	        collectedAt := now
-	        return models.CollectEnvelope[models.GitLabData]{
-	                Source:      models.SourceGitLab,
-	                Status:      models.StatusUnknown,
-	                AttemptedAt: now,
-	                CollectedAt: &collectedAt,
-	                Stale:       false,
-	                Data:        models.GitLabData{Projects: []models.GitLabProjectStatus{}},
-	        }
+		collectedAt := now
+		return models.CollectEnvelope[models.GitLabData]{
+			Source:      models.SourceGitLab,
+			Status:      models.StatusUnknown,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        models.GitLabData{Projects: []models.GitLabProjectStatus{}},
+		}
 	}
 	var projects []models.GitLabProjectStatus
 	status := models.StatusOk
@@ -77,12 +78,24 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 	baseUrl := strings.TrimRight(target.BaseURL, "/")
 	projects := target.Projects
 
+	if baseUrl == "" {
+		return gitlabError(now, models.ErrConnectionFailed, "GitLab base URL is required", models.StatusDown)
+	}
+	if strings.TrimSpace(target.Token) == "" {
+		return gitlabError(now, models.ErrPermissionDenied, "GitLab token is required", models.StatusPermissionError)
+	}
+	if len(projects) == 0 {
+		return gitlabError(now, models.ErrConnectionFailed, "At least one GitLab project is required", models.StatusDown)
+	}
+
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
 	results := make([]models.GitLabProjectStatus, len(projects))
 	var wg sync.WaitGroup
 	var isStale bool
+	var collectErr *models.CollectError
+	status := models.StatusOk
 	var mu sync.Mutex
 	client := &http.Client{}
 
@@ -91,80 +104,83 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 		go func(i int, p models.GitLabProjectTarget) {
 			defer wg.Done()
 
+			link := p.Link
+			if link == nil && baseUrl != "" && p.Path != "" {
+				l := baseUrl + "/" + p.Path
+				link = &l
+			}
+
+			projectStatus := models.GitLabProjectStatus{
+				GitLabProjectTarget: p,
+				IntegrationName:     target.Name,
+			}
+			projectStatus.Link = link
+
+			if strings.TrimSpace(p.Path) == "" {
+				mu.Lock()
+				results[i] = projectStatus
+				if severity(models.StatusDown) > severity(status) {
+					status = models.StatusDown
+					collectErr = &models.CollectError{Code: models.ErrConnectionFailed, Message: "GitLab project path is required"}
+				}
+				mu.Unlock()
+				return
+			}
+
 			pathEncoded := url.QueryEscape(p.Path)
 			branchEncoded := url.QueryEscape(p.DefaultBranch)
 
 			commitsUrl := baseUrl + "/api/v4/projects/" + pathEncoded + "/repository/commits?ref_name=" + branchEncoded + "&per_page=1"
 			pipelinesUrl := baseUrl + "/api/v4/projects/" + pathEncoded + "/pipelines?ref=" + branchEncoded + "&per_page=1"
 
-			link := p.Link
-			if link == nil {
-				l := baseUrl + "/" + p.Path
-				link = &l
+			commits, err := fetchGitLabJSON[[]gitlabCommitResponse](reqCtx, client, commitsUrl, target.Token, "commits")
+			if err == nil && len(commits) == 0 {
+				err = &gitlabAPIError{code: models.ErrUnknownError, status: models.StatusDown, message: "GitLab commits response was empty"}
+			}
+			if err != nil {
+				mu.Lock()
+				results[i] = projectStatus
+				applyGitLabError(err, &status, &collectErr)
+				mu.Unlock()
+				return
 			}
 
-			var latestCommit *models.GitLabCommit
-			var latestPipeline *models.GitLabPipeline
-
-			// Fetch Commits
-			reqC, _ := http.NewRequestWithContext(reqCtx, "GET", commitsUrl, nil)
-			reqC.Header.Set("PRIVATE-TOKEN", target.Token)
-			reqC.Header.Set("Accept", "application/json")
-			if resC, err := client.Do(reqC); err == nil {
-				if resC.StatusCode == 200 {
-					var commits []gitlabCommitResponse
-					if json.NewDecoder(resC.Body).Decode(&commits) == nil && len(commits) > 0 {
-						latestCommit = &models.GitLabCommit{
-							Sha:         commits[0].Id,
-							Title:       commits[0].Title,
-							AuthorName:  commits[0].AuthorName,
-							CommittedAt: commits[0].CreatedAt,
-						}
-					}
-				}
-				resC.Body.Close()
+			projectStatus.LatestCommit = &models.GitLabCommit{
+				Sha:         commits[0].Id,
+				Title:       commits[0].Title,
+				AuthorName:  commits[0].AuthorName,
+				CommittedAt: commits[0].CreatedAt,
 			}
 
-			// Fetch Pipelines
-			reqP, _ := http.NewRequestWithContext(reqCtx, "GET", pipelinesUrl, nil)
-			reqP.Header.Set("PRIVATE-TOKEN", target.Token)
-			reqP.Header.Set("Accept", "application/json")
-			if resP, err := client.Do(reqP); err == nil {
-				if resP.StatusCode == 200 {
-					var pipelines []gitlabPipelineResponse
-					if json.NewDecoder(resP.Body).Decode(&pipelines) == nil && len(pipelines) > 0 {
-						pStatus := strings.ToLower(pipelines[0].Status)
-						mappedStatus := "unknown"
-						if pStatus == "success" || pStatus == "failed" || pStatus == "running" || pStatus == "pending" || pStatus == "canceled" {
-							mappedStatus = pStatus
-						}
-						plink := pipelines[0].WebUrl
-						if plink == "" {
-							// fallback
-						}
+			pipelines, err := fetchGitLabJSON[[]gitlabPipelineResponse](reqCtx, client, pipelinesUrl, target.Token, "pipelines")
+			if err == nil && len(pipelines) == 0 {
+				err = &gitlabAPIError{code: models.ErrUnknownError, status: models.StatusDown, message: "GitLab pipelines response was empty"}
+			}
+			if err != nil {
+				mu.Lock()
+				results[i] = projectStatus
+				applyGitLabError(err, &status, &collectErr)
+				mu.Unlock()
+				return
+			}
 
-						latestPipeline = &models.GitLabPipeline{
-							Id:        pipelines[0].Id,
-							Status:    mappedStatus,
-							Ref:       pipelines[0].Ref,
-							UpdatedAt: pipelines[0].UpdatedAt,
-							Link:      plink,
-						}
-					}
-				}
-				resP.Body.Close()
+			pStatus := strings.ToLower(pipelines[0].Status)
+			mappedStatus := "unknown"
+			if pStatus == "success" || pStatus == "failed" || pStatus == "running" || pStatus == "pending" || pStatus == "canceled" {
+				mappedStatus = pStatus
+			}
+
+			projectStatus.LatestPipeline = &models.GitLabPipeline{
+				Id:        pipelines[0].Id,
+				Status:    mappedStatus,
+				Ref:       pipelines[0].Ref,
+				UpdatedAt: pipelines[0].UpdatedAt,
+				Link:      pipelines[0].WebUrl,
 			}
 
 			mu.Lock()
-			results[i] = models.GitLabProjectStatus{
-				GitLabProjectTarget: p,
-				IntegrationName:     target.Name,
-				LatestCommit:        latestCommit,
-				LatestPipeline:      latestPipeline,
-			}
-			results[i].Link = link
-
-			if latestPipeline != nil && (latestPipeline.Status == "failed" || latestPipeline.Status == "canceled") {
+			results[i] = projectStatus
+			if projectStatus.LatestPipeline.Status == "failed" || projectStatus.LatestPipeline.Status == "canceled" {
 				isStale = true
 			}
 			mu.Unlock()
@@ -178,8 +194,7 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 		return gitlabError(now, models.ErrTimeout, "GitLab API check timed out", models.StatusTimeout)
 	}
 
-	status := models.StatusOk
-	if isStale {
+	if status == models.StatusOk && isStale {
 		status = models.StatusStale
 	}
 
@@ -189,9 +204,68 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 		Status:      status,
 		AttemptedAt: now,
 		CollectedAt: &collectedAt,
-		Stale:       false,
-		Error:       nil,
+		Stale:       status == models.StatusStale,
+		Error:       collectErr,
 		Data:        models.GitLabData{Projects: results},
+	}
+}
+
+type gitlabAPIError struct {
+	code    models.CollectErrorCode
+	status  models.SourceStatus
+	message string
+}
+
+func (e *gitlabAPIError) Error() string {
+	return e.message
+}
+
+func fetchGitLabJSON[T any](ctx context.Context, client *http.Client, endpoint string, token string, label string) (T, error) {
+	var out T
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return out, &gitlabAPIError{code: models.ErrConnectionFailed, status: models.StatusDown, message: err.Error()}
+	}
+	req.Header.Set("PRIVATE-TOKEN", token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := client.Do(req)
+	if err != nil {
+		code := models.ErrConnectionFailed
+		status := models.StatusDown
+		if ctx.Err() == context.DeadlineExceeded {
+			code = models.ErrTimeout
+			status = models.StatusTimeout
+		}
+		return out, &gitlabAPIError{code: code, status: status, message: err.Error()}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		code := models.ErrConnectionFailed
+		status := models.StatusDown
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			code = models.ErrPermissionDenied
+			status = models.StatusPermissionError
+		}
+		return out, &gitlabAPIError{code: code, status: status, message: fmt.Sprintf("GitLab %s API responded with %d", label, resp.StatusCode)}
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		return out, &gitlabAPIError{code: models.ErrUnknownError, status: models.StatusDown, message: fmt.Sprintf("Failed to parse GitLab %s response", label)}
+	}
+
+	return out, nil
+}
+
+func applyGitLabError(err error, status *models.SourceStatus, collectErr **models.CollectError) {
+	apiErr, ok := err.(*gitlabAPIError)
+	if !ok {
+		apiErr = &gitlabAPIError{code: models.ErrUnknownError, status: models.StatusDown, message: err.Error()}
+	}
+	if severity(apiErr.status) > severity(*status) {
+		*status = apiErr.status
+		*collectErr = &models.CollectError{Code: apiErr.code, Message: apiErr.message}
 	}
 }
 
