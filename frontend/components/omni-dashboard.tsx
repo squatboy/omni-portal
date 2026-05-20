@@ -34,13 +34,13 @@ const appViews: AppView[] = [
   "argocd",
   "gitlab",
   "nexus",
-  "manage-resources",
+  "manage-vm",
   "manage-integrations",
   "manage-users",
 ]
 
 const manageViewMap = {
-  "manage-resources": "resources",
+  "manage-vm": "resources",
   "manage-integrations": "integrations",
   "manage-users": "users",
 } satisfies Record<string, ManageSection>
@@ -51,7 +51,7 @@ function resolveInitialView(mockMode: boolean): AppView {
   }
   const candidate = getMockViewParam()
   if (candidate === "manage") {
-    return "manage-resources"
+    return "manage-vm"
   }
   if (candidate && appViews.includes(candidate as AppView)) {
     return candidate as AppView
@@ -83,7 +83,7 @@ function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
 
 export function OmniDashboard() {
   const mounted = React.useSyncExternalStore(
-    React.useCallback(() => () => {}, []),
+    React.useCallback(() => () => { }, []),
     () => true,
     () => false
   )

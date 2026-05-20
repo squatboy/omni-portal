@@ -39,14 +39,14 @@ import { formatTime } from "./dashboard/lib/utils"
 import { StatusDot } from "./dashboard/shared/status-badge"
 
 export type ManageView =
-  | "manage-resources"
+  | "manage-vm"
   | "manage-integrations"
   | "manage-users"
 
 export type AppView = DashboardTab | ManageView
 
 const manageItems: { label: string; view: ManageView }[] = [
-  { label: "Resources", view: "manage-resources" },
+  { label: "Virtual Machines", view: "manage-vm" },
   { label: "Integrations", view: "manage-integrations" },
   { label: "Users", view: "manage-users" },
 ]
@@ -170,6 +170,7 @@ export function AppSidebar({
                             <button
                               type="button"
                               onClick={() => onViewChange(item.view)}
+                              className="w-full flex items-center justify-start"
                             >
                               <span>{item.label}</span>
                             </button>

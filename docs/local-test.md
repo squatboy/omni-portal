@@ -85,8 +85,8 @@ NEXT_PUBLIC_OMNI_MOCK=true
 
 옵션:
 - `?mock=1` 쿼리로도 mock 모드를 켤 수 있습니다.
-- Manage mock deep-link는 `?view=manage-resources`, `?view=manage-integrations`, `?view=manage-users`를 사용합니다.
-- 기존 `?view=manage`는 호환용으로 `manage-resources`에 진입합니다.
+- Manage mock deep-link는 `?view=manage-vm`, `?view=manage-integrations`, `?view=manage-users`를 사용합니다.
+- 기존 `?view=manage`는 호환용으로 `manage-vm`에 진입합니다.
 
 주의:
 - mock 모드는 **개발 환경에서만** 동작하며 Docker build/프로덕션 빌드에는 영향이 없습니다.
