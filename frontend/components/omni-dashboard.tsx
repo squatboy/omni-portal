@@ -40,7 +40,7 @@ const appViews: AppView[] = [
 ]
 
 const manageViewMap = {
-  "manage-vm": "resources",
+  "manage-vm": "vm",
   "manage-integrations": "integrations",
   "manage-users": "users",
 } satisfies Record<string, ManageSection>

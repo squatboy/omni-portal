@@ -5,9 +5,9 @@ Manage는 self-hosted 사용자가 UI에서 자신의 인프라 리소스와 외
 
 ## Scope
 - Sidebar에는 `Manage`를 다른 탭과 동일한 메뉴 아이템 형태로 두고, 클릭 시 하위 메뉴를 접고 펼친다.
-- 하위 메뉴는 `Resources`, `Integrations`, `Users`로 나눈다.
+- 하위 메뉴는 `Virtual Machines`, `Integrations`, `Users`로 나눈다.
 - Manage 화면 내부에는 별도 tablist를 두지 않고, sidebar에서 선택한 section만 렌더링한다.
-- `Resources`는 VM 같은 관측 대상 리소스를 관리한다.
+- `Virtual Machines`는 VM 리소스를 관리한다.
 - `Integrations`는 Kubernetes, GitLab, ArgoCD, Nexus 연결 정보를 관리한다.
 - `Users`는 admin이 계정과 권한을 관리하는 영역이다.
 - IPAM 기능은 이번 범위에서 제외하되, PostgreSQL 선택은 향후 IPAM 확장을 고려한 결정이다.

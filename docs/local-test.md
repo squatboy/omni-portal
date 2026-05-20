@@ -64,7 +64,7 @@ docker-compose --env-file .env.local up -d
 
 1. DB에 사용자가 없는 상태에서 admin 계정 생성
 2. 생성한 계정으로 로그인
-3. `Manage > Resources`에서 VM 등록
+3. `Manage > Virtual Machines`에서 VM 등록
 4. `Manage > Integrations`에서 외부 시스템 credential 등록
 5. 각 integration의 `Test connection` 실행
 

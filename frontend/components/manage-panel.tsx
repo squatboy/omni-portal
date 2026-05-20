@@ -82,16 +82,16 @@ const emptyArgoCD: ArgoCDIntegration & { token: string } = {
 }
 
 const emptyGitLab: GitLabIntegration & { token: string; projectsText: string } =
-  {
-    id: "",
-    name: "",
-    baseUrl: "",
-    projects: [],
-    active: true,
-    tokenConfigured: false,
-    token: "",
-    projectsText: "",
-  }
+{
+  id: "",
+  name: "",
+  baseUrl: "",
+  projects: [],
+  active: true,
+  tokenConfigured: false,
+  token: "",
+  projectsText: "",
+}
 
 const emptyNexus: NexusIntegration = {
   id: "",
@@ -100,7 +100,7 @@ const emptyNexus: NexusIntegration = {
   active: true,
 }
 
-export type ManageSection = "resources" | "integrations" | "users"
+export type ManageSection = "vm" | "integrations" | "users"
 
 export function ManagePanel({ section }: { section: ManageSection }) {
   const [vms, setVMs] = React.useState<VMResource[]>([])
@@ -229,7 +229,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {section === "resources" ? (
+      {section === "vm" ? (
         <Card>
           <CardHeader>
             <CardTitle>VM Resources</CardTitle>
@@ -914,11 +914,10 @@ function FormActions({
       {result && (
         <Badge
           variant={result.ok ? "outline" : "destructive"}
-          className={`h-7 px-2 rounded-md text-xs font-medium whitespace-nowrap ${
-            result.ok
-              ? "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400"
-              : ""
-          }`}
+          className={`h-7 px-2 rounded-md text-xs font-medium whitespace-nowrap ${result.ok
+            ? "bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400"
+            : ""
+            }`}
         >
           {result.message}
         </Badge>
