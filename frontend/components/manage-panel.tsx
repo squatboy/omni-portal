@@ -933,13 +933,15 @@ function splitList(value: string) {
     .filter(Boolean)
 }
 
-function parseProjects(value: string) {
+export function parseProjects(value: string) {
   return value
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
     .map((line) => {
-      const [name, path, defaultBranch = "main", link = ""] = line.split("|")
+      const parts = line.split("|").map((part) => part.trim())
+      const [name, rawPath, defaultBranch = "main", link = ""] = parts
+      const path = rawPath || name
       return {
         id: "",
         name,

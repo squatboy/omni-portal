@@ -93,6 +93,27 @@ func TestCollectGitLabFailureMapping(t *testing.T) {
 	})
 }
 
+func TestCollectGitLabUsesNameAsPathFallback(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(writeGitLabTestPayload))
+	defer server.Close()
+
+	envelope := CollectGitLab(context.Background(), []models.GitLabCollectTarget{
+		gitlabTestTarget(server.URL, "test-token", []models.GitLabProjectTarget{
+			{Name: "group/repo"},
+		}),
+	})
+
+	if envelope.Status != models.StatusOk {
+		t.Fatalf("expected status=%s, got status=%s error=%#v", models.StatusOk, envelope.Status, envelope.Error)
+	}
+	if len(envelope.Data.Projects) != 1 || envelope.Data.Projects[0].Path != "group/repo" {
+		t.Fatalf("expected fallback path group/repo, got %#v", envelope.Data.Projects)
+	}
+	if envelope.Data.Projects[0].DefaultBranch != "main" {
+		t.Fatalf("expected default branch main, got %q", envelope.Data.Projects[0].DefaultBranch)
+	}
+}
+
 func gitlabTestTarget(baseURL string, token string, projects []models.GitLabProjectTarget) models.GitLabCollectTarget {
 	return models.GitLabCollectTarget{
 		ID:       "gitlab",

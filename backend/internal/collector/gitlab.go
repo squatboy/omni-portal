@@ -103,6 +103,7 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 		wg.Add(1)
 		go func(i int, p models.GitLabProjectTarget) {
 			defer wg.Done()
+			p = normalizeGitLabProject(p)
 
 			link := p.Link
 			if link == nil && baseUrl != "" && p.Path != "" {
@@ -208,6 +209,19 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 		Error:       collectErr,
 		Data:        models.GitLabData{Projects: results},
 	}
+}
+
+func normalizeGitLabProject(p models.GitLabProjectTarget) models.GitLabProjectTarget {
+	if strings.TrimSpace(p.Path) == "" {
+		p.Path = strings.TrimSpace(p.Name)
+	}
+	if strings.TrimSpace(p.Name) == "" {
+		p.Name = p.Path
+	}
+	if strings.TrimSpace(p.DefaultBranch) == "" {
+		p.DefaultBranch = "main"
+	}
+	return p
 }
 
 type gitlabAPIError struct {
