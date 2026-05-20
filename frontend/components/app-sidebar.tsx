@@ -1,15 +1,23 @@
 "use client"
 
 import * as React from "react"
-import { Activity, HeartPulse, LayoutDashboard, Settings } from "lucide-react"
+import {
+  Activity,
+  ChevronRight,
+  HeartPulse,
+  LayoutDashboard,
+  Settings,
+} from "lucide-react"
 
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
 import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
@@ -59,6 +67,7 @@ export function AppSidebar({
 }) {
   const sources = snapshot?.overview.data.sources ?? []
   const { state } = useSidebar()
+  const isManageActive = manageItems.some((item) => item.view === activeView)
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" {...props}>
@@ -131,37 +140,49 @@ export function AppSidebar({
               </SidebarMenuItem>
             )
           })}
+          {canManage ? (
+            <>
+              <Separator className="my-2" />
+              <Collapsible
+                asChild
+                defaultOpen={isManageActive}
+                className="group/collapsible"
+              >
+                <SidebarMenuItem>
+                  <CollapsibleTrigger asChild>
+                    <SidebarMenuButton
+                      isActive={isManageActive}
+                      tooltip="Manage"
+                    >
+                      <Settings />
+                      <span>Manage</span>
+                      <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                    </SidebarMenuButton>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <SidebarMenuSub>
+                      {manageItems.map((item) => (
+                        <SidebarMenuSubItem key={item.view}>
+                          <SidebarMenuSubButton
+                            asChild
+                            isActive={activeView === item.view}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => onViewChange(item.view)}
+                            >
+                              <span>{item.label}</span>
+                            </button>
+                          </SidebarMenuSubButton>
+                        </SidebarMenuSubItem>
+                      ))}
+                    </SidebarMenuSub>
+                  </CollapsibleContent>
+                </SidebarMenuItem>
+              </Collapsible>
+            </>
+          ) : null}
         </SidebarMenu>
-        {canManage ? (
-          <>
-            <Separator className="mx-2 my-2" />
-            <SidebarGroup>
-              <SidebarGroupLabel>
-                <Settings />
-                <span>Manage</span>
-              </SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenuSub>
-                  {manageItems.map((item) => (
-                    <SidebarMenuSubItem key={item.view}>
-                      <SidebarMenuSubButton
-                        asChild
-                        isActive={activeView === item.view}
-                      >
-                        <button
-                          type="button"
-                          onClick={() => onViewChange(item.view)}
-                        >
-                          <span>{item.label}</span>
-                        </button>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  ))}
-                </SidebarMenuSub>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          </>
-        ) : null}
       </SidebarContent>
       <SidebarFooter>
         {state !== "collapsed" && (
