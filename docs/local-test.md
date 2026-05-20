@@ -25,25 +25,24 @@ cp deploy/.env.example deploy/.env.local
 `deploy/.env.local` 수정 예시:
 ```env
 OMNI_VERSION=local
-KUBERNETES_API_URL=https://your-k8s-api
-KUBERNETES_BEARER_TOKEN=your-token
-GITLAB_TOKEN=your-gitlab-token
-ARGOCD_TOKEN=your-argocd-token
+POSTGRES_DB=omni
+POSTGRES_USER=omni
+POSTGRES_PASSWORD=local-password
+OMNI_SECRET_KEY=0123456789abcdef0123456789abcdef
 ```
 
 ## 3. 필수 리소스 준비
 
-`docker-compose.yml`에서 참조하는 파일들을 준비해야 합니다.
+`docker-compose.yml`에서 참조하는 인증서 파일을 준비해야 합니다.
 
 ```bash
-# 인벤토리 설정 복사
-mkdir -p deploy/config
-cp deploy/config/inventory.example.json deploy/config/inventory.json
-
 # 인증서 파일 생성 (없을 경우 빈 파일이라도 생성하여 마운트 에러 방지)
 mkdir -p deploy/certs
 touch deploy/certs/kubernetes-ca.crt
 ```
+
+VM, Kubernetes, GitLab, ArgoCD, Nexus 설정은 더 이상 `inventory.json`으로 준비하지 않습니다.
+컨테이너 실행 후 `http://localhost:3000`에서 최초 admin을 만들고 `Manage` 화면에서 등록합니다.
 
 ## 4. 컨테이너 실행
 
@@ -59,7 +58,15 @@ docker-compose --env-file .env.local up -d
 브라우저에서 다음 주소로 접속합니다.
 
 - **Frontend**: [http://localhost:3000](http://localhost:3000)
-- **Backend API**: [http://localhost:8080/api/v1/health](http://localhost:8080/api/v1/health) (직접 노출 시)
+- **Backend ready**: Compose 내부에서는 `http://backend:8080/health/ready`, 로컬 직접 실행 시 `http://localhost:8080/health/ready`
+
+최초 접속 흐름:
+
+1. DB에 사용자가 없는 상태에서 admin 계정 생성
+2. 생성한 계정으로 로그인
+3. `Manage > Resources`에서 VM 등록
+4. `Manage > Integrations`에서 외부 시스템 credential 등록
+5. 각 integration의 `Test connection` 실행
 
 ## 6. 종료 및 정리
 

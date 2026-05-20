@@ -1,53 +1,77 @@
 "use client"
 
 import * as React from "react"
-import {
-  AlertTriangle,
-  RefreshCw,
-} from "lucide-react"
+import { AlertTriangle, RefreshCw } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Separator } from "@/components/ui/separator"
 import { cn } from "@/lib/utils"
-import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { AppSidebar } from "./app-sidebar"
+import { api } from "@/lib/api"
+import type { User } from "@/lib/types"
 import {
-  POLL_INTERVAL_MS,
-  sourceLabels,
-} from "./dashboard/lib/constants"
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
+import { AppSidebar, type AppView } from "./app-sidebar"
+import { AuthScreen } from "./auth-screen"
+import { POLL_INTERVAL_MS, sourceLabels } from "./dashboard/lib/constants"
 import type { DashboardSnapshot, DashboardTab } from "./dashboard/lib/types"
 import { formatDateTime, loadSnapshot } from "./dashboard/lib/utils"
 import { HealthBadge } from "./dashboard/shared/common"
 import { DashboardContent } from "./dashboard/shared/dashboard-content"
 import { DashboardSkeleton } from "./dashboard/shared/dashboard-skeleton"
+import { ManagePanel } from "./manage-panel"
 
 export function OmniDashboard() {
+  const [authLoading, setAuthLoading] = React.useState(true)
+  const [setupRequired, setSetupRequired] = React.useState(false)
+  const [user, setUser] = React.useState<User | null>(null)
   const [snapshot, setSnapshot] = React.useState<DashboardSnapshot | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [isRefreshing, setIsRefreshing] = React.useState(false)
-  const [activeTab, setActiveTab] = React.useState<DashboardTab>("overview")
+  const [activeView, setActiveView] = React.useState<AppView>("overview")
   const [pollKey, setPollKey] = React.useState(0)
   const [lastUiRefreshAt, setLastUiRefreshAt] = React.useState<string | null>(
     null
   )
 
-  const refresh = React.useCallback(async (force = false) => {
-    setIsRefreshing(true)
-    try {
-      const nextSnapshot = await loadSnapshot(force)
-      setSnapshot(nextSnapshot)
-      setError(null)
-      setLastUiRefreshAt(new Date().toISOString())
-    } catch (refreshError) {
-      setError(
-        refreshError instanceof Error
-          ? refreshError.message
-          : "Collect API polling failed."
-      )
-    } finally {
-      setIsRefreshing(false)
-    }
+  const refresh = React.useCallback(
+    async (force = false) => {
+      if (!user) {
+        return
+      }
+      setIsRefreshing(true)
+      try {
+        const nextSnapshot = await loadSnapshot(force)
+        setSnapshot(nextSnapshot)
+        setError(null)
+        setLastUiRefreshAt(new Date().toISOString())
+      } catch (refreshError) {
+        setError(
+          refreshError instanceof Error
+            ? refreshError.message
+            : "Collect API polling failed."
+        )
+      } finally {
+        setIsRefreshing(false)
+      }
+    },
+    [user]
+  )
+
+  React.useEffect(() => {
+    void api
+      .me()
+      .then((me) => {
+        setSetupRequired(me.setupRequired)
+        setUser(me.authenticated ? me.user : null)
+      })
+      .catch(() => {
+        setUser(null)
+      })
+      .finally(() => setAuthLoading(false))
   }, [])
 
   React.useEffect(() => {
@@ -63,15 +87,36 @@ export function OmniDashboard() {
       window.clearTimeout(initialId)
       window.clearInterval(intervalId)
     }
-  }, [refresh, pollKey])
+  }, [refresh, pollKey, user])
+
+  if (authLoading) {
+    return <DashboardSkeleton />
+  }
+
+  if (!user) {
+    return (
+      <AuthScreen
+        setupRequired={setupRequired}
+        onAuthenticated={(nextUser) => {
+          setUser(nextUser)
+          setSetupRequired(false)
+        }}
+      />
+    )
+  }
+
+  const canManage = user.role === "admin"
+  const activeTab: DashboardTab =
+    activeView === "manage" ? "overview" : activeView
 
   return (
     <SidebarProvider>
       <AppSidebar
         snapshot={snapshot}
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
+        activeView={activeView}
+        onViewChange={setActiveView}
         lastUiRefreshAt={lastUiRefreshAt}
+        canManage={canManage}
       />
       <SidebarInset>
         <header className="sticky top-0 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur md:px-6">
@@ -80,10 +125,12 @@ export function OmniDashboard() {
           <div className="flex flex-1 items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold">
-                {activeTab === "overview"
-                  ? "Infrastructure Overview"
-                  : sourceLabels[activeTab as keyof typeof sourceLabels] ??
-                    "Platform Health"}
+                {activeView === "manage"
+                  ? "Manage"
+                  : activeTab === "overview"
+                    ? "Infrastructure Overview"
+                    : (sourceLabels[activeTab as keyof typeof sourceLabels] ??
+                      "Platform Health")}
               </h1>
               <p className="truncate text-[10px] text-muted-foreground">
                 Last collect{" "}
@@ -100,6 +147,15 @@ export function OmniDashboard() {
                 </Badge>
               ) : null}
               <HealthBadge health={snapshot?.overview.data.health} />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  void api.logout().finally(() => setUser(null))
+                }}
+              >
+                Logout
+              </Button>
               <Button
                 variant="outline"
                 size="icon-sm"
@@ -120,11 +176,15 @@ export function OmniDashboard() {
         </header>
 
         <div className="flex flex-col gap-4 p-4 md:p-6">
-          {snapshot ? (
+          {activeView === "manage" ? (
+            <ManagePanel />
+          ) : snapshot ? (
             <DashboardContent
               snapshot={snapshot}
               activeTab={activeTab}
-              onTabChange={setActiveTab}
+              onTabChange={(tab) => {
+                setActiveView(tab)
+              }}
             />
           ) : (
             <DashboardSkeleton />

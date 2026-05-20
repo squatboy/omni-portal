@@ -1,21 +1,23 @@
 # Omni Dashboard
 
-Omni is an internal infrastructure dashboard that centralizes the status of virtual machines, Kubernetes clusters, and development tools (GitLab, ArgoCD, Nexus) into a single, unified view.
+Omni is an internal infrastructure portal that centralizes the status of virtual machines, Kubernetes clusters, and development tools (GitLab, ArgoCD, Nexus) into a single, unified view.
 
 ## Features
 - **Centralized Dashboard**: View the health and metrics of all your infrastructure components in one place.
-- **Agentless Collection**: The Go backend securely collects data via APIs and SSH without requiring any agents installed on your target systems.
+- **Manage UI**: Configure VM resources, external integrations, and users from the portal.
+- **Agentless Collection**: The Go backend securely collects data via APIs and ping checks without requiring any agents installed on your target systems.
 - **Resilient Architecture**: Designed to run externally from your clusters so it remains accessible even during major outages.
 
 ## Self-Hosted Deployment Guide
 
 Omni is deployed on an external VM using Docker Compose and prebuilt GHCR images.
 Release images are published only when a `v*` Git tag is pushed. Use an explicit release tag for `OMNI_VERSION`; do not use `latest`.
-The Compose file pulls `ghcr.io/squatboy/omni-frontend:${OMNI_VERSION}` and `ghcr.io/squatboy/omni-backend:${OMNI_VERSION}`.
+The Compose file pulls `ghcr.io/squatboy/omni-frontend:${OMNI_VERSION}` and `ghcr.io/squatboy/omni-backend:${OMNI_VERSION}`, then runs PostgreSQL for portal configuration and encrypted integration credentials.
 
 ### Prerequisites
 - Docker and Docker Compose installed on the host VM.
 - Network access from the host VM to your Kubernetes API, GitLab, ArgoCD, Nexus, and monitored VMs.
+- A 32-byte `OMNI_SECRET_KEY` for credential encryption.
 
 ### Step 1: Preparation
 
@@ -25,11 +27,10 @@ Prepare only the deploy bundle on the host VM. The full repository is not requir
 /opt/omni-portal/deploy/
   docker-compose.yml
   .env
-  config/inventory.json
   certs/kubernetes-ca.crt   # only when the Kubernetes API uses a private/self-signed CA
 ```
 
-Copy `deploy/docker-compose.yml`, create `.env`, and place the inventory file under `config/inventory.json`.
+Copy `deploy/docker-compose.yml` and create `.env`.
 
 ### Step 2: Configuration
 
@@ -39,32 +40,22 @@ Use `deploy/.env.example` from the repository as a template, then place the comp
 
 Required environment variables:
 - `OMNI_VERSION`: One release version tag used by both frontend and backend images (e.g., `v1.0.1`).
-- `KUBERNETES_API_URL`: Your cluster's API endpoint.
-- `KUBERNETES_BEARER_TOKEN`: A read-only token for the cluster.
-- `GITLAB_TOKEN`: Personal Access Token for GitLab.
-- `ARGOCD_TOKEN`: Authentication token for ArgoCD.
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: PostgreSQL settings for the Compose database.
+- `OMNI_SECRET_KEY`: 32-byte raw string or base64-encoded 32-byte key used for external credential encryption.
 
-**2. Configure the Infrastructure Inventory**
+**2. Configure Resources and Integrations**
 
-Define the VMs and services you want to monitor:
-
-```bash
-# From /opt/omni-portal/deploy
-mkdir -p config
-vi config/inventory.json
-```
-
-Use `deploy/config/inventory.example.json` from the repository as the starting template when preparing the deploy bundle.
+After the containers start, open the portal, create the first admin user while the database has no users, then configure VM resources and Kubernetes/GitLab/ArgoCD/Nexus integrations under `Manage`.
 
 **3. Set Up Kubernetes Credentials**
 
-Omni requires read-only Kubernetes access. Apply the provided RBAC manifest to the target cluster from the repository checkout or from a copied manifest file:
+Omni requires read-only Kubernetes access when you register a Kubernetes integration. Apply the provided RBAC manifest to the target cluster from the repository checkout or from a copied manifest file:
 
 ```bash
 kubectl apply -f deploy/kubernetes/readonly-rbac.yaml
 ```
 
-Extract the generated token and place it in `.env` as `KUBERNETES_BEARER_TOKEN`:
+Extract the generated token and paste it into the Kubernetes integration form:
 
 ```bash
 kubectl -n omni get secret omni-reader-token \
@@ -92,6 +83,8 @@ docker compose ps
 
 Once the containers are running, access the Omni portal via your web browser:
 `http://<Server-IP>:3000`
+
+On a fresh database, Omni opens the setup screen first. Create the first admin user, then add resources and integrations in `Manage`.
 
 External access should use the frontend on port 3000.
 The backend is an internal Compose service and is reached by the frontend through `http://backend:8080`.

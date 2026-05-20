@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Activity, HeartPulse, LayoutDashboard } from "lucide-react"
+import { Activity, HeartPulse, LayoutDashboard, Settings } from "lucide-react"
 
 import {
   Sidebar,
@@ -15,22 +15,30 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar"
 import { Separator } from "@/components/ui/separator"
-import { sourceIcons, sourceLabels, sourceOrder } from "./dashboard/lib/constants"
+import {
+  sourceIcons,
+  sourceLabels,
+  sourceOrder,
+} from "./dashboard/lib/constants"
 import type { DashboardSnapshot, DashboardTab } from "./dashboard/lib/types"
 import { formatTime } from "./dashboard/lib/utils"
 import { StatusDot } from "./dashboard/shared/status-badge"
 
+export type AppView = DashboardTab | "manage"
+
 export function AppSidebar({
   snapshot,
-  activeTab,
-  onTabChange,
+  activeView,
+  onViewChange,
   lastUiRefreshAt,
+  canManage,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   snapshot: DashboardSnapshot | null
-  activeTab: DashboardTab
-  onTabChange: (tab: DashboardTab) => void
+  activeView: AppView
+  onViewChange: (view: AppView) => void
   lastUiRefreshAt: string | null
+  canManage: boolean
 }) {
   const sources = snapshot?.overview.data.sources ?? []
   const { state } = useSidebar()
@@ -62,8 +70,8 @@ export function AppSidebar({
         <SidebarMenu className="px-2">
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={activeTab === "overview"}
-              onClick={() => onTabChange("overview")}
+              isActive={activeView === "overview"}
+              onClick={() => onViewChange("overview")}
               tooltip="Overview"
             >
               <LayoutDashboard />
@@ -72,8 +80,8 @@ export function AppSidebar({
           </SidebarMenuItem>
           <SidebarMenuItem>
             <SidebarMenuButton
-              isActive={activeTab === "health"}
-              onClick={() => onTabChange("health")}
+              isActive={activeView === "health"}
+              onClick={() => onViewChange("health")}
               tooltip="Platform Health"
             >
               <HeartPulse />
@@ -88,8 +96,8 @@ export function AppSidebar({
             return (
               <SidebarMenuItem key={source}>
                 <SidebarMenuButton
-                  isActive={activeTab === source}
-                  onClick={() => onTabChange(source)}
+                  isActive={activeView === source}
+                  onClick={() => onViewChange(source)}
                   tooltip={sourceLabels[source]}
                 >
                   <Icon />
@@ -106,6 +114,21 @@ export function AppSidebar({
               </SidebarMenuItem>
             )
           })}
+          {canManage ? (
+            <>
+              <Separator className="my-2" />
+              <SidebarMenuItem>
+                <SidebarMenuButton
+                  isActive={activeView === "manage"}
+                  onClick={() => onViewChange("manage")}
+                  tooltip="Manage"
+                >
+                  <Settings />
+                  <span>Manage</span>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            </>
+          ) : null}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>

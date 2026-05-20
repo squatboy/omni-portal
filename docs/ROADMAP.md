@@ -4,8 +4,8 @@
 
 - 입력 문서: `docs/PRD.md`
 - 목표: VM IP와 포트로 인프라 현재 상태를 빠르게 확인하는 v1 대시보드 구현
-- 범위: 현재 상태 중심 dashboard, collect API, 외부 VM Docker Compose 배포 준비
-- 제외: 인증/권한 UI, 알림, 시계열 분석, 상세 로그 분석, 장기 저장 DB
+- 범위: 현재 상태 중심 dashboard, collect API, Manage/Auth, 외부 VM Docker Compose 배포 준비
+- 제외: 알림, 시계열 분석, 상세 로그 분석, IPAM
 
 ## 전제
 
@@ -13,8 +13,8 @@
 - 화면은 Next.js에서 제공하며, `/api/collect/snapshot` 호출은 Next.js `rewrites` 프록시를 통해 Go 서버(8080)로 전달된다.
 - v1은 단일 replica + Go 백엔드의 in-memory snapshot cache 전제로 시작한다.
 - 앱은 Kubernetes cluster 외부 VM에 Docker Compose로 배포한다.
-- 실제 inventory는 Git에 넣지 않는 local `deploy/config/inventory.json`으로 관리하고, repo에는 `deploy/config/inventory.example.json`만 추적한다.
-- credential은 Git에 넣지 않고 VM `deploy/.env` 및 secret mount로만 주입한다.
+- 실제 inventory 파일은 사용하지 않고 PostgreSQL을 설정 source of truth로 둔다.
+- 외부 system credential은 Manage UI에서 입력하고 `OMNI_SECRET_KEY`로 암호화 저장한다.
 - 프론트엔드/백엔드 배포 image는 같은 GHCR version tag를 사용한다.
 - CI는 PR/main push에서 검증만 수행하고, `v*` Git tag push에서 frontend/backend image publish를 수행한다.
 - Kubernetes/Argo CD 조회에는 전용 read-only ServiceAccount와 ClusterRole/Binding이 필요하다.
@@ -26,7 +26,7 @@
 - 상태: 완료 (`2026-05-12`)
 - collect API 응답 타입을 먼저 정의한다.
 - Overview rollup, source 수집 상태, stale/error 표현 규칙을 정한다.
-- VM, Kubernetes, Argo CD, GitLab, Nexus inventory config 형식을 정한다.
+- VM, Kubernetes, Argo CD, GitLab, Nexus collect data 형식을 정한다.
 
 ### 2. Overview + 섹션 탭 UI 골격 구현
 
@@ -80,9 +80,17 @@
 - Go Kubernetes adapter의 세부 fetching logic 구현 완료 (`2026-05-19`).
 - 전체 시스템 통합 테스트 및 안정화는 후속 진행.
 
+### 10. Manage/Auth/PostgreSQL 도입
+
+- 상태: 진행 중
+- 파일 기반 inventory runtime 의존 제거.
+- PostgreSQL migration, ID/PW auth, admin/viewer 권한, Manage CRUD를 추가.
+- collector는 매 수집 시 DB의 active 설정과 암호화 credential을 읽어 사용.
+- Docker Compose에 PostgreSQL service와 volume 추가.
+
 ## 우선순위
 
-1. 배포 가이드 최신화 및 배포 검증
+1. Manage/Auth/PostgreSQL 배포 검증
 2. UI 피드백 반영 및 버그 수정
 
 ## 후속 backlog
@@ -92,4 +100,4 @@
 - GitLab job 로그 상세 분석
 - Nexus artifact/image 목록 조회
 - VM agent 기반 CPU/메모리/디스크 수집
-- 인증/권한 관리 UI
+- IPAM

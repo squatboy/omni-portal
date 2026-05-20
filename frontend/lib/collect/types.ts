@@ -82,6 +82,7 @@ export type KubernetesInventoryConfig = {
 }
 
 export type KubernetesNodeStatus = {
+  integrationName?: string
   name: string
   ready: boolean
   cpuUsagePercent: number | null
@@ -89,6 +90,7 @@ export type KubernetesNodeStatus = {
 }
 
 export type KubernetesWorkloadStatus = {
+  integrationName?: string
   namespace: string
   kind: "deployment" | "statefulset" | "daemonset"
   name: string
@@ -129,6 +131,7 @@ export type KubernetesData = {
 }
 
 export type ArgoCdApplication = {
+  integrationName?: string
   name: string
   namespace: string
   syncStatus: "Synced" | "OutOfSync" | "Unknown"
@@ -149,6 +152,7 @@ export type GitLabProjectTarget = {
 }
 
 export type GitLabProjectStatus = GitLabProjectTarget & {
+  integrationName?: string
   latestCommit: {
     sha: string
     title: string
@@ -175,6 +179,14 @@ export type GitLabData = {
 }
 
 export type NexusData = {
+  items: {
+    id: string
+    integrationName: string
+    url: string
+    reachable: boolean
+    httpStatus: number | null
+    checkedAt: string
+  }[]
   url: string
   reachable: boolean
   httpStatus: number | null
