@@ -1,3 +1,5 @@
+name: omni
+
 services:
   postgres:
     image: postgres:17.5-alpine
@@ -14,7 +16,7 @@ services:
       timeout: 5s
       retries: 5
 
-  omni:
+  frontend:
     image: ghcr.io/squatboy/omni-frontend:${OMNI_VERSION:?set OMNI_VERSION}
     restart: unless-stopped
     ports:
