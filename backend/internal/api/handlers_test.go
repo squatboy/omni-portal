@@ -12,7 +12,7 @@ import (
 
 func TestCollectSnapshotRoute(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	ginRouter := SetupRouter(collector.NewCache(), nil)
+	ginRouter := SetupRouter(collector.NewCache(), nil, nil, nil)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/collect/snapshot", nil)
 	rec := httptest.NewRecorder()

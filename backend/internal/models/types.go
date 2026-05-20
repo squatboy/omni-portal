@@ -106,6 +106,7 @@ type VmsData struct {
 }
 
 type KubernetesNodeStatus struct {
+	IntegrationName    string   `json:"integrationName,omitempty"`
 	Name               string   `json:"name"`
 	Ready              bool     `json:"ready"`
 	CpuUsagePercent    *float64 `json:"cpuUsagePercent"`
@@ -113,6 +114,7 @@ type KubernetesNodeStatus struct {
 }
 
 type KubernetesWorkloadStatus struct {
+	IntegrationName     string `json:"integrationName,omitempty"`
 	Namespace           string `json:"namespace"`
 	Kind                string `json:"kind"` // deployment | statefulset | daemonset
 	Name                string `json:"name"`
@@ -161,12 +163,13 @@ type KubernetesData struct {
 }
 
 type ArgoCdApplication struct {
-	Name         string  `json:"name"`
-	Namespace    string  `json:"namespace"`
-	SyncStatus   string  `json:"syncStatus"`   // Synced, OutOfSync, Unknown
-	HealthStatus string  `json:"healthStatus"` // Healthy, Progressing, Degraded, Unknown
-	Revision     *string `json:"revision"`
-	Link         string  `json:"link"`
+	IntegrationName string  `json:"integrationName,omitempty"`
+	Name            string  `json:"name"`
+	Namespace       string  `json:"namespace"`
+	SyncStatus      string  `json:"syncStatus"`   // Synced, OutOfSync, Unknown
+	HealthStatus    string  `json:"healthStatus"` // Healthy, Progressing, Degraded, Unknown
+	Revision        *string `json:"revision"`
+	Link            string  `json:"link"`
 }
 
 type ArgoCdData struct {
@@ -197,8 +200,9 @@ type GitLabPipeline struct {
 
 type GitLabProjectStatus struct {
 	GitLabProjectTarget
-	LatestCommit   *GitLabCommit   `json:"latestCommit"`
-	LatestPipeline *GitLabPipeline `json:"latestPipeline"`
+	IntegrationName string          `json:"integrationName,omitempty"`
+	LatestCommit    *GitLabCommit   `json:"latestCommit"`
+	LatestPipeline  *GitLabPipeline `json:"latestPipeline"`
 }
 
 type GitLabData struct {
@@ -206,10 +210,20 @@ type GitLabData struct {
 }
 
 type NexusData struct {
-	Url        string `json:"url"`
-	Reachable  bool   `json:"reachable"`
-	HttpStatus *int   `json:"httpStatus"`
-	CheckedAt  string `json:"checkedAt"`
+	Items      []NexusStatus `json:"items"`
+	Url        string        `json:"url"`
+	Reachable  bool          `json:"reachable"`
+	HttpStatus *int          `json:"httpStatus"`
+	CheckedAt  string        `json:"checkedAt"`
+}
+
+type NexusStatus struct {
+	ID              string `json:"id"`
+	IntegrationName string `json:"integrationName"`
+	Url             string `json:"url"`
+	Reachable       bool   `json:"reachable"`
+	HttpStatus      *int   `json:"httpStatus"`
+	CheckedAt       string `json:"checkedAt"`
 }
 
 type KubernetesInventoryConfig struct {
@@ -218,17 +232,110 @@ type KubernetesInventoryConfig struct {
 	AppNamespaces []string `json:"appNamespaces"`
 }
 
-type CollectInventoryConfig struct {
-	Vms        []VmInventoryItem         `json:"vms"`
-	Kubernetes KubernetesInventoryConfig `json:"kubernetes"`
-	ArgoCD     struct {
-		BaseUrl string `json:"baseUrl"`
-	} `json:"argocd"`
-	GitLab struct {
-		BaseUrl  string                `json:"baseUrl"`
-		Projects []GitLabProjectTarget `json:"projects"`
-	} `json:"gitlab"`
-	Nexus struct {
-		Url string `json:"url"`
-	} `json:"nexus"`
+type KubernetesCollectTarget struct {
+	ID            string
+	Name          string
+	ClusterName   string
+	APIURL        string
+	Token         string
+	Namespaces    []string
+	AppNamespaces []string
+}
+
+type GitLabCollectTarget struct {
+	ID       string
+	Name     string
+	BaseURL  string
+	Token    string
+	Projects []GitLabProjectTarget
+}
+
+type ArgoCDCollectTarget struct {
+	ID      string
+	Name    string
+	BaseURL string
+	Token   string
+}
+
+type NexusCollectTarget struct {
+	ID   string
+	Name string
+	URL  string
+}
+
+type CollectSettings struct {
+	VMs        []VmInventoryItem
+	Kubernetes []KubernetesCollectTarget
+	ArgoCD     []ArgoCDCollectTarget
+	GitLab     []GitLabCollectTarget
+	Nexus      []NexusCollectTarget
+}
+
+type UserRole string
+
+const (
+	RoleAdmin  UserRole = "admin"
+	RoleViewer UserRole = "viewer"
+)
+
+type User struct {
+	ID                 string   `json:"id"`
+	Username           string   `json:"username"`
+	Role               UserRole `json:"role"`
+	MustChangePassword bool     `json:"mustChangePassword"`
+	CreatedAt          string   `json:"createdAt"`
+	UpdatedAt          string   `json:"updatedAt"`
+}
+
+type VMResource struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Address     string  `json:"address"`
+	Description *string `json:"description,omitempty"`
+	Link        *string `json:"link,omitempty"`
+	Active      bool    `json:"active"`
+}
+
+type KubernetesIntegration struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	ClusterName     string   `json:"clusterName"`
+	APIURL          string   `json:"apiUrl"`
+	Namespaces      []string `json:"namespaces"`
+	AppNamespaces   []string `json:"appNamespaces"`
+	Active          bool     `json:"active"`
+	TokenConfigured bool     `json:"tokenConfigured"`
+}
+
+type GitLabIntegration struct {
+	ID              string              `json:"id"`
+	Name            string              `json:"name"`
+	BaseURL         string              `json:"baseUrl"`
+	Projects        []GitLabProjectItem `json:"projects"`
+	Active          bool                `json:"active"`
+	TokenConfigured bool                `json:"tokenConfigured"`
+}
+
+type GitLabProjectItem struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Path          string  `json:"path"`
+	DefaultBranch string  `json:"defaultBranch"`
+	Link          *string `json:"link,omitempty"`
+	Active        bool    `json:"active"`
+}
+
+type ArgoCDIntegration struct {
+	ID              string `json:"id"`
+	Name            string `json:"name"`
+	BaseURL         string `json:"baseUrl"`
+	Active          bool   `json:"active"`
+	TokenConfigured bool   `json:"tokenConfigured"`
+}
+
+type NexusIntegration struct {
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	URL    string `json:"url"`
+	Active bool   `json:"active"`
 }

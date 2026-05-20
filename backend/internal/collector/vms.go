@@ -2,7 +2,6 @@ package collector
 
 import (
 	"context"
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
 	"os/exec"
 	"runtime"
@@ -10,8 +9,7 @@ import (
 	"time"
 )
 
-func CollectVMs(ctx context.Context, cfg *config.AppConfig) models.CollectEnvelope[models.VmsData] {
-	vms := cfg.Inventory.Vms
+func CollectVMs(ctx context.Context, vms []models.VmInventoryItem) models.CollectEnvelope[models.VmsData] {
 	now := time.Now().Format(time.RFC3339)
 
 	if len(vms) == 0 {

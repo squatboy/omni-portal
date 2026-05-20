@@ -2,67 +2,105 @@ package collector
 
 import (
 	"context"
-	"omni-backend/internal/config"
+	"log"
+	"omni-backend/internal/models"
 	"sync"
 	"time"
 )
 
-type Runner struct {
-	cache  *Cache
-	config *config.AppConfig
+type SettingsStore interface {
+	CollectSettings(ctx context.Context) (models.CollectSettings, error)
 }
 
-func NewRunner(cache *Cache, cfg *config.AppConfig) *Runner {
+type Runner struct {
+	cache *Cache
+	store SettingsStore
+}
+
+func NewRunner(cache *Cache, store SettingsStore) *Runner {
 	return &Runner{
-		cache:  cache,
-		config: cfg,
+		cache: cache,
+		store: store,
 	}
 }
 
 func (r *Runner) Start(ctx context.Context) {
 	go r.runLoop(ctx, "vms", 30*time.Second, func(ctx context.Context) {
-		r.cache.SetVMs(CollectVMs(ctx, r.config))
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetVMs(CollectVMs(ctx, settings.VMs))
 	})
 	go r.runLoop(ctx, "nexus", 30*time.Second, func(ctx context.Context) {
-		r.cache.SetNexus(CollectNexus(ctx, r.config))
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetNexus(CollectNexus(ctx, settings.Nexus))
 	})
 	go r.runLoop(ctx, "argocd", 30*time.Second, func(ctx context.Context) {
-		r.cache.SetArgoCD(CollectArgoCD(ctx, r.config))
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetArgoCD(CollectArgoCD(ctx, settings.ArgoCD))
 	})
 	go r.runLoop(ctx, "gitlab", 30*time.Second, func(ctx context.Context) {
-		r.cache.SetGitLab(CollectGitLab(ctx, r.config))
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetGitLab(CollectGitLab(ctx, settings.GitLab))
 	})
 	go r.runLoop(ctx, "kubernetes", 30*time.Second, func(ctx context.Context) {
-		r.cache.SetKubernetes(CollectKubernetes(ctx, r.config))
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetKubernetes(CollectKubernetes(ctx, settings.Kubernetes))
 	})
 }
 
 func (r *Runner) CollectOnce(ctx context.Context) {
+	settings, err := r.settings(ctx)
+	if err != nil {
+		return
+	}
 	var wg sync.WaitGroup
 	wg.Add(5)
 
 	go func() {
 		defer wg.Done()
-		r.cache.SetVMs(CollectVMs(ctx, r.config))
+		r.cache.SetVMs(CollectVMs(ctx, settings.VMs))
 	}()
 	go func() {
 		defer wg.Done()
-		r.cache.SetNexus(CollectNexus(ctx, r.config))
+		r.cache.SetNexus(CollectNexus(ctx, settings.Nexus))
 	}()
 	go func() {
 		defer wg.Done()
-		r.cache.SetArgoCD(CollectArgoCD(ctx, r.config))
+		r.cache.SetArgoCD(CollectArgoCD(ctx, settings.ArgoCD))
 	}()
 	go func() {
 		defer wg.Done()
-		r.cache.SetGitLab(CollectGitLab(ctx, r.config))
+		r.cache.SetGitLab(CollectGitLab(ctx, settings.GitLab))
 	}()
 	go func() {
 		defer wg.Done()
-		r.cache.SetKubernetes(CollectKubernetes(ctx, r.config))
+		r.cache.SetKubernetes(CollectKubernetes(ctx, settings.Kubernetes))
 	}()
 
 	wg.Wait()
+}
+
+func (r *Runner) settings(ctx context.Context) (models.CollectSettings, error) {
+	settings, err := r.store.CollectSettings(ctx)
+	if err != nil {
+		log.Printf("collect settings load failed: %v", err)
+		return models.CollectSettings{}, err
+	}
+	return settings, nil
 }
 
 func (r *Runner) runLoop(ctx context.Context, name string, interval time.Duration, collectFn func(context.Context)) {

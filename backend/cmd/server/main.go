@@ -7,6 +7,7 @@ import (
 	"omni-backend/internal/api"
 	"omni-backend/internal/collector"
 	"omni-backend/internal/config"
+	"omni-backend/internal/store"
 	"os"
 	"os/signal"
 	"syscall"
@@ -23,16 +24,26 @@ func main() {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	cache := collector.NewCache()
-	runner := collector.NewRunner(cache, cfg)
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+
+	st, err := store.Open(ctx, cfg.DatabaseURL, cfg.SecretKey)
+	if err != nil {
+		log.Fatalf("Failed to connect database: %v", err)
+	}
+	defer st.Close()
+
+	if err := st.Migrate(ctx); err != nil {
+		log.Fatalf("Failed to apply migrations: %v", err)
+	}
+
+	cache := collector.NewCache()
+	runner := collector.NewRunner(cache, st)
 
 	log.Println("Starting collector runner...")
 	runner.Start(ctx)
 
-	router := api.SetupRouter(cache, runner)
+	router := api.SetupRouter(cache, runner, st, cfg)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
