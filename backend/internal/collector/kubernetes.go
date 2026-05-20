@@ -145,9 +145,10 @@ type kubernetesNodeUsage struct {
 }
 
 type kubernetesAPIError struct {
-	code   models.CollectErrorCode
-	status models.SourceStatus
-	err    error
+	code           models.CollectErrorCode
+	status         models.SourceStatus
+	err            error
+	upstreamStatus *int
 }
 
 func (e *kubernetesAPIError) Error() string {
@@ -155,60 +156,60 @@ func (e *kubernetesAPIError) Error() string {
 }
 
 func CollectKubernetes(ctx context.Context, targets []models.KubernetesCollectTarget) models.CollectEnvelope[models.KubernetesData] {
-        now := time.Now().Format(time.RFC3339)
-        if len(targets) == 0 {
-                collectedAt := now
-                return models.CollectEnvelope[models.KubernetesData]{
-                        Source:      models.SourceKubernetes,
-                        Status:      models.StatusUnknown,
-                        AttemptedAt: now,
-                        CollectedAt: &collectedAt,
-                        Stale:       false,
-                        Data:        emptyKubernetesData(models.KubernetesCollectTarget{Name: "unconfigured"}),
-                }
-        }
-        var wg sync.WaitGroup
-        var mu sync.Mutex
-        merged := emptyKubernetesData(targets[0])
-        status := models.StatusOk
-        var collectErr *models.CollectError
-        isStale := false
+	now := time.Now().Format(time.RFC3339)
+	if len(targets) == 0 {
+		collectedAt := now
+		return models.CollectEnvelope[models.KubernetesData]{
+			Source:      models.SourceKubernetes,
+			Status:      models.StatusUnknown,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        emptyKubernetesData(models.KubernetesCollectTarget{Name: "unconfigured"}),
+		}
+	}
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	merged := emptyKubernetesData(targets[0])
+	status := models.StatusOk
+	var collectErr *models.CollectError
+	isStale := false
 
-        for _, target := range targets {
-                wg.Add(1)
-                go func(target models.KubernetesCollectTarget) {
-                        defer wg.Done()
-                        result := collectKubernetesTarget(ctx, target, now)
-                        mu.Lock()
-                        mergeKubernetesData(&merged, result.Data)
-                        if severity(result.Status) > severity(status) {
-                                status = result.Status
-                                collectErr = result.Error
-                        }
-                        if result.Stale {
-                                isStale = true
-                        }
-                        mu.Unlock()
-                }(target)
-        }
-        wg.Wait()
+	for _, target := range targets {
+		wg.Add(1)
+		go func(target models.KubernetesCollectTarget) {
+			defer wg.Done()
+			result := collectKubernetesTarget(ctx, target, now)
+			mu.Lock()
+			mergeKubernetesData(&merged, result.Data)
+			if severity(result.Status) > severity(status) {
+				status = result.Status
+				collectErr = result.Error
+			}
+			if result.Stale {
+				isStale = true
+			}
+			mu.Unlock()
+		}(target)
+	}
+	wg.Wait()
 
-        names := make([]string, 0, len(targets))
-        for _, target := range targets {
-                names = append(names, target.Name)
-        }
-        merged.Name = strings.Join(names, ", ")
+	names := make([]string, 0, len(targets))
+	for _, target := range targets {
+		names = append(names, target.Name)
+	}
+	merged.Name = strings.Join(names, ", ")
 
-        collectedAt := now
-        return models.CollectEnvelope[models.KubernetesData]{
-                Source:      models.SourceKubernetes,
-                Status:      status,
-                AttemptedAt: now,
-                CollectedAt: &collectedAt,
-                Stale:       isStale,
-                Error:       collectErr,
-                Data:        merged,
-        }
+	collectedAt := now
+	return models.CollectEnvelope[models.KubernetesData]{
+		Source:      models.SourceKubernetes,
+		Status:      status,
+		AttemptedAt: now,
+		CollectedAt: &collectedAt,
+		Stale:       isStale,
+		Error:       collectErr,
+		Data:        merged,
+	}
 }
 func collectKubernetesTarget(ctx context.Context, target models.KubernetesCollectTarget, now string) models.CollectEnvelope[models.KubernetesData] {
 	data := emptyKubernetesData(target)
@@ -322,7 +323,7 @@ func collectKubernetesTarget(ctx context.Context, target models.KubernetesCollec
 
 	status := models.StatusOk
 	if isStale {
-	        status = models.StatusStale
+		status = models.StatusStale
 	}
 
 	collectedAt := now
@@ -338,34 +339,34 @@ func collectKubernetesTarget(ctx context.Context, target models.KubernetesCollec
 }
 
 func emptyKubernetesData(target models.KubernetesCollectTarget) models.KubernetesData {
-        return models.KubernetesData{
-                Name:       target.Name,
-                Nodes:      []models.KubernetesNodeStatus{},
-                Namespaces: target.Namespaces,
-                Workloads:  []models.KubernetesWorkloadStatus{},
-                Pods:       models.PodsStatus{},
-                Services:   models.ServicesStatus{},
-                Ingresses: models.IngressesStatus{
-                        Hosts: []string{},
-                },
-                Pvcs: models.PvcsStatus{},
-        }
+	return models.KubernetesData{
+		Name:       target.Name,
+		Nodes:      []models.KubernetesNodeStatus{},
+		Namespaces: target.Namespaces,
+		Workloads:  []models.KubernetesWorkloadStatus{},
+		Pods:       models.PodsStatus{},
+		Services:   models.ServicesStatus{},
+		Ingresses: models.IngressesStatus{
+			Hosts: []string{},
+		},
+		Pvcs: models.PvcsStatus{},
+	}
 }
 
 func mergeKubernetesData(dst *models.KubernetesData, src models.KubernetesData) {
-        dst.Nodes = append(dst.Nodes, src.Nodes...)
-        dst.Namespaces = append(dst.Namespaces, src.Namespaces...)
-        dst.Workloads = append(dst.Workloads, src.Workloads...)
-        dst.Pods.Total += src.Pods.Total
-        dst.Pods.Ready += src.Pods.Ready
-        dst.Pods.NotReady += src.Pods.NotReady
-        dst.Pods.Restarting += src.Pods.Restarting
-        dst.Services.Total += src.Services.Total
-        dst.Ingresses.Total += src.Ingresses.Total
-        dst.Ingresses.Hosts = append(dst.Ingresses.Hosts, src.Ingresses.Hosts...)
-        dst.Pvcs.Total += src.Pvcs.Total
-        dst.Pvcs.Bound += src.Pvcs.Bound
-        dst.Pvcs.Pending += src.Pvcs.Pending
+	dst.Nodes = append(dst.Nodes, src.Nodes...)
+	dst.Namespaces = append(dst.Namespaces, src.Namespaces...)
+	dst.Workloads = append(dst.Workloads, src.Workloads...)
+	dst.Pods.Total += src.Pods.Total
+	dst.Pods.Ready += src.Pods.Ready
+	dst.Pods.NotReady += src.Pods.NotReady
+	dst.Pods.Restarting += src.Pods.Restarting
+	dst.Services.Total += src.Services.Total
+	dst.Ingresses.Total += src.Ingresses.Total
+	dst.Ingresses.Hosts = append(dst.Ingresses.Hosts, src.Ingresses.Hosts...)
+	dst.Pvcs.Total += src.Pvcs.Total
+	dst.Pvcs.Bound += src.Pvcs.Bound
+	dst.Pvcs.Pending += src.Pvcs.Pending
 }
 
 func newKubernetesHTTPClient() (*http.Client, error) {
@@ -418,9 +419,11 @@ func fetchKubernetesJSON[T any](ctx context.Context, client *http.Client, baseUR
 	if resp.StatusCode != http.StatusOK {
 		io.Copy(io.Discard, resp.Body)
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			return out, &kubernetesAPIError{code: models.ErrPermissionDenied, status: models.StatusPermissionError, err: fmt.Errorf("Kubernetes API responded with %d", resp.StatusCode)}
+			upstreamStatus := resp.StatusCode
+			return out, &kubernetesAPIError{code: models.ErrPermissionDenied, status: models.StatusPermissionError, err: fmt.Errorf("Kubernetes API responded with %d", resp.StatusCode), upstreamStatus: &upstreamStatus}
 		}
-		return out, &kubernetesAPIError{code: models.ErrConnectionFailed, status: models.StatusDown, err: fmt.Errorf("Kubernetes API responded with %d", resp.StatusCode)}
+		upstreamStatus := resp.StatusCode
+		return out, &kubernetesAPIError{code: models.ErrConnectionFailed, status: models.StatusDown, err: fmt.Errorf("Kubernetes API responded with %d", resp.StatusCode), upstreamStatus: &upstreamStatus}
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -618,20 +621,25 @@ func controllerOwner(owners []kubernetesOwnerReference) (kubernetesOwnerReferenc
 	return kubernetesOwnerReference{}, false
 }
 
-func kubernetesAPIEnvelope(now string, data models.KubernetesData, err error) models.CollectEnvelope[models.KubernetesData] {	var apiErr *kubernetesAPIError
+func kubernetesAPIEnvelope(now string, data models.KubernetesData, err error) models.CollectEnvelope[models.KubernetesData] {
+	var apiErr *kubernetesAPIError
 	if errors.As(err, &apiErr) {
-		return kubernetesError(now, data, apiErr.code, apiErr.err.Error(), apiErr.status)
+		return kubernetesError(now, data, apiErr.code, apiErr.err.Error(), apiErr.status, apiErr.upstreamStatus)
 	}
 	return kubernetesError(now, data, models.ErrUnknownError, err.Error(), models.StatusDown)
 }
 
-func kubernetesError(now string, data models.KubernetesData, code models.CollectErrorCode, msg string, status models.SourceStatus) models.CollectEnvelope[models.KubernetesData] {
+func kubernetesError(now string, data models.KubernetesData, code models.CollectErrorCode, msg string, status models.SourceStatus, upstreamStatus ...*int) models.CollectEnvelope[models.KubernetesData] {
+	var upstream *int
+	if len(upstreamStatus) > 0 {
+		upstream = upstreamStatus[0]
+	}
 	return models.CollectEnvelope[models.KubernetesData]{
 		Source:      models.SourceKubernetes,
 		Status:      status,
 		AttemptedAt: now,
 		Stale:       false,
-		Error:       &models.CollectError{Code: code, Message: msg},
+		Error:       &models.CollectError{Code: code, Message: msg, UpstreamStatus: upstream},
 		Data:        data,
 	}
 }

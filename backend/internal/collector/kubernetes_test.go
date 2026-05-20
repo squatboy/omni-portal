@@ -160,6 +160,7 @@ func TestCollectKubernetesFailureMapping(t *testing.T) {
 		if envelope.Status != models.StatusPermissionError || envelope.Error == nil || envelope.Error.Code != models.ErrPermissionDenied {
 			t.Fatalf("expected permission error, got status=%s error=%#v", envelope.Status, envelope.Error)
 		}
+		assertUpstreamStatus(t, envelope.Error, http.StatusForbidden)
 	})
 
 	t.Run("timeout", func(t *testing.T) {

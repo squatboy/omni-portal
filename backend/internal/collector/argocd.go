@@ -34,15 +34,15 @@ func CollectArgoCD(ctx context.Context, targets []models.ArgoCDCollectTarget) mo
 	now := time.Now().Format(time.RFC3339)
 
 	if len(targets) == 0 {
-	        collectedAt := now
-	        return models.CollectEnvelope[models.ArgoCdData]{
-	                Source:      models.SourceArgoCD,
-	                Status:      models.StatusUnknown,
-	                AttemptedAt: now,
-	                CollectedAt: &collectedAt,
-	                Stale:       false,
-	                Data:        models.ArgoCdData{Applications: []models.ArgoCdApplication{}},
-	        }
+		collectedAt := now
+		return models.CollectEnvelope[models.ArgoCdData]{
+			Source:      models.SourceArgoCD,
+			Status:      models.StatusUnknown,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        models.ArgoCdData{Applications: []models.ArgoCdApplication{}},
+		}
 	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
@@ -113,7 +113,8 @@ func collectArgoCDTarget(ctx context.Context, target models.ArgoCDCollectTarget,
 			code = models.ErrPermissionDenied
 			status = models.StatusPermissionError
 		}
-		return argoError(now, code, "Argo CD API responded with error", status)
+		upstreamStatus := resp.StatusCode
+		return argoError(now, code, "Argo CD API responded with error", status, &upstreamStatus)
 	}
 
 	var payload argoApplicationListResponse
@@ -200,13 +201,17 @@ func severity(status models.SourceStatus) int {
 	}
 }
 
-func argoError(now string, code models.CollectErrorCode, msg string, status models.SourceStatus) models.CollectEnvelope[models.ArgoCdData] {
+func argoError(now string, code models.CollectErrorCode, msg string, status models.SourceStatus, upstreamStatus ...*int) models.CollectEnvelope[models.ArgoCdData] {
+	var upstream *int
+	if len(upstreamStatus) > 0 {
+		upstream = upstreamStatus[0]
+	}
 	return models.CollectEnvelope[models.ArgoCdData]{
 		Source:      models.SourceArgoCD,
 		Status:      status,
 		AttemptedAt: now,
 		Stale:       false,
-		Error:       &models.CollectError{Code: code, Message: msg},
+		Error:       &models.CollectError{Code: code, Message: msg, UpstreamStatus: upstream},
 		Data:        models.ArgoCdData{Applications: []models.ArgoCdApplication{}},
 	}
 }

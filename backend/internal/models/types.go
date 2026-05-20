@@ -41,8 +41,9 @@ const (
 )
 
 type CollectError struct {
-	Code    CollectErrorCode `json:"code"`
-	Message string           `json:"message"`
+	Code           CollectErrorCode `json:"code"`
+	Message        string           `json:"message"`
+	UpstreamStatus *int             `json:"upstreamStatus,omitempty"`
 }
 
 type CollectEnvelope[T any] struct {
@@ -150,14 +151,14 @@ type PvcsStatus struct {
 }
 
 type KubernetesData struct {
-        Name       string                     `json:"name"`
-        Nodes      []KubernetesNodeStatus     `json:"nodes"`
-        Namespaces []string                   `json:"namespaces"`
-        Workloads  []KubernetesWorkloadStatus `json:"workloads"`
-        Pods       PodsStatus                 `json:"pods"`
-        Services   ServicesStatus             `json:"services"`
-        Ingresses  IngressesStatus            `json:"ingresses"`
-        Pvcs       PvcsStatus                 `json:"pvcs"`
+	Name       string                     `json:"name"`
+	Nodes      []KubernetesNodeStatus     `json:"nodes"`
+	Namespaces []string                   `json:"namespaces"`
+	Workloads  []KubernetesWorkloadStatus `json:"workloads"`
+	Pods       PodsStatus                 `json:"pods"`
+	Services   ServicesStatus             `json:"services"`
+	Ingresses  IngressesStatus            `json:"ingresses"`
+	Pvcs       PvcsStatus                 `json:"pvcs"`
 }
 type ArgoCdApplication struct {
 	IntegrationName string  `json:"integrationName,omitempty"`
@@ -224,14 +225,14 @@ type NexusStatus struct {
 }
 
 type KubernetesInventoryConfig struct {
-        Namespaces    []string `json:"namespaces"`
+	Namespaces []string `json:"namespaces"`
 }
 type KubernetesCollectTarget struct {
-        ID            string
-        Name          string
-        APIURL        string
-        Token         string
-        Namespaces    []string
+	ID         string
+	Name       string
+	APIURL     string
+	Token      string
+	Namespaces []string
 }
 type GitLabCollectTarget struct {
 	ID       string
@@ -287,12 +288,12 @@ type VMResource struct {
 }
 
 type KubernetesIntegration struct {
-        ID              string   `json:"id"`
-        Name            string   `json:"name"`
-        APIURL          string   `json:"apiUrl"`
-        Namespaces      []string `json:"namespaces"`
-        Active          bool     `json:"active"`
-        TokenConfigured bool     `json:"tokenConfigured"`
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	APIURL          string   `json:"apiUrl"`
+	Namespaces      []string `json:"namespaces"`
+	Active          bool     `json:"active"`
+	TokenConfigured bool     `json:"tokenConfigured"`
 }
 type GitLabIntegration struct {
 	ID              string              `json:"id"`

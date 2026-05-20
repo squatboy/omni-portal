@@ -198,18 +198,18 @@ func (api *API) handleDeleteKubernetes(c *gin.Context) {
 }
 
 func (api *API) handleTestKubernetes(c *gin.Context) {
-        var req struct {
-                models.KubernetesIntegration
-                Token string `json:"token"`
-        }
-        if !bindJSON(c, &req) {
-                return
-        }
-        result := collector.CollectKubernetes(c.Request.Context(), []models.KubernetesCollectTarget{{
-                ID: req.ID, Name: req.Name, APIURL: req.APIURL, Token: req.Token,
-                Namespaces: req.Namespaces,
-        }})
-        writeTestResult(c, result.Status, result.Error)
+	var req struct {
+		models.KubernetesIntegration
+		Token string `json:"token"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	result := collector.CollectKubernetes(c.Request.Context(), []models.KubernetesCollectTarget{{
+		ID: req.ID, Name: req.Name, APIURL: req.APIURL, Token: req.Token,
+		Namespaces: req.Namespaces,
+	}})
+	writeTestResult(c, result.Status, result.Error)
 }
 func (api *API) handleListArgoCD(c *gin.Context) {
 	items, err := api.store.ListArgoCDIntegrations(c.Request.Context())
@@ -428,7 +428,39 @@ func writeError(c *gin.Context, status int, err error) {
 
 func writeTestResult(c *gin.Context, status models.SourceStatus, collectErr *models.CollectError) {
 	ok := status == models.StatusOk || status == models.StatusProgressing || status == models.StatusStale
-	c.JSON(http.StatusOK, gin.H{"ok": ok, "status": status, "error": collectErr})
+	c.JSON(testResultHTTPStatus(status, collectErr), gin.H{"ok": ok, "status": status, "error": collectErr})
+}
+
+func testResultHTTPStatus(status models.SourceStatus, collectErr *models.CollectError) int {
+	if status == models.StatusOk || status == models.StatusProgressing || status == models.StatusStale {
+		return http.StatusOK
+	}
+	if status == models.StatusPermissionError || (collectErr != nil && collectErr.Code == models.ErrPermissionDenied) {
+		return http.StatusForbidden
+	}
+	if collectErr != nil && collectErr.UpstreamStatus != nil {
+		upstreamStatus := *collectErr.UpstreamStatus
+		switch {
+		case upstreamStatus == http.StatusTooManyRequests:
+			return http.StatusServiceUnavailable
+		case upstreamStatus == http.StatusBadRequest || upstreamStatus == http.StatusNotFound || upstreamStatus == http.StatusUnprocessableEntity:
+			return http.StatusUnprocessableEntity
+		case upstreamStatus >= http.StatusInternalServerError:
+			return http.StatusBadGateway
+		}
+	}
+	if status == models.StatusTimeout || (collectErr != nil && collectErr.Code == models.ErrTimeout) {
+		return http.StatusGatewayTimeout
+	}
+	if status == models.StatusDown && collectErr != nil {
+		switch collectErr.Code {
+		case models.ErrConnectionFailed:
+			return http.StatusBadGateway
+		case models.ErrUnknownError:
+			return http.StatusBadGateway
+		}
+	}
+	return http.StatusInternalServerError
 }
 
 func setSessionCookie(c *gin.Context, token string) {

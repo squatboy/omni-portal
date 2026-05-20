@@ -211,9 +211,10 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 }
 
 type gitlabAPIError struct {
-	code    models.CollectErrorCode
-	status  models.SourceStatus
-	message string
+	code           models.CollectErrorCode
+	status         models.SourceStatus
+	message        string
+	upstreamStatus *int
 }
 
 func (e *gitlabAPIError) Error() string {
@@ -248,7 +249,8 @@ func fetchGitLabJSON[T any](ctx context.Context, client *http.Client, endpoint s
 			code = models.ErrPermissionDenied
 			status = models.StatusPermissionError
 		}
-		return out, &gitlabAPIError{code: code, status: status, message: fmt.Sprintf("GitLab %s API responded with %d", label, resp.StatusCode)}
+		upstreamStatus := resp.StatusCode
+		return out, &gitlabAPIError{code: code, status: status, message: fmt.Sprintf("GitLab %s API responded with %d", label, resp.StatusCode), upstreamStatus: &upstreamStatus}
 	}
 
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -265,7 +267,7 @@ func applyGitLabError(err error, status *models.SourceStatus, collectErr **model
 	}
 	if severity(apiErr.status) > severity(*status) {
 		*status = apiErr.status
-		*collectErr = &models.CollectError{Code: apiErr.code, Message: apiErr.message}
+		*collectErr = &models.CollectError{Code: apiErr.code, Message: apiErr.message, UpstreamStatus: apiErr.upstreamStatus}
 	}
 }
 

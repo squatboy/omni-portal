@@ -21,9 +21,11 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as {
-      error?: string
+      error?: string | { message?: string }
     } | null
-    throw new Error(payload?.error ?? `Request failed: ${response.status}`)
+    const message =
+      typeof payload?.error === "string" ? payload.error : payload?.error?.message
+    throw new Error(message ?? `Request failed: ${response.status}`)
   }
 
   return response.json() as Promise<T>
@@ -336,5 +338,5 @@ export const api = {
 export type TestResult = {
   ok: boolean
   status: string
-  error: { code: string; message: string } | null
+  error: { code: string; message: string; upstreamStatus?: number } | null
 }

@@ -39,6 +39,9 @@ Manage는 self-hosted 사용자가 UI에서 자신의 인프라 리소스와 외
 - 저장과 연결 검증은 분리한다.
 - 사용자는 네트워크가 일시적으로 막혀 있어도 설정을 저장할 수 있다.
 - 각 integration에는 `Test connection` 액션을 둔다.
+- `Test connection` API는 외부 API 실패를 HTTP non-2xx로 반환한다.
+- 외부 API 원본 HTTP status는 응답 body의 `error.upstreamStatus`에서 확인한다.
+- `/api/collect/snapshot`은 dashboard 조회 계약을 유지하기 위해 source별 실패를 envelope에 담고 HTTP 200으로 응답한다.
 - 테스트 결과는 collector 상태와 별도로 마지막 검증 결과로 표시한다.
 - 실제 dashboard health는 collector가 수집한 snapshot을 기준으로 판단한다.
 

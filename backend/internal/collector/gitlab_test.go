@@ -43,6 +43,7 @@ func TestCollectGitLabFailureMapping(t *testing.T) {
 		})
 
 		assertGitLabError(t, envelope, models.StatusPermissionError, models.ErrPermissionDenied)
+		assertUpstreamStatus(t, envelope.Error, http.StatusUnauthorized)
 	})
 
 	t.Run("invalid project path", func(t *testing.T) {
@@ -60,6 +61,7 @@ func TestCollectGitLabFailureMapping(t *testing.T) {
 		})
 
 		assertGitLabError(t, envelope, models.StatusDown, models.ErrConnectionFailed)
+		assertUpstreamStatus(t, envelope.Error, http.StatusNotFound)
 	})
 
 	t.Run("api 500", func(t *testing.T) {
@@ -73,6 +75,7 @@ func TestCollectGitLabFailureMapping(t *testing.T) {
 		})
 
 		assertGitLabError(t, envelope, models.StatusDown, models.ErrConnectionFailed)
+		assertUpstreamStatus(t, envelope.Error, http.StatusInternalServerError)
 	})
 
 	t.Run("bad json", func(t *testing.T) {
@@ -128,5 +131,12 @@ func assertGitLabError(t *testing.T, envelope models.CollectEnvelope[models.GitL
 	t.Helper()
 	if envelope.Status != status || envelope.Error == nil || envelope.Error.Code != code {
 		t.Fatalf("expected status=%s code=%s, got status=%s error=%#v", status, code, envelope.Status, envelope.Error)
+	}
+}
+
+func assertUpstreamStatus(t *testing.T, collectErr *models.CollectError, status int) {
+	t.Helper()
+	if collectErr == nil || collectErr.UpstreamStatus == nil || *collectErr.UpstreamStatus != status {
+		t.Fatalf("expected upstream status %d, got %#v", status, collectErr)
 	}
 }
