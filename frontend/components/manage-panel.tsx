@@ -47,7 +47,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Tooltip,
   TooltipContent,
@@ -101,7 +100,9 @@ const emptyNexus: NexusIntegration = {
   active: true,
 }
 
-export function ManagePanel() {
+export type ManageSection = "resources" | "integrations" | "users"
+
+export function ManagePanel({ section }: { section: ManageSection }) {
   const [vms, setVMs] = React.useState<VMResource[]>([])
   const [kubernetes, setKubernetes] = React.useState<KubernetesIntegration[]>(
     []
@@ -228,363 +229,352 @@ export function ManagePanel() {
 
   return (
     <div className="flex flex-col gap-4">
-      <Tabs defaultValue="resources" className="flex flex-col gap-4">
-        <TabsList>
-          <TabsTrigger value="resources">Resources</TabsTrigger>
-          <TabsTrigger value="integrations">Integrations</TabsTrigger>
-          <TabsTrigger value="users">Users</TabsTrigger>
-        </TabsList>
-        <TabsContent value="resources">
-          <Card>
-            <CardHeader>
-              <CardTitle>VM Resources</CardTitle>
-              <CardDescription>
-                Ping targets used by the dashboard.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <ResourceForm
-                value={vmForm}
-                onChange={setVMForm}
-                onSave={() =>
-                  void saveVM().catch((error) => setMessage(error.message))
+      {section === "resources" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>VM Resources</CardTitle>
+            <CardDescription>
+              Ping targets used by the dashboard.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <ResourceForm
+              value={vmForm}
+              onChange={setVMForm}
+              onSave={() =>
+                void saveVM().catch((error) => setMessage(error.message))
+              }
+            />
+            <ResourceTable
+              items={vms}
+              onEdit={setVMForm}
+              onDelete={(id) =>
+                void api
+                  .deleteVM(id)
+                  .then(load)
+                  .catch((error) => setMessage(error.message))
+              }
+            />
+          </CardContent>
+        </Card>
+      ) : null}
+      {section === "integrations" ? (
+        <div className="grid gap-4 xl:grid-cols-2">
+          <IntegrationCard title="Kubernetes" configured={kubernetes.length}>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void saveKubernetes().catch((error) =>
+                  setMessage(error.message)
+                )
+              }}
+            >
+              <TextInput
+                label="Name"
+                value={kubernetesForm.name}
+                onChange={(name) =>
+                  setKubernetesForm((prev) => ({ ...prev, name }))
+                }
+                required
+              />
+              <TextInput
+                label="API URL"
+                value={kubernetesForm.apiUrl}
+                onChange={(apiUrl) =>
+                  setKubernetesForm((prev) => ({ ...prev, apiUrl }))
+                }
+                required
+              />
+              <TextInput
+                label="Namespaces"
+                value={kubernetesForm.namespaces.join(",")}
+                onChange={(value) =>
+                  setKubernetesForm((prev) => ({
+                    ...prev,
+                    namespaces: splitList(value),
+                  }))
                 }
               />
-              <ResourceTable
-                items={vms}
-                onEdit={setVMForm}
-                onDelete={(id) =>
-                  void api
-                    .deleteVM(id)
-                    .then(load)
-                    .catch((error) => setMessage(error.message))
+              <SecretInput
+                configured={kubernetesForm.tokenConfigured}
+                value={kubernetesForm.token}
+                onChange={(token) =>
+                  setKubernetesForm((prev) => ({ ...prev, token }))
                 }
               />
-            </CardContent>
-          </Card>
-        </TabsContent>
-        <TabsContent value="integrations">
-          <div className="grid gap-4 xl:grid-cols-2">
-            <IntegrationCard title="Kubernetes" configured={kubernetes.length}>
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void saveKubernetes().catch((error) =>
-                    setMessage(error.message)
-                  )
-                }}
-              >
-                <TextInput
-                  label="Name"
-                  value={kubernetesForm.name}
-                  onChange={(name) =>
-                    setKubernetesForm((prev) => ({ ...prev, name }))
-                  }
-                  required
-                />
-                <TextInput
-                  label="API URL"
-                  value={kubernetesForm.apiUrl}
-                  onChange={(apiUrl) =>
-                    setKubernetesForm((prev) => ({ ...prev, apiUrl }))
-                  }
-                  required
-                />
-                <TextInput
-                  label="Namespaces"
-                  value={kubernetesForm.namespaces.join(",")}
-                  onChange={(value) =>
-                    setKubernetesForm((prev) => ({
-                      ...prev,
-                      namespaces: splitList(value),
-                    }))
-                  }
-                />
-                <SecretInput
-                  configured={kubernetesForm.tokenConfigured}
-                  value={kubernetesForm.token}
-                  onChange={(token) =>
-                    setKubernetesForm((prev) => ({ ...prev, token }))
-                  }
-                />
-                <ActiveToggle
-                  checked={kubernetesForm.active}
-                  onChange={(active) =>
-                    setKubernetesForm((prev) => ({ ...prev, active }))
-                  }
-                />
-                <FormActions
-                  onTest={() => api.testKubernetes(kubernetesForm)}
-                />
-              </form>
-              <IntegrationList
-                items={kubernetes}
-                onEdit={(item) => setKubernetesForm({ ...item, token: "" })}
-                onDelete={(id) =>
-                  void api
-                    .deleteKubernetes(id)
-                    .then(load)
-                    .catch((error) => setMessage(error.message))
+              <ActiveToggle
+                checked={kubernetesForm.active}
+                onChange={(active) =>
+                  setKubernetesForm((prev) => ({ ...prev, active }))
                 }
               />
-            </IntegrationCard>
-            <IntegrationCard title="ArgoCD" configured={argocd.length}>
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void saveArgoCD().catch((error) => setMessage(error.message))
-                }}
-              >
-                <TextInput
-                  label="Name"
-                  value={argocdForm.name}
-                  onChange={(name) =>
-                    setArgoCDForm((prev) => ({ ...prev, name }))
-                  }
-                  required
-                />
-                <TextInput
-                  label="Base URL"
-                  value={argocdForm.baseUrl}
-                  onChange={(baseUrl) =>
-                    setArgoCDForm((prev) => ({ ...prev, baseUrl }))
-                  }
-                  required
-                />
-                <SecretInput
-                  configured={argocdForm.tokenConfigured}
-                  value={argocdForm.token}
-                  onChange={(token) =>
-                    setArgoCDForm((prev) => ({ ...prev, token }))
-                  }
-                />
-                <ActiveToggle
-                  checked={argocdForm.active}
-                  onChange={(active) =>
-                    setArgoCDForm((prev) => ({ ...prev, active }))
-                  }
-                />
-                <FormActions onTest={() => api.testArgoCD(argocdForm)} />
-              </form>
-              <IntegrationList
-                items={argocd}
-                onEdit={(item) => setArgoCDForm({ ...item, token: "" })}
-                onDelete={(id) =>
-                  void api
-                    .deleteArgoCD(id)
-                    .then(load)
-                    .catch((error) => setMessage(error.message))
+              <FormActions onTest={() => api.testKubernetes(kubernetesForm)} />
+            </form>
+            <IntegrationList
+              items={kubernetes}
+              onEdit={(item) => setKubernetesForm({ ...item, token: "" })}
+              onDelete={(id) =>
+                void api
+                  .deleteKubernetes(id)
+                  .then(load)
+                  .catch((error) => setMessage(error.message))
+              }
+            />
+          </IntegrationCard>
+          <IntegrationCard title="ArgoCD" configured={argocd.length}>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void saveArgoCD().catch((error) => setMessage(error.message))
+              }}
+            >
+              <TextInput
+                label="Name"
+                value={argocdForm.name}
+                onChange={(name) =>
+                  setArgoCDForm((prev) => ({ ...prev, name }))
+                }
+                required
+              />
+              <TextInput
+                label="Base URL"
+                value={argocdForm.baseUrl}
+                onChange={(baseUrl) =>
+                  setArgoCDForm((prev) => ({ ...prev, baseUrl }))
+                }
+                required
+              />
+              <SecretInput
+                configured={argocdForm.tokenConfigured}
+                value={argocdForm.token}
+                onChange={(token) =>
+                  setArgoCDForm((prev) => ({ ...prev, token }))
                 }
               />
-            </IntegrationCard>
-            <IntegrationCard title="GitLab" configured={gitlab.length}>
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void saveGitLab().catch((error) => setMessage(error.message))
-                }}
-              >
-                <TextInput
-                  label="Name"
-                  value={gitlabForm.name}
-                  onChange={(name) =>
-                    setGitLabForm((prev) => ({ ...prev, name }))
-                  }
-                  required
-                />
-                <TextInput
-                  label="Base URL"
-                  value={gitlabForm.baseUrl}
-                  onChange={(baseUrl) =>
-                    setGitLabForm((prev) => ({ ...prev, baseUrl }))
-                  }
-                  required
-                />
-                <TextInput
-                  label="Projects"
-                  value={gitlabForm.projectsText}
-                  onChange={(projectsText) =>
-                    setGitLabForm((prev) => ({ ...prev, projectsText }))
-                  }
-                  placeholder="name|group/project|main"
-                />
-                <SecretInput
-                  configured={gitlabForm.tokenConfigured}
-                  value={gitlabForm.token}
-                  onChange={(token) =>
-                    setGitLabForm((prev) => ({ ...prev, token }))
-                  }
-                />
-                <ActiveToggle
-                  checked={gitlabForm.active}
-                  onChange={(active) =>
-                    setGitLabForm((prev) => ({ ...prev, active }))
-                  }
-                />
-                <FormActions
-                  onTest={() =>
-                    api.testGitLab({
-                      ...gitlabForm,
-                      projects: parseProjects(gitlabForm.projectsText),
-                    })
-                  }
-                />
-              </form>
-              <IntegrationList
-                items={gitlab}
-                onEdit={(item) =>
-                  setGitLabForm({
-                    ...item,
-                    token: "",
-                    projectsText: (item.projects ?? [])
-                      .map((project) =>
-                        [
-                          project.name,
-                          project.path,
-                          project.defaultBranch,
-                          project.link ?? "",
-                        ].join("|")
-                      )
-                      .join("\n"),
+              <ActiveToggle
+                checked={argocdForm.active}
+                onChange={(active) =>
+                  setArgoCDForm((prev) => ({ ...prev, active }))
+                }
+              />
+              <FormActions onTest={() => api.testArgoCD(argocdForm)} />
+            </form>
+            <IntegrationList
+              items={argocd}
+              onEdit={(item) => setArgoCDForm({ ...item, token: "" })}
+              onDelete={(id) =>
+                void api
+                  .deleteArgoCD(id)
+                  .then(load)
+                  .catch((error) => setMessage(error.message))
+              }
+            />
+          </IntegrationCard>
+          <IntegrationCard title="GitLab" configured={gitlab.length}>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void saveGitLab().catch((error) => setMessage(error.message))
+              }}
+            >
+              <TextInput
+                label="Name"
+                value={gitlabForm.name}
+                onChange={(name) =>
+                  setGitLabForm((prev) => ({ ...prev, name }))
+                }
+                required
+              />
+              <TextInput
+                label="Base URL"
+                value={gitlabForm.baseUrl}
+                onChange={(baseUrl) =>
+                  setGitLabForm((prev) => ({ ...prev, baseUrl }))
+                }
+                required
+              />
+              <TextInput
+                label="Projects"
+                value={gitlabForm.projectsText}
+                onChange={(projectsText) =>
+                  setGitLabForm((prev) => ({ ...prev, projectsText }))
+                }
+                placeholder="name|group/project|main"
+              />
+              <SecretInput
+                configured={gitlabForm.tokenConfigured}
+                value={gitlabForm.token}
+                onChange={(token) =>
+                  setGitLabForm((prev) => ({ ...prev, token }))
+                }
+              />
+              <ActiveToggle
+                checked={gitlabForm.active}
+                onChange={(active) =>
+                  setGitLabForm((prev) => ({ ...prev, active }))
+                }
+              />
+              <FormActions
+                onTest={() =>
+                  api.testGitLab({
+                    ...gitlabForm,
+                    projects: parseProjects(gitlabForm.projectsText),
                   })
                 }
-                onDelete={(id) =>
-                  void api
-                    .deleteGitLab(id)
-                    .then(load)
-                    .catch((error) => setMessage(error.message))
+              />
+            </form>
+            <IntegrationList
+              items={gitlab}
+              onEdit={(item) =>
+                setGitLabForm({
+                  ...item,
+                  token: "",
+                  projectsText: (item.projects ?? [])
+                    .map((project) =>
+                      [
+                        project.name,
+                        project.path,
+                        project.defaultBranch,
+                        project.link ?? "",
+                      ].join("|")
+                    )
+                    .join("\n"),
+                })
+              }
+              onDelete={(id) =>
+                void api
+                  .deleteGitLab(id)
+                  .then(load)
+                  .catch((error) => setMessage(error.message))
+              }
+            />
+          </IntegrationCard>
+          <IntegrationCard title="Nexus" configured={nexus.length}>
+            <form
+              className="flex flex-col gap-3"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void saveNexus().catch((error) => setMessage(error.message))
+              }}
+            >
+              <TextInput
+                label="Name"
+                value={nexusForm.name}
+                onChange={(name) => setNexusForm((prev) => ({ ...prev, name }))}
+                required
+              />
+              <TextInput
+                label="URL"
+                value={nexusForm.url}
+                onChange={(url) => setNexusForm((prev) => ({ ...prev, url }))}
+                required
+              />
+              <ActiveToggle
+                checked={nexusForm.active}
+                onChange={(active) =>
+                  setNexusForm((prev) => ({ ...prev, active }))
                 }
               />
-            </IntegrationCard>
-            <IntegrationCard title="Nexus" configured={nexus.length}>
-              <form
-                className="flex flex-col gap-3"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void saveNexus().catch((error) => setMessage(error.message))
-                }}
-              >
-                <TextInput
-                  label="Name"
-                  value={nexusForm.name}
-                  onChange={(name) =>
-                    setNexusForm((prev) => ({ ...prev, name }))
+              <FormActions onTest={() => api.testNexus(nexusForm)} />
+            </form>
+            <IntegrationList
+              items={nexus}
+              onEdit={setNexusForm}
+              onDelete={(id) =>
+                void api
+                  .deleteNexus(id)
+                  .then(load)
+                  .catch((error) => setMessage(error.message))
+              }
+            />
+          </IntegrationCard>
+        </div>
+      ) : null}
+      {section === "users" ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+            <CardDescription>Admin can manage portal users.</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <form
+              className="grid gap-3 md:grid-cols-[120px_1fr_1fr_auto]"
+              onSubmit={(e) => {
+                e.preventDefault()
+                void createUser().catch((error) => setMessage(error.message))
+              }}
+            >
+              <div className="flex flex-col gap-1.5">
+                <Label className="text-xs font-medium">Role</Label>
+                <Select
+                  value={userForm.role}
+                  onValueChange={(value) =>
+                    setUserForm((prev) => ({
+                      ...prev,
+                      role: value as "admin" | "viewer",
+                    }))
                   }
-                  required
-                />
-                <TextInput
-                  label="URL"
-                  value={nexusForm.url}
-                  onChange={(url) => setNexusForm((prev) => ({ ...prev, url }))}
-                  required
-                />
-                <ActiveToggle
-                  checked={nexusForm.active}
-                  onChange={(active) =>
-                    setNexusForm((prev) => ({ ...prev, active }))
-                  }
-                />
-                <FormActions onTest={() => api.testNexus(nexusForm)} />
-              </form>
-              <IntegrationList
-                items={nexus}
-                onEdit={setNexusForm}
-                onDelete={(id) =>
-                  void api
-                    .deleteNexus(id)
-                    .then(load)
-                    .catch((error) => setMessage(error.message))
+                >
+                  <SelectTrigger className="h-7 text-xs">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="viewer">viewer</SelectItem>
+                    <SelectItem value="admin">admin</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <TextInput
+                label="Username"
+                value={userForm.username}
+                onChange={(username) =>
+                  setUserForm((prev) => ({ ...prev, username }))
                 }
+                required
               />
-            </IntegrationCard>
-          </div>
-        </TabsContent>
-        <TabsContent value="users">
-          <Card>
-            <CardHeader>
-              <CardTitle>Users</CardTitle>
-              <CardDescription>Admin can manage portal users.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              <form
-                className="grid gap-3 md:grid-cols-[120px_1fr_1fr_auto]"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  void createUser().catch((error) => setMessage(error.message))
-                }}
-              >
-                <div className="flex flex-col gap-1.5">
-                  <Label className="text-xs font-medium">Role</Label>
-                  <Select
-                    value={userForm.role}
-                    onValueChange={(value) =>
-                      setUserForm((prev) => ({
-                        ...prev,
-                        role: value as "admin" | "viewer",
-                      }))
-                    }
-                  >
-                    <SelectTrigger className="h-7 text-xs">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="viewer">viewer</SelectItem>
-                      <SelectItem value="admin">admin</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <TextInput
-                  label="Username"
-                  value={userForm.username}
-                  onChange={(username) =>
-                    setUserForm((prev) => ({ ...prev, username }))
-                  }
-                  required
-                />
-                <PasswordInput
-                  label="Password"
-                  value={userForm.password}
-                  onChange={(password) =>
-                    setUserForm((prev) => ({ ...prev, password }))
-                  }
-                  required
-                />
-                <div className="flex items-end">
-                  <Button className="w-full" type="submit">
-                    <Check data-icon="inline-start" />
-                    Create
-                  </Button>
-                </div>
-              </form>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Username</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Password</TableHead>
+              <PasswordInput
+                label="Password"
+                value={userForm.password}
+                onChange={(password) =>
+                  setUserForm((prev) => ({ ...prev, password }))
+                }
+                required
+              />
+              <div className="flex items-end">
+                <Button className="w-full" type="submit">
+                  <Check data-icon="inline-start" />
+                  Create
+                </Button>
+              </div>
+            </form>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Username</TableHead>
+                  <TableHead>Role</TableHead>
+                  <TableHead>Password</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {users.map((user) => (
+                  <TableRow key={user.id}>
+                    <TableCell>{user.username}</TableCell>
+                    <TableCell>
+                      <Badge variant="secondary">{user.role}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      {user.mustChangePassword ? "Change required" : "Set"}
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => (
-                    <TableRow key={user.id}>
-                      <TableCell>{user.username}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{user.role}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        {user.mustChangePassword ? "Change required" : "Set"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   )
 }

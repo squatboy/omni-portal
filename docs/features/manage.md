@@ -4,8 +4,9 @@ Manage는 self-hosted 사용자가 UI에서 자신의 인프라 리소스와 외
 기존 파일 기반 `inventory.json`은 runtime source of truth에서 제거하고 PostgreSQL을 기준으로 한다.
 
 ## Scope
-- Sidebar 상위 메뉴명은 `Manage`로 둔다.
-- 내부는 `Resources`, `Integrations`, `Users`로 나눈다.
+- Sidebar에는 클릭 가능한 단일 `Manage` 버튼을 두지 않고, `Manage` 그룹 라벨 아래에 하위 메뉴를 둔다.
+- 하위 메뉴는 `Resources`, `Integrations`, `Users`로 나눈다.
+- Manage 화면 내부에는 별도 tablist를 두지 않고, sidebar에서 선택한 section만 렌더링한다.
 - `Resources`는 VM 같은 관측 대상 리소스를 관리한다.
 - `Integrations`는 Kubernetes, GitLab, ArgoCD, Nexus 연결 정보를 관리한다.
 - `Users`는 admin이 계정과 권한을 관리하는 영역이다.

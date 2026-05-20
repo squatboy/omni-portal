@@ -23,7 +23,7 @@ import { formatDateTime, loadSnapshot } from "./dashboard/lib/utils"
 import { HealthBadge } from "./dashboard/shared/common"
 import { DashboardContent } from "./dashboard/shared/dashboard-content"
 import { DashboardSkeleton } from "./dashboard/shared/dashboard-skeleton"
-import { ManagePanel } from "./manage-panel"
+import { ManagePanel, type ManageSection } from "./manage-panel"
 
 const appViews: AppView[] = [
   "overview",
@@ -34,18 +34,51 @@ const appViews: AppView[] = [
   "argocd",
   "gitlab",
   "nexus",
-  "manage",
+  "manage-resources",
+  "manage-integrations",
+  "manage-users",
 ]
+
+const manageViewMap = {
+  "manage-resources": "resources",
+  "manage-integrations": "integrations",
+  "manage-users": "users",
+} satisfies Record<string, ManageSection>
 
 function resolveInitialView(mockMode: boolean): AppView {
   if (!mockMode) {
     return "overview"
   }
   const candidate = getMockViewParam()
+  if (candidate === "manage") {
+    return "manage-resources"
+  }
   if (candidate && appViews.includes(candidate as AppView)) {
     return candidate as AppView
   }
   return "overview"
+}
+
+function isManageView(view: AppView): view is keyof typeof manageViewMap {
+  return view in manageViewMap
+}
+
+function getManageSection(view: AppView): ManageSection | null {
+  return isManageView(view) ? manageViewMap[view] : null
+}
+
+function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
+  const manageSection = getManageSection(view)
+  if (manageSection) {
+    const label = manageSection.charAt(0).toUpperCase() + manageSection.slice(1)
+    return `Manage / ${label}`
+  }
+  if (activeTab === "overview") {
+    return "Infrastructure Overview"
+  }
+  return (
+    sourceLabels[activeTab as keyof typeof sourceLabels] ?? "Platform Health"
+  )
 }
 
 export function OmniDashboard() {
@@ -155,8 +188,10 @@ export function OmniDashboard() {
   }
 
   const canManage = user.role === "admin"
-  const activeTab: DashboardTab =
-    activeView === "manage" ? "overview" : activeView
+  const manageSection = getManageSection(activeView)
+  const activeTab: DashboardTab = isManageView(activeView)
+    ? "overview"
+    : activeView
 
   return (
     <SidebarProvider>
@@ -174,12 +209,7 @@ export function OmniDashboard() {
           <div className="flex flex-1 items-center justify-between gap-3">
             <div className="min-w-0">
               <h1 className="truncate text-sm font-semibold">
-                {activeView === "manage"
-                  ? "Manage"
-                  : activeTab === "overview"
-                    ? "Infrastructure Overview"
-                    : (sourceLabels[activeTab as keyof typeof sourceLabels] ??
-                      "Platform Health")}
+                {getHeaderTitle(activeView, activeTab)}
               </h1>
               <p className="truncate text-[10px] text-muted-foreground">
                 Last collect{" "}
@@ -227,8 +257,8 @@ export function OmniDashboard() {
         </header>
 
         <div className="flex flex-col gap-4 p-4 md:p-6">
-          {activeView === "manage" ? (
-            <ManagePanel />
+          {manageSection ? (
+            <ManagePanel section={manageSection} />
           ) : snapshot ? (
             <DashboardContent
               snapshot={snapshot}

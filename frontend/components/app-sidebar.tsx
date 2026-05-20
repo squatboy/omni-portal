@@ -7,10 +7,16 @@ import {
   Sidebar,
   SidebarContent,
   SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  SidebarMenuSub,
+  SidebarMenuSubButton,
+  SidebarMenuSubItem,
   SidebarRail,
   useSidebar,
 } from "@/components/ui/sidebar"
@@ -24,7 +30,18 @@ import type { DashboardSnapshot, DashboardTab } from "./dashboard/lib/types"
 import { formatTime } from "./dashboard/lib/utils"
 import { StatusDot } from "./dashboard/shared/status-badge"
 
-export type AppView = DashboardTab | "manage"
+export type ManageView =
+  | "manage-resources"
+  | "manage-integrations"
+  | "manage-users"
+
+export type AppView = DashboardTab | ManageView
+
+const manageItems: { label: string; view: ManageView }[] = [
+  { label: "Resources", view: "manage-resources" },
+  { label: "Integrations", view: "manage-integrations" },
+  { label: "Users", view: "manage-users" },
+]
 
 export function AppSidebar({
   snapshot,
@@ -114,22 +131,37 @@ export function AppSidebar({
               </SidebarMenuItem>
             )
           })}
-          {canManage ? (
-            <>
-              <Separator className="my-2" />
-              <SidebarMenuItem>
-                <SidebarMenuButton
-                  isActive={activeView === "manage"}
-                  onClick={() => onViewChange("manage")}
-                  tooltip="Manage"
-                >
-                  <Settings />
-                  <span>Manage</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </>
-          ) : null}
         </SidebarMenu>
+        {canManage ? (
+          <>
+            <Separator className="mx-2 my-2" />
+            <SidebarGroup>
+              <SidebarGroupLabel>
+                <Settings />
+                <span>Manage</span>
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenuSub>
+                  {manageItems.map((item) => (
+                    <SidebarMenuSubItem key={item.view}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={activeView === item.view}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => onViewChange(item.view)}
+                        >
+                          <span>{item.label}</span>
+                        </button>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
+                </SidebarMenuSub>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </>
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
         {state !== "collapsed" && (
