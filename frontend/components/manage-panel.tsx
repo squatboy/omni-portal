@@ -882,7 +882,7 @@ function FormActions({
       setResult({
         ok: res.ok,
         message: res.ok
-          ? `Test ${res.status}.`
+          ? "Test Success."
           : `Test failed: ${res.error?.message ?? res.status}`,
       })
     } catch (error) {
