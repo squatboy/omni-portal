@@ -1,16 +1,16 @@
 package config
 
 import (
-	"encoding/json"
+	"encoding/base64"
+	"fmt"
 	"os"
-
-	"omni-backend/internal/models"
+	"strings"
 )
 
 type AppConfig struct {
-	Port              string
-	InventoryFilePath string
-	Inventory         models.CollectInventoryConfig
+	Port        string
+	DatabaseURL string
+	SecretKey   []byte
 }
 
 func LoadConfig() (*AppConfig, error) {
@@ -19,26 +19,39 @@ func LoadConfig() (*AppConfig, error) {
 		port = "8080"
 	}
 
-	inventoryPath := os.Getenv("INVENTORY_PATH")
-	if inventoryPath == "" {
-		inventoryPath = "../deploy/config/inventory.example.json"
+	databaseURL := strings.TrimSpace(os.Getenv("DATABASE_URL"))
+	if databaseURL == "" {
+		return nil, fmt.Errorf("DATABASE_URL is required")
 	}
 
-	cfg := &AppConfig{
-		Port:              port,
-		InventoryFilePath: inventoryPath,
-	}
-
-	file, err := os.Open(inventoryPath)
+	secretKey, err := loadSecretKey(os.Getenv("OMNI_SECRET_KEY"))
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
-	decoder := json.NewDecoder(file)
-	if err := decoder.Decode(&cfg.Inventory); err != nil {
-		return nil, err
+	return &AppConfig{
+		Port:        port,
+		DatabaseURL: databaseURL,
+		SecretKey:   secretKey,
+	}, nil
+}
+
+func loadSecretKey(value string) ([]byte, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, fmt.Errorf("OMNI_SECRET_KEY is required")
 	}
 
-	return cfg, nil
+	if decoded, err := base64.StdEncoding.DecodeString(value); err == nil && len(decoded) == 32 {
+		return decoded, nil
+	}
+	if decoded, err := base64.RawStdEncoding.DecodeString(value); err == nil && len(decoded) == 32 {
+		return decoded, nil
+	}
+
+	raw := []byte(value)
+	if len(raw) != 32 {
+		return nil, fmt.Errorf("OMNI_SECRET_KEY must be 32 bytes or base64-encoded 32 bytes")
+	}
+	return raw, nil
 }

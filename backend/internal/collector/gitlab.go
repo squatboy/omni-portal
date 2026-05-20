@@ -5,9 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
-	"os"
 	"strings"
 	"sync"
 	"time"
@@ -28,19 +26,57 @@ type gitlabPipelineResponse struct {
 	WebUrl    string `json:"web_url"`
 }
 
-func CollectGitLab(ctx context.Context, cfg *config.AppConfig) models.CollectEnvelope[models.GitLabData] {
-	baseUrl := strings.TrimRight(cfg.Inventory.GitLab.BaseUrl, "/")
-	projects := cfg.Inventory.GitLab.Projects
+func CollectGitLab(ctx context.Context, targets []models.GitLabCollectTarget) models.CollectEnvelope[models.GitLabData] {
 	now := time.Now().Format(time.RFC3339)
 
-	if baseUrl == "" {
-		return gitlabError(now, models.ErrUnknownError, "GitLab base URL not configured", models.StatusUnknown)
+	if len(targets) == 0 {
+		collectedAt := now
+		return models.CollectEnvelope[models.GitLabData]{
+			Source:      models.SourceGitLab,
+			Status:      models.StatusOk,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        models.GitLabData{Projects: []models.GitLabProjectStatus{}},
+		}
 	}
 
-	token := strings.TrimSpace(os.Getenv("GITLAB_TOKEN"))
-	if token == "" {
-		return gitlabError(now, models.ErrPermissionDenied, "GITLAB_TOKEN is missing", models.StatusPermissionError)
+	var projects []models.GitLabProjectStatus
+	status := models.StatusOk
+	var collectErr *models.CollectError
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, target := range targets {
+		wg.Add(1)
+		go func(target models.GitLabCollectTarget) {
+			defer wg.Done()
+			result := collectGitLabTarget(ctx, target, now)
+			mu.Lock()
+			projects = append(projects, result.Data.Projects...)
+			if severity(result.Status) > severity(status) {
+				status = result.Status
+				collectErr = result.Error
+			}
+			mu.Unlock()
+		}(target)
 	}
+	wg.Wait()
+
+	collectedAt := now
+	return models.CollectEnvelope[models.GitLabData]{
+		Source:      models.SourceGitLab,
+		Status:      status,
+		AttemptedAt: now,
+		CollectedAt: &collectedAt,
+		Stale:       status == models.StatusStale,
+		Error:       collectErr,
+		Data:        models.GitLabData{Projects: projects},
+	}
+}
+
+func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget, now string) models.CollectEnvelope[models.GitLabData] {
+	baseUrl := strings.TrimRight(target.BaseURL, "/")
+	projects := target.Projects
 
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
@@ -73,7 +109,7 @@ func CollectGitLab(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 
 			// Fetch Commits
 			reqC, _ := http.NewRequestWithContext(reqCtx, "GET", commitsUrl, nil)
-			reqC.Header.Set("PRIVATE-TOKEN", token)
+			reqC.Header.Set("PRIVATE-TOKEN", target.Token)
 			reqC.Header.Set("Accept", "application/json")
 			if resC, err := client.Do(reqC); err == nil {
 				if resC.StatusCode == 200 {
@@ -92,7 +128,7 @@ func CollectGitLab(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 
 			// Fetch Pipelines
 			reqP, _ := http.NewRequestWithContext(reqCtx, "GET", pipelinesUrl, nil)
-			reqP.Header.Set("PRIVATE-TOKEN", token)
+			reqP.Header.Set("PRIVATE-TOKEN", target.Token)
 			reqP.Header.Set("Accept", "application/json")
 			if resP, err := client.Do(reqP); err == nil {
 				if resP.StatusCode == 200 {
@@ -123,6 +159,7 @@ func CollectGitLab(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 			mu.Lock()
 			results[i] = models.GitLabProjectStatus{
 				GitLabProjectTarget: p,
+				IntegrationName:     target.Name,
 				LatestCommit:        latestCommit,
 				LatestPipeline:      latestPipeline,
 			}

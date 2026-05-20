@@ -2,8 +2,6 @@
 
 Omni is a web portal that centralizes infrastructure resource(vm, kubernetes, etc.) and dev tools status in one place.
 
-## Scope
-Working Guide & Rules for 'omni' infrastructure dashboard project
 
 ## graphify
 
@@ -20,9 +18,9 @@ Rules:
 Common rules and each rule when working on frontend & backend
 
 ### Do
+- Always add/update .md files in @/docs folder if things changed
 - Always test after code fix & update
 - Commit on appropriate unit after code fix
-- update .md files in @/docs folder if things changed
 
 ### Don't
 - Do not git push, commit only

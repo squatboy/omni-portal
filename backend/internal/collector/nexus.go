@@ -3,27 +3,83 @@ package collector
 import (
 	"context"
 	"net/http"
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
 	"strings"
+	"sync"
 	"time"
 )
 
-func CollectNexus(ctx context.Context, cfg *config.AppConfig) models.CollectEnvelope[models.NexusData] {
-	nexusUrl := cfg.Inventory.Nexus.Url
+func CollectNexus(ctx context.Context, targets []models.NexusCollectTarget) models.CollectEnvelope[models.NexusData] {
 	now := time.Now().Format(time.RFC3339)
 
-	if nexusUrl == "" {
+	if len(targets) == 0 {
+		collectedAt := now
 		return models.CollectEnvelope[models.NexusData]{
 			Source:      models.SourceNexus,
-			Status:      models.StatusUnknown,
+			Status:      models.StatusOk,
 			AttemptedAt: now,
+			CollectedAt: &collectedAt,
 			Stale:       false,
-			Error:       &models.CollectError{Code: models.ErrUnknownError, Message: "Nexus URL not configured"},
-			Data:        models.NexusData{Url: "", Reachable: false, HttpStatus: nil, CheckedAt: now},
+			Data:        models.NexusData{Items: []models.NexusStatus{}, CheckedAt: now},
 		}
 	}
 
+	results := make([]models.NexusStatus, len(targets))
+	var wg sync.WaitGroup
+	var downCount int
+	var timeoutCount int
+	var mu sync.Mutex
+
+	for i, target := range targets {
+		wg.Add(1)
+		go func(i int, target models.NexusCollectTarget) {
+			defer wg.Done()
+			status, code := collectNexusTarget(ctx, target, now)
+			mu.Lock()
+			results[i] = status
+			if !status.Reachable {
+				downCount++
+			}
+			if code == models.ErrTimeout {
+				timeoutCount++
+			}
+			mu.Unlock()
+		}(i, target)
+	}
+	wg.Wait()
+
+	status := models.StatusOk
+	var collectErr *models.CollectError
+	if downCount > 0 {
+		status = models.StatusDown
+		collectErr = &models.CollectError{Code: models.ErrConnectionFailed, Message: "One or more Nexus checks failed"}
+	}
+	if timeoutCount > 0 {
+		status = models.StatusTimeout
+		collectErr = &models.CollectError{Code: models.ErrTimeout, Message: "One or more Nexus checks timed out"}
+	}
+
+	collectedAt := now
+	first := results[0]
+	return models.CollectEnvelope[models.NexusData]{
+		Source:      models.SourceNexus,
+		Status:      status,
+		AttemptedAt: now,
+		CollectedAt: &collectedAt,
+		Stale:       false,
+		Error:       collectErr,
+		Data: models.NexusData{
+			Items:      results,
+			Url:        first.Url,
+			Reachable:  first.Reachable,
+			HttpStatus: first.HttpStatus,
+			CheckedAt:  now,
+		},
+	}
+}
+
+func collectNexusTarget(ctx context.Context, target models.NexusCollectTarget, now string) (models.NexusStatus, models.CollectErrorCode) {
+	nexusUrl := target.URL
 	checkUrl := strings.TrimRight(nexusUrl, "/") + "/service/rest/v1/status"
 
 	reqCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
@@ -31,7 +87,7 @@ func CollectNexus(ctx context.Context, cfg *config.AppConfig) models.CollectEnve
 
 	req, err := http.NewRequestWithContext(reqCtx, "HEAD", checkUrl, nil)
 	if err != nil {
-		return nexusError(now, nexusUrl, models.ErrConnectionFailed, err.Error())
+		return nexusStatus(target, false, nil, now), models.ErrConnectionFailed
 	}
 
 	client := &http.Client{}
@@ -42,50 +98,26 @@ func CollectNexus(ctx context.Context, cfg *config.AppConfig) models.CollectEnve
 		if reqCtx.Err() == context.DeadlineExceeded {
 			code = models.ErrTimeout
 		}
-		return nexusError(now, nexusUrl, code, err.Error())
+		return nexusStatus(target, false, nil, now), code
 	}
 	defer resp.Body.Close()
 
 	reachable := resp.StatusCode >= 200 && resp.StatusCode < 300
-	status := models.StatusOk
-	var collectErr *models.CollectError
-
+	code := models.CollectErrorCode("")
 	if !reachable {
-		status = models.StatusDown
-		collectErr = &models.CollectError{
-			Code:    models.ErrConnectionFailed,
-			Message: "Nexus health check failed",
-		}
+		code = models.ErrConnectionFailed
 	}
 
-	collectedAt := now
-	return models.CollectEnvelope[models.NexusData]{
-		Source:      models.SourceNexus,
-		Status:      status,
-		AttemptedAt: now,
-		CollectedAt: &collectedAt,
-		Stale:       false,
-		Error:       collectErr,
-		Data: models.NexusData{
-			Url:        nexusUrl,
-			Reachable:  reachable,
-			HttpStatus: &resp.StatusCode,
-			CheckedAt:  now,
-		},
-	}
+	return nexusStatus(target, reachable, &resp.StatusCode, now), code
 }
 
-func nexusError(now string, url string, code models.CollectErrorCode, msg string) models.CollectEnvelope[models.NexusData] {
-	status := models.StatusDown
-	if code == models.ErrTimeout {
-		status = models.StatusTimeout
-	}
-	return models.CollectEnvelope[models.NexusData]{
-		Source:      models.SourceNexus,
-		Status:      status,
-		AttemptedAt: now,
-		Stale:       false,
-		Error:       &models.CollectError{Code: code, Message: msg},
-		Data:        models.NexusData{Url: url, Reachable: false, HttpStatus: nil, CheckedAt: now},
+func nexusStatus(target models.NexusCollectTarget, reachable bool, httpStatus *int, checkedAt string) models.NexusStatus {
+	return models.NexusStatus{
+		ID:              target.ID,
+		IntegrationName: target.Name,
+		Url:             target.URL,
+		Reachable:       reachable,
+		HttpStatus:      httpStatus,
+		CheckedAt:       checkedAt,
 	}
 }

@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
 )
 
@@ -235,14 +235,16 @@ func TestCollectKubernetesMetricsFailureIsOptional(t *testing.T) {
 	}
 }
 
-func kubernetesTestConfig(namespaces []string, appNamespaces []string) *config.AppConfig {
-	return &config.AppConfig{
-		Inventory: models.CollectInventoryConfig{
-			Kubernetes: models.KubernetesInventoryConfig{
-				ClusterName:   "test-cluster",
-				Namespaces:    namespaces,
-				AppNamespaces: appNamespaces,
-			},
+func kubernetesTestConfig(namespaces []string, appNamespaces []string) []models.KubernetesCollectTarget {
+	return []models.KubernetesCollectTarget{
+		{
+			ID:            "test-k8s",
+			Name:          "Test Kubernetes",
+			ClusterName:   "test-cluster",
+			APIURL:        os.Getenv("KUBERNETES_API_URL"),
+			Token:         os.Getenv("KUBERNETES_BEARER_TOKEN"),
+			Namespaces:    namespaces,
+			AppNamespaces: appNamespaces,
 		},
 	}
 }

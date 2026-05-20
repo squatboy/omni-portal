@@ -7,12 +7,20 @@ const nextConfig = {
   async rewrites() {
     return [
       {
-        source: '/api/collect/:path*',
-        destination: `${process.env.API_URL || 'http://localhost:8080'}/api/collect/:path*`,
+        source: "/api/collect/:path*",
+        destination: `${process.env.API_URL || "http://localhost:8080"}/api/collect/:path*`,
       },
       {
-        source: '/api/health/ready',
-        destination: `${process.env.API_URL || 'http://localhost:8080'}/health/ready`,
+        source: "/api/auth/:path*",
+        destination: `${process.env.API_URL || "http://localhost:8080"}/api/auth/:path*`,
+      },
+      {
+        source: "/api/manage/:path*",
+        destination: `${process.env.API_URL || "http://localhost:8080"}/api/manage/:path*`,
+      },
+      {
+        source: "/api/health/ready",
+        destination: `${process.env.API_URL || "http://localhost:8080"}/health/ready`,
       },
     ]
   },

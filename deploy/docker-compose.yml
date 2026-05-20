@@ -1,4 +1,19 @@
 services:
+  postgres:
+    image: postgres:17.5-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-omni}
+      POSTGRES_USER: ${POSTGRES_USER:-omni}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   omni:
     image: ghcr.io/squatboy/omni-frontend:${OMNI_VERSION:?set OMNI_VERSION}
     restart: unless-stopped
@@ -8,7 +23,8 @@ services:
       NODE_ENV: production
       API_URL: http://backend:8080
     depends_on:
-      - backend
+      backend:
+        condition: service_started
 
   backend:
     image: ghcr.io/squatboy/omni-backend:${OMNI_VERSION:?set OMNI_VERSION}
@@ -18,11 +34,13 @@ services:
     expose:
       - "8080"
     environment:
-      KUBERNETES_API_URL: ${KUBERNETES_API_URL:?set KUBERNETES_API_URL}
-      KUBERNETES_BEARER_TOKEN: ${KUBERNETES_BEARER_TOKEN:?set KUBERNETES_BEARER_TOKEN}
-      GITLAB_TOKEN: ${GITLAB_TOKEN:?set GITLAB_TOKEN}
-      ARGOCD_TOKEN: ${ARGOCD_TOKEN:?set ARGOCD_TOKEN}
-      INVENTORY_PATH: /app/config/inventory.json
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
+      OMNI_SECRET_KEY: ${OMNI_SECRET_KEY:?set OMNI_SECRET_KEY}
     volumes:
-      - ./config/inventory.json:/app/config/inventory.json:ro
       - ./certs/kubernetes-ca.crt:/run/secrets/kubernetes-ca.crt:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

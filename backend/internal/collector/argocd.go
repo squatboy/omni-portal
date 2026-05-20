@@ -4,10 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
-	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -31,18 +30,57 @@ type argoApplicationItem struct {
 	} `json:"status"`
 }
 
-func CollectArgoCD(ctx context.Context, cfg *config.AppConfig) models.CollectEnvelope[models.ArgoCdData] {
-	baseUrl := strings.TrimRight(cfg.Inventory.ArgoCD.BaseUrl, "/")
+func CollectArgoCD(ctx context.Context, targets []models.ArgoCDCollectTarget) models.CollectEnvelope[models.ArgoCdData] {
 	now := time.Now().Format(time.RFC3339)
 
-	if baseUrl == "" {
-		return argoError(now, models.ErrUnknownError, "Argo CD base URL not configured", models.StatusUnknown)
+	if len(targets) == 0 {
+		collectedAt := now
+		return models.CollectEnvelope[models.ArgoCdData]{
+			Source:      models.SourceArgoCD,
+			Status:      models.StatusOk,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        models.ArgoCdData{Applications: []models.ArgoCdApplication{}},
+		}
 	}
 
-	token := strings.TrimSpace(os.Getenv("ARGOCD_TOKEN"))
-	if token == "" {
-		return argoError(now, models.ErrPermissionDenied, "ARGOCD_TOKEN is missing", models.StatusPermissionError)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	applications := []models.ArgoCdApplication{}
+	status := models.StatusOk
+	var collectErr *models.CollectError
+
+	for _, target := range targets {
+		wg.Add(1)
+		go func(target models.ArgoCDCollectTarget) {
+			defer wg.Done()
+			result := collectArgoCDTarget(ctx, target, now)
+			mu.Lock()
+			applications = append(applications, result.Data.Applications...)
+			if severity(result.Status) > severity(status) {
+				status = result.Status
+				collectErr = result.Error
+			}
+			mu.Unlock()
+		}(target)
 	}
+	wg.Wait()
+
+	collectedAt := now
+	return models.CollectEnvelope[models.ArgoCdData]{
+		Source:      models.SourceArgoCD,
+		Status:      status,
+		AttemptedAt: now,
+		CollectedAt: &collectedAt,
+		Stale:       status == models.StatusStale,
+		Error:       collectErr,
+		Data:        models.ArgoCdData{Applications: applications},
+	}
+}
+
+func collectArgoCDTarget(ctx context.Context, target models.ArgoCDCollectTarget, now string) models.CollectEnvelope[models.ArgoCdData] {
+	baseUrl := strings.TrimRight(target.BaseURL, "/")
 
 	reqCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
@@ -53,7 +91,7 @@ func CollectArgoCD(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Authorization", "Bearer "+target.Token)
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
@@ -112,12 +150,13 @@ func CollectArgoCD(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 		}
 
 		applications = append(applications, models.ArgoCdApplication{
-			Name:         name,
-			Namespace:    namespace,
-			SyncStatus:   syncStatus,
-			HealthStatus: healthStatus,
-			Revision:     revPtr,
-			Link:         baseUrl + "/applications/" + name,
+			IntegrationName: target.Name,
+			Name:            name,
+			Namespace:       namespace,
+			SyncStatus:      syncStatus,
+			HealthStatus:    healthStatus,
+			Revision:        revPtr,
+			Link:            baseUrl + "/applications/" + name,
 		})
 
 		if healthStatus == "Degraded" || healthStatus == "Unknown" || (syncStatus != "Synced" && healthStatus != "Progressing") {
@@ -144,6 +183,21 @@ func CollectArgoCD(ctx context.Context, cfg *config.AppConfig) models.CollectEnv
 		Stale:       false,
 		Error:       nil,
 		Data:        models.ArgoCdData{Applications: applications},
+	}
+}
+
+func severity(status models.SourceStatus) int {
+	switch status {
+	case models.StatusDown, models.StatusTimeout, models.StatusPermissionError:
+		return 4
+	case models.StatusStale:
+		return 3
+	case models.StatusProgressing:
+		return 2
+	case models.StatusUnknown:
+		return 1
+	default:
+		return 0
 	}
 }
 

@@ -14,9 +14,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
-	"omni-backend/internal/config"
 	"omni-backend/internal/models"
 )
 
@@ -154,18 +154,74 @@ func (e *kubernetesAPIError) Error() string {
 	return e.err.Error()
 }
 
-func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.CollectEnvelope[models.KubernetesData] {
+func CollectKubernetes(ctx context.Context, targets []models.KubernetesCollectTarget) models.CollectEnvelope[models.KubernetesData] {
 	now := time.Now().Format(time.RFC3339)
-	data := emptyKubernetesData(cfg)
-
-	baseURL := strings.TrimRight(os.Getenv("KUBERNETES_API_URL"), "/")
-	if baseURL == "" {
-		return kubernetesError(now, data, models.ErrUnknownError, "KUBERNETES_API_URL is missing", models.StatusUnknown)
+	if len(targets) == 0 {
+		collectedAt := now
+		return models.CollectEnvelope[models.KubernetesData]{
+			Source:      models.SourceKubernetes,
+			Status:      models.StatusOk,
+			AttemptedAt: now,
+			CollectedAt: &collectedAt,
+			Stale:       false,
+			Data:        emptyKubernetesData(models.KubernetesCollectTarget{ClusterName: "unconfigured"}),
+		}
 	}
 
-	token := strings.TrimSpace(os.Getenv("KUBERNETES_BEARER_TOKEN"))
-	if token == "" {
-		return kubernetesError(now, data, models.ErrPermissionDenied, "KUBERNETES_BEARER_TOKEN is missing", models.StatusPermissionError)
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	merged := emptyKubernetesData(targets[0])
+	merged.ClusterName = ""
+	status := models.StatusOk
+	var collectErr *models.CollectError
+	isStale := false
+
+	for _, target := range targets {
+		wg.Add(1)
+		go func(target models.KubernetesCollectTarget) {
+			defer wg.Done()
+			result := collectKubernetesTarget(ctx, target, now)
+			mu.Lock()
+			mergeKubernetesData(&merged, result.Data)
+			if severity(result.Status) > severity(status) {
+				status = result.Status
+				collectErr = result.Error
+			}
+			if result.Stale {
+				isStale = true
+			}
+			mu.Unlock()
+		}(target)
+	}
+	wg.Wait()
+	if merged.ClusterName == "" {
+		names := make([]string, 0, len(targets))
+		for _, target := range targets {
+			names = append(names, target.ClusterName)
+		}
+		merged.ClusterName = strings.Join(names, ", ")
+	}
+
+	collectedAt := now
+	return models.CollectEnvelope[models.KubernetesData]{
+		Source:      models.SourceKubernetes,
+		Status:      status,
+		AttemptedAt: now,
+		CollectedAt: &collectedAt,
+		Stale:       isStale,
+		Error:       collectErr,
+		Data:        merged,
+	}
+}
+
+func collectKubernetesTarget(ctx context.Context, target models.KubernetesCollectTarget, now string) models.CollectEnvelope[models.KubernetesData] {
+	data := emptyKubernetesData(target)
+	baseURL := strings.TrimRight(target.APIURL, "/")
+	if baseURL == "" {
+		return kubernetesError(now, data, models.ErrUnknownError, "Kubernetes API URL not configured", models.StatusUnknown)
+	}
+	if strings.TrimSpace(target.Token) == "" {
+		return kubernetesError(now, data, models.ErrPermissionDenied, "Kubernetes bearer token is missing", models.StatusPermissionError)
 	}
 
 	client, err := newKubernetesHTTPClient()
@@ -176,20 +232,23 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 	reqCtx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 
-	nodes, err := fetchKubernetesJSON[kubernetesList[kubernetesNode]](reqCtx, client, baseURL, token, "/api/v1/nodes")
+	nodes, err := fetchKubernetesJSON[kubernetesList[kubernetesNode]](reqCtx, client, baseURL, target.Token, "/api/v1/nodes")
 	if err != nil {
 		return kubernetesAPIEnvelope(now, data, err)
 	}
 
-	metrics := fetchKubernetesNodeMetrics(reqCtx, client, baseURL, token)
+	metrics := fetchKubernetesNodeMetrics(reqCtx, client, baseURL, target.Token)
 	data.Nodes = toNodeStatuses(nodes.Items, metrics)
+	for i := range data.Nodes {
+		data.Nodes[i].IntegrationName = target.Name
+	}
 
 	workloads := make([]models.KubernetesWorkloadStatus, 0)
 	podRestartsByWorkload := make(map[string]int)
 	isStale := hasNotReadyNode(data.Nodes)
 
-	for _, namespace := range cfg.Inventory.Kubernetes.Namespaces {
-		pods, err := fetchKubernetesJSON[kubernetesList[kubernetesPod]](reqCtx, client, baseURL, token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/pods")
+	for _, namespace := range target.Namespaces {
+		pods, err := fetchKubernetesJSON[kubernetesList[kubernetesPod]](reqCtx, client, baseURL, target.Token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/pods")
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
@@ -208,19 +267,19 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 			}
 		}
 
-		replicaSets, err := fetchKubernetesJSON[kubernetesList[kubernetesReplicaSet]](reqCtx, client, baseURL, token, "/apis/apps/v1/namespaces/"+url.PathEscape(namespace)+"/replicasets")
+		replicaSets, err := fetchKubernetesJSON[kubernetesList[kubernetesReplicaSet]](reqCtx, client, baseURL, target.Token, "/apis/apps/v1/namespaces/"+url.PathEscape(namespace)+"/replicasets")
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
 		podRestartsByWorkload = mergeRestartCounts(podRestartsByWorkload, buildRestartByWorkload(namespace, pods.Items, replicaSets.Items))
 
-		services, err := fetchKubernetesJSON[kubernetesList[kubernetesService]](reqCtx, client, baseURL, token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/services")
+		services, err := fetchKubernetesJSON[kubernetesList[kubernetesService]](reqCtx, client, baseURL, target.Token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/services")
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
 		data.Services.Total += len(services.Items)
 
-		pvcs, err := fetchKubernetesJSON[kubernetesList[kubernetesPersistentVolumeClaim]](reqCtx, client, baseURL, token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/persistentvolumeclaims")
+		pvcs, err := fetchKubernetesJSON[kubernetesList[kubernetesPersistentVolumeClaim]](reqCtx, client, baseURL, target.Token, "/api/v1/namespaces/"+url.PathEscape(namespace)+"/persistentvolumeclaims")
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
@@ -235,7 +294,7 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 			}
 		}
 
-		ingresses, err := fetchKubernetesJSON[kubernetesList[kubernetesIngress]](reqCtx, client, baseURL, token, "/apis/networking.k8s.io/v1/namespaces/"+url.PathEscape(namespace)+"/ingresses")
+		ingresses, err := fetchKubernetesJSON[kubernetesList[kubernetesIngress]](reqCtx, client, baseURL, target.Token, "/apis/networking.k8s.io/v1/namespaces/"+url.PathEscape(namespace)+"/ingresses")
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
@@ -248,7 +307,7 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 			}
 		}
 
-		namespaceWorkloads, namespaceStale, err := fetchKubernetesWorkloads(reqCtx, client, baseURL, token, namespace)
+		namespaceWorkloads, namespaceStale, err := fetchKubernetesWorkloads(reqCtx, client, baseURL, target.Token, namespace)
 		if err != nil {
 			return kubernetesAPIEnvelope(now, data, err)
 		}
@@ -259,11 +318,12 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 	}
 
 	for i := range workloads {
+		workloads[i].IntegrationName = target.Name
 		workloads[i].RestartCount = podRestartsByWorkload[workloadKey(workloads[i].Namespace, workloads[i].Kind, workloads[i].Name)]
 	}
 
 	data.Workloads = workloads
-	data.AppWorkloads = filterAppWorkloads(workloads, cfg.Inventory.Kubernetes.AppNamespaces)
+	data.AppWorkloads = filterAppWorkloads(workloads, target.AppNamespaces)
 
 	status := models.StatusOk
 	if isStale {
@@ -282,8 +342,8 @@ func CollectKubernetes(ctx context.Context, cfg *config.AppConfig) models.Collec
 	}
 }
 
-func emptyKubernetesData(cfg *config.AppConfig) models.KubernetesData {
-	clusterName := cfg.Inventory.Kubernetes.ClusterName
+func emptyKubernetesData(target models.KubernetesCollectTarget) models.KubernetesData {
+	clusterName := target.ClusterName
 	if clusterName == "" {
 		clusterName = "unknown-cluster"
 	}
@@ -291,7 +351,7 @@ func emptyKubernetesData(cfg *config.AppConfig) models.KubernetesData {
 	return models.KubernetesData{
 		ClusterName:  clusterName,
 		Nodes:        []models.KubernetesNodeStatus{},
-		Namespaces:   cfg.Inventory.Kubernetes.Namespaces,
+		Namespaces:   target.Namespaces,
 		Workloads:    []models.KubernetesWorkloadStatus{},
 		AppWorkloads: []models.KubernetesWorkloadStatus{},
 		Pods:         models.PodsStatus{},
@@ -301,6 +361,28 @@ func emptyKubernetesData(cfg *config.AppConfig) models.KubernetesData {
 		},
 		Pvcs: models.PvcsStatus{},
 	}
+}
+
+func mergeKubernetesData(dst *models.KubernetesData, src models.KubernetesData) {
+	if dst.ClusterName == "" {
+		dst.ClusterName = src.ClusterName
+	} else if src.ClusterName != "" {
+		dst.ClusterName += ", " + src.ClusterName
+	}
+	dst.Nodes = append(dst.Nodes, src.Nodes...)
+	dst.Namespaces = append(dst.Namespaces, src.Namespaces...)
+	dst.Workloads = append(dst.Workloads, src.Workloads...)
+	dst.AppWorkloads = append(dst.AppWorkloads, src.AppWorkloads...)
+	dst.Pods.Total += src.Pods.Total
+	dst.Pods.Ready += src.Pods.Ready
+	dst.Pods.NotReady += src.Pods.NotReady
+	dst.Pods.Restarting += src.Pods.Restarting
+	dst.Services.Total += src.Services.Total
+	dst.Ingresses.Total += src.Ingresses.Total
+	dst.Ingresses.Hosts = append(dst.Ingresses.Hosts, src.Ingresses.Hosts...)
+	dst.Pvcs.Total += src.Pvcs.Total
+	dst.Pvcs.Bound += src.Pvcs.Bound
+	dst.Pvcs.Pending += src.Pvcs.Pending
 }
 
 func newKubernetesHTTPClient() (*http.Client, error) {
