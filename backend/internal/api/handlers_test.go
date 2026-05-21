@@ -35,6 +35,61 @@ func TestCollectSnapshotRoute(t *testing.T) {
 	}
 }
 
+func TestCollectSnapshotRouteHTTPStatus(t *testing.T) {
+	tests := []struct {
+		name  string
+		cache *collector.Cache
+		want  int
+	}{
+		{name: "all unknown initial state", cache: collector.NewCache(), want: http.StatusOK},
+		{name: "all runtime sources healthy", cache: collectCacheWithStatuses(t, map[models.CollectSource]models.SourceStatus{}), want: http.StatusOK},
+		{name: "partial runtime source failure", cache: collectCacheWithStatuses(t, map[models.CollectSource]models.SourceStatus{models.SourceNexus: models.StatusDown}), want: http.StatusMultiStatus},
+		{name: "all runtime sources failed", cache: collectCacheWithStatuses(t, map[models.CollectSource]models.SourceStatus{
+			models.SourceVMs:        models.StatusDown,
+			models.SourceKubernetes: models.StatusDown,
+			models.SourceArgoCD:     models.StatusTimeout,
+			models.SourceGitLab:     models.StatusPermissionError,
+			models.SourceNexus:      models.StatusDown,
+		}), want: http.StatusBadGateway},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			ginRouter := SetupRouter(tt.cache, nil, nil, nil)
+
+			req := httptest.NewRequest(http.MethodGet, "/api/collect/snapshot", nil)
+			rec := httptest.NewRecorder()
+
+			ginRouter.ServeHTTP(rec, req)
+
+			if rec.Code != tt.want {
+				t.Fatalf("expected status %d, got %d", tt.want, rec.Code)
+			}
+		})
+	}
+}
+
+func TestCollectSourceRouteHTTPStatus(t *testing.T) {
+	cache := collector.NewCache()
+	cache.SetNexus(models.CollectEnvelope[models.NexusData]{
+		Source: models.SourceNexus,
+		Status: models.StatusDown,
+		Error:  &models.CollectError{Code: models.ErrConnectionFailed, Message: "connection refused"},
+	})
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(cache, nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/collect/nexus", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadGateway {
+		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, rec.Code)
+	}
+}
+
 func TestTestResultHTTPStatus(t *testing.T) {
 	upstream400 := http.StatusBadRequest
 	upstream404 := http.StatusNotFound
@@ -49,6 +104,7 @@ func TestTestResultHTTPStatus(t *testing.T) {
 		want       int
 	}{
 		{name: "ok", status: models.StatusOk, want: http.StatusOK},
+		{name: "unknown without error", status: models.StatusUnknown, want: http.StatusOK},
 		{name: "stale", status: models.StatusStale, want: http.StatusOK},
 		{name: "permission status", status: models.StatusPermissionError, collectErr: &models.CollectError{Code: models.ErrPermissionDenied}, want: http.StatusForbidden},
 		{name: "upstream 400", status: models.StatusDown, collectErr: &models.CollectError{Code: models.ErrConnectionFailed, UpstreamStatus: &upstream400}, want: http.StatusUnprocessableEntity},
@@ -70,4 +126,39 @@ func TestTestResultHTTPStatus(t *testing.T) {
 			}
 		})
 	}
+}
+
+func collectCacheWithStatuses(t *testing.T, statuses map[models.CollectSource]models.SourceStatus) *collector.Cache {
+	t.Helper()
+	cache := collector.NewCache()
+	statusFor := func(source models.CollectSource) models.SourceStatus {
+		if status, ok := statuses[source]; ok {
+			return status
+		}
+		return models.StatusOk
+	}
+	errorFor := func(status models.SourceStatus) *models.CollectError {
+		switch status {
+		case models.StatusDown:
+			return &models.CollectError{Code: models.ErrConnectionFailed, Message: "connection failed"}
+		case models.StatusTimeout:
+			return &models.CollectError{Code: models.ErrTimeout, Message: "timed out"}
+		case models.StatusPermissionError:
+			return &models.CollectError{Code: models.ErrPermissionDenied, Message: "permission denied"}
+		default:
+			return nil
+		}
+	}
+	vmStatus := statusFor(models.SourceVMs)
+	kubernetesStatus := statusFor(models.SourceKubernetes)
+	argoCDStatus := statusFor(models.SourceArgoCD)
+	gitLabStatus := statusFor(models.SourceGitLab)
+	nexusStatus := statusFor(models.SourceNexus)
+
+	cache.SetVMs(models.CollectEnvelope[models.VmsData]{Source: models.SourceVMs, Status: vmStatus, Error: errorFor(vmStatus)})
+	cache.SetKubernetes(models.CollectEnvelope[models.KubernetesData]{Source: models.SourceKubernetes, Status: kubernetesStatus, Error: errorFor(kubernetesStatus)})
+	cache.SetArgoCD(models.CollectEnvelope[models.ArgoCdData]{Source: models.SourceArgoCD, Status: argoCDStatus, Error: errorFor(argoCDStatus)})
+	cache.SetGitLab(models.CollectEnvelope[models.GitLabData]{Source: models.SourceGitLab, Status: gitLabStatus, Error: errorFor(gitLabStatus)})
+	cache.SetNexus(models.CollectEnvelope[models.NexusData]{Source: models.SourceNexus, Status: nexusStatus, Error: errorFor(nexusStatus)})
+	return cache
 }

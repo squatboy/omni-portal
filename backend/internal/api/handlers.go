@@ -42,14 +42,33 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 			if c.Query("force") == "true" && runner != nil {
 				runner.CollectOnce(c.Request.Context())
 			}
-			c.JSON(http.StatusOK, cache.GetSnapshot())
+			snapshot := cache.GetSnapshot()
+			c.JSON(snapshotHTTPStatus(snapshot), snapshot)
 		})
-		collect.GET("/vms", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetVMs()) })
-		collect.GET("/kubernetes", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetKubernetes()) })
-		collect.GET("/argocd", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetArgoCD()) })
-		collect.GET("/gitlab", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetGitLab()) })
-		collect.GET("/nexus", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetNexus()) })
-		collect.GET("/overview", func(c *gin.Context) { c.JSON(http.StatusOK, cache.GetOverview()) })
+		collect.GET("/vms", func(c *gin.Context) {
+			envelope := cache.GetVMs()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
+		collect.GET("/kubernetes", func(c *gin.Context) {
+			envelope := cache.GetKubernetes()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
+		collect.GET("/argocd", func(c *gin.Context) {
+			envelope := cache.GetArgoCD()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
+		collect.GET("/gitlab", func(c *gin.Context) {
+			envelope := cache.GetGitLab()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
+		collect.GET("/nexus", func(c *gin.Context) {
+			envelope := cache.GetNexus()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
+		collect.GET("/overview", func(c *gin.Context) {
+			envelope := cache.GetOverview()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
 	}
 
 	manage := r.Group("/api/manage")
@@ -427,12 +446,53 @@ func writeError(c *gin.Context, status int, err error) {
 }
 
 func writeTestResult(c *gin.Context, status models.SourceStatus, collectErr *models.CollectError) {
-	ok := status == models.StatusOk || status == models.StatusProgressing || status == models.StatusStale
+	ok := !isCollectFailure(status, collectErr)
 	c.JSON(testResultHTTPStatus(status, collectErr), gin.H{"ok": ok, "status": status, "error": collectErr})
 }
 
+func snapshotHTTPStatus(snapshot models.DashboardSnapshot) int {
+	failures := 0
+	runtimeSources := []struct {
+		status models.SourceStatus
+		err    *models.CollectError
+	}{
+		{status: snapshot.VMs.Status, err: snapshot.VMs.Error},
+		{status: snapshot.Kubernetes.Status, err: snapshot.Kubernetes.Error},
+		{status: snapshot.ArgoCD.Status, err: snapshot.ArgoCD.Error},
+		{status: snapshot.GitLab.Status, err: snapshot.GitLab.Error},
+		{status: snapshot.Nexus.Status, err: snapshot.Nexus.Error},
+	}
+
+	for _, source := range runtimeSources {
+		if isCollectFailure(source.status, source.err) {
+			failures++
+		}
+	}
+	if failures == 0 {
+		return http.StatusOK
+	}
+	if failures == len(runtimeSources) {
+		return http.StatusBadGateway
+	}
+	return http.StatusMultiStatus
+}
+
+func collectEnvelopeHTTPStatus(status models.SourceStatus, collectErr *models.CollectError) int {
+	if !isCollectFailure(status, collectErr) {
+		return http.StatusOK
+	}
+	return testResultHTTPStatus(status, collectErr)
+}
+
+func isCollectFailure(status models.SourceStatus, collectErr *models.CollectError) bool {
+	if collectErr != nil {
+		return true
+	}
+	return status == models.StatusDown || status == models.StatusTimeout || status == models.StatusPermissionError
+}
+
 func testResultHTTPStatus(status models.SourceStatus, collectErr *models.CollectError) int {
-	if status == models.StatusOk || status == models.StatusProgressing || status == models.StatusStale {
+	if !isCollectFailure(status, collectErr) {
 		return http.StatusOK
 	}
 	if status == models.StatusPermissionError || (collectErr != nil && collectErr.Code == models.ErrPermissionDenied) {

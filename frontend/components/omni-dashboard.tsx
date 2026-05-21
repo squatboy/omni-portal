@@ -19,7 +19,11 @@ import { AppSidebar, type AppView } from "./app-sidebar"
 import { AuthScreen } from "./auth-screen"
 import { POLL_INTERVAL_MS, sourceLabels } from "./dashboard/lib/constants"
 import type { DashboardSnapshot, DashboardTab } from "./dashboard/lib/types"
-import { formatDateTime, loadSnapshot } from "./dashboard/lib/utils"
+import {
+  allRuntimeSourcesFailed,
+  formatDateTime,
+  loadSnapshot,
+} from "./dashboard/lib/utils"
 import { HealthBadge } from "./dashboard/shared/common"
 import { DashboardContent } from "./dashboard/shared/dashboard-content"
 import { DashboardSkeleton } from "./dashboard/shared/dashboard-skeleton"
@@ -83,7 +87,7 @@ function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
 
 export function OmniDashboard() {
   const mounted = React.useSyncExternalStore(
-    React.useCallback(() => () => { }, []),
+    React.useCallback(() => () => {}, []),
     () => true,
     () => false
   )
@@ -114,7 +118,9 @@ export function OmniDashboard() {
       try {
         const nextSnapshot = await loadSnapshot(force)
         setSnapshot(nextSnapshot)
-        setError(null)
+        setError(
+          allRuntimeSourcesFailed(nextSnapshot) ? "All sources failed" : null
+        )
         setLastUiRefreshAt(new Date().toISOString())
       } catch (refreshError) {
         setError(
@@ -222,7 +228,7 @@ export function OmniDashboard() {
               {error ? (
                 <Badge variant="destructive">
                   <AlertTriangle data-icon="inline-start" />
-                  Poll failed
+                  {error === "All sources failed" ? error : "Poll failed"}
                 </Badge>
               ) : null}
               <HealthBadge health={snapshot?.overview.data.health} />

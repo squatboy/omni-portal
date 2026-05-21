@@ -78,19 +78,71 @@ function normalizeSnapshot(snapshot: DashboardSnapshot): DashboardSnapshot {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null
+}
+
+function isCollectEnvelope(value: unknown) {
+  if (!isRecord(value)) {
+    return false
+  }
+  return (
+    typeof value.source === "string" &&
+    typeof value.status === "string" &&
+    "data" in value
+  )
+}
+
+function isDashboardSnapshot(value: unknown): value is DashboardSnapshot {
+  if (!isRecord(value)) {
+    return false
+  }
+  return (
+    isCollectEnvelope(value.overview) &&
+    isCollectEnvelope(value.vms) &&
+    isCollectEnvelope(value.kubernetes) &&
+    isCollectEnvelope(value.argocd) &&
+    isCollectEnvelope(value.gitlab) &&
+    isCollectEnvelope(value.nexus)
+  )
+}
+
 export async function loadSnapshot(force = false): Promise<DashboardSnapshot> {
   if (isMockMode()) {
     return createMockSnapshot()
   }
-  const url = force ? "/api/collect/snapshot?force=true" : "/api/collect/snapshot"
+  const url = force
+    ? "/api/collect/snapshot?force=true"
+    : "/api/collect/snapshot"
   const response = await fetch(url, { cache: "no-store" })
 
-  if (!response.ok) {
+  if (!response.ok && response.status !== 502) {
     throw new Error(`Collect snapshot API returned ${response.status}`)
   }
 
-  const payload = (await response.json()) as DashboardSnapshot
+  const payload = (await response.json().catch(() => null)) as unknown
+  if (!isDashboardSnapshot(payload)) {
+    throw new Error(`Collect snapshot API returned ${response.status}`)
+  }
+
   return normalizeSnapshot(payload)
+}
+
+export function allRuntimeSourcesFailed(snapshot: DashboardSnapshot) {
+  const runtimeSources = [
+    snapshot.vms,
+    snapshot.kubernetes,
+    snapshot.argocd,
+    snapshot.gitlab,
+    snapshot.nexus,
+  ]
+  return runtimeSources.every(
+    (source) =>
+      source.error !== null ||
+      source.status === "down" ||
+      source.status === "timeout" ||
+      source.status === "permission_error"
+  )
 }
 
 export function badgeVariant(

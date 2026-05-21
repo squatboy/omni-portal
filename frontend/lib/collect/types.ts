@@ -26,6 +26,7 @@ export type CollectErrorCode =
 export type CollectError = {
   code: CollectErrorCode
   message: string
+  upstreamStatus?: number
 }
 
 export type CollectEnvelope<
