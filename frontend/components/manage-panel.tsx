@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { ColumnDef } from "@tanstack/react-table"
 import {
   Check,
   Eye,
@@ -53,6 +54,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { DataTable } from "@/components/ui/data-table"
 
 const emptyVM: VMResource = {
   id: "",
@@ -990,7 +992,14 @@ function IntegrationCard({
 }
 
 function IntegrationList<
-  T extends { id: string; name: string; active: boolean },
+  T extends {
+    id: string
+    name: string
+    active: boolean
+    apiUrl?: string
+    baseUrl?: string
+    url?: string
+  },
 >({
   items,
   onEdit,
@@ -1004,19 +1013,42 @@ function IntegrationList<
   editingId?: string | null
   renderEditForm?: (item: T) => React.ReactNode
 }) {
-  return (
-    <div className="flex flex-col gap-2">
-      {items.map((item) => (
-        <div
-          key={item.id}
-          className="flex flex-col gap-3 rounded-md border p-3 text-sm"
-        >
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 truncate font-medium">{item.name}</div>
-            <div className="flex items-center gap-2">
-              <Badge variant={item.active ? "secondary" : "outline"}>
-                {item.active ? "active" : "inactive"}
-              </Badge>
+  const columns = React.useMemo<ColumnDef<T>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+      },
+      {
+        accessorKey: "url",
+        header: "URL",
+        cell: ({ row }) => {
+          const item = row.original
+          const displayUrl = item.apiUrl || item.baseUrl || item.url
+          return (
+            <div className="font-mono text-xs text-muted-foreground">
+              {displayUrl || "-"}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: "active",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant={row.original.active ? "secondary" : "outline"}>
+            {row.original.active ? "active" : "inactive"}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        cell: ({ row }) => {
+          const item = row.original
+          return (
+            <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => onEdit(item)}>
                 {editingId === item.id ? "Cancel" : "Edit"}
               </Button>
@@ -1031,15 +1063,25 @@ function IntegrationList<
                 </Button>
               ) : null}
             </div>
-          </div>
-          {editingId === item.id && renderEditForm && (
-            <div className="border-t pt-3 flex flex-col gap-3 animate-slide-down">
-              {renderEditForm(item)}
-            </div>
-          )}
+          )
+        },
+      },
+    ],
+    [editingId, onEdit, onDelete]
+  )
+
+  return (
+    <DataTable
+      columns={columns}
+      data={items}
+      getRowId={(row) => row.id}
+      expandedId={editingId}
+      renderSubComponent={(item) => (
+        <div className="animate-slide-down">
+          {renderEditForm?.(item)}
         </div>
-      ))}
-    </div>
+      )}
+    />
   )
 }
 
