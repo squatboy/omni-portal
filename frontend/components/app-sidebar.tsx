@@ -159,7 +159,7 @@ export function AppSidebar({
                       <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
                     </SidebarMenuButton>
                   </CollapsibleTrigger>
-                  <CollapsibleContent>
+                  <CollapsibleContent className="overflow-hidden data-[state=open]:animate-[collapsible-down_0.2s_cubic-bezier(0.87,_0,_0.13,_1)] data-[state=closed]:animate-[collapsible-up_0.1s_cubic-bezier(0.87,_0,_0.13,_1)]">
                     <SidebarMenuSub>
                       {manageItems.map((item) => (
                         <SidebarMenuSubItem key={item.view}>
