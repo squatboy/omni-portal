@@ -145,29 +145,64 @@ export function ManagePanel({ section }: { section: ManageSection }) {
     mustChangePassword: true,
   })
 
-  const load = React.useCallback(async () => {
-    const [
-      nextVMs,
-      nextKubernetes,
-      nextArgoCD,
-      nextGitLab,
-      nextNexus,
-      nextUsers,
-    ] = await Promise.all([
-      api.listVMs(),
-      api.listKubernetes(),
-      api.listArgoCD(),
-      api.listGitLab(),
-      api.listNexus(),
-      api.listUsers(),
-    ])
+  const [editingKubernetesId, setEditingKubernetesId] = React.useState<string | null>(null)
+  const [editKubernetesForm, setEditKubernetesForm] = React.useState<
+    KubernetesIntegration & { token: string }
+  >(emptyKubernetes)
+
+  const [editingArgoCDId, setEditingArgoCDId] = React.useState<string | null>(null)
+  const [editArgoCDForm, setEditArgoCDForm] = React.useState<
+    ArgoCDIntegration & { token: string }
+  >(emptyArgoCD)
+
+  const [editingGitLabId, setEditingGitLabId] = React.useState<string | null>(null)
+  const [editGitLabForm, setEditGitLabForm] = React.useState<
+    GitLabIntegration & { token: string; projectsText: string }
+  >(emptyGitLab)
+
+  const [editingNexusId, setEditingNexusId] = React.useState<string | null>(null)
+  const [editNexusForm, setEditNexusForm] = React.useState<NexusIntegration>(emptyNexus)
+
+  const loadVMs = React.useCallback(async () => {
+    const nextVMs = await api.listVMs()
     setVMs(nextVMs ?? [])
+  }, [])
+
+  const loadKubernetes = React.useCallback(async () => {
+    const nextKubernetes = await api.listKubernetes()
     setKubernetes(nextKubernetes ?? [])
+  }, [])
+
+  const loadArgoCD = React.useCallback(async () => {
+    const nextArgoCD = await api.listArgoCD()
     setArgoCD(nextArgoCD ?? [])
+  }, [])
+
+  const loadGitLab = React.useCallback(async () => {
+    const nextGitLab = await api.listGitLab()
     setGitLab(nextGitLab ?? [])
+  }, [])
+
+  const loadNexus = React.useCallback(async () => {
+    const nextNexus = await api.listNexus()
     setNexus(nextNexus ?? [])
+  }, [])
+
+  const loadUsers = React.useCallback(async () => {
+    const nextUsers = await api.listUsers()
     setUsers(nextUsers ?? [])
   }, [])
+
+  const load = React.useCallback(async () => {
+    await Promise.all([
+      loadVMs(),
+      loadKubernetes(),
+      loadArgoCD(),
+      loadGitLab(),
+      loadNexus(),
+      loadUsers(),
+    ])
+  }, [loadVMs, loadKubernetes, loadArgoCD, loadGitLab, loadNexus, loadUsers])
 
   React.useEffect(() => {
     const id = window.setTimeout(() => {
@@ -181,38 +216,46 @@ export function ManagePanel({ section }: { section: ManageSection }) {
     await api.saveVM(vmForm)
     setVMForm(emptyVM)
     setMessage("VM saved.")
-    await load()
+    await loadVMs()
   }
 
-  async function saveKubernetes() {
-    await api.saveKubernetes(kubernetesForm)
-    setKubernetesForm(emptyKubernetes)
+  async function saveKubernetes(form: KubernetesIntegration & { token: string }, isEdit = false) {
+    await api.saveKubernetes(form)
+    if (!isEdit) {
+      setKubernetesForm(emptyKubernetes)
+    }
     setMessage("Kubernetes integration saved.")
-    await load()
+    await loadKubernetes()
   }
 
-  async function saveArgoCD() {
-    await api.saveArgoCD(argocdForm)
-    setArgoCDForm(emptyArgoCD)
+  async function saveArgoCD(form: ArgoCDIntegration & { token: string }, isEdit = false) {
+    await api.saveArgoCD(form)
+    if (!isEdit) {
+      setArgoCDForm(emptyArgoCD)
+    }
     setMessage("ArgoCD integration saved.")
-    await load()
+    await loadArgoCD()
   }
 
-  async function saveGitLab() {
+  async function saveGitLab(form: GitLabIntegration & { token: string; projectsText: string }, isEdit = false) {
     await api.saveGitLab({
-      ...gitlabForm,
-      projects: parseProjects(gitlabForm.projectsText),
+      ...form,
+      projects: parseProjects(form.projectsText),
     })
-    setGitLabForm(emptyGitLab)
+    if (!isEdit) {
+      setGitLabForm(emptyGitLab)
+    }
     setMessage("GitLab integration saved.")
-    await load()
+    await loadGitLab()
   }
 
-  async function saveNexus() {
-    await api.saveNexus(nexusForm)
-    setNexusForm(emptyNexus)
+  async function saveNexus(form: NexusIntegration, isEdit = false) {
+    await api.saveNexus(form)
+    if (!isEdit) {
+      setNexusForm(emptyNexus)
+    }
     setMessage("Nexus integration saved.")
-    await load()
+    await loadNexus()
   }
 
   async function createUser() {
@@ -224,7 +267,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
       mustChangePassword: true,
     })
     setMessage("User created.")
-    await load()
+    await loadUsers()
   }
 
   return (
@@ -251,7 +294,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               onDelete={(id) =>
                 void api
                   .deleteVM(id)
-                  .then(load)
+                  .then(loadVMs)
                   .catch((error) => setMessage(error.message))
               }
             />
@@ -265,7 +308,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                void saveKubernetes().catch((error) =>
+                void saveKubernetes(kubernetesForm, false).catch((error) =>
                   setMessage(error.message)
                 )
               }}
@@ -304,6 +347,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 }
               />
               <ActiveToggle
+                id="kubernetes-active"
                 checked={kubernetesForm.active}
                 onChange={(active) =>
                   setKubernetesForm((prev) => ({ ...prev, active }))
@@ -313,13 +357,77 @@ export function ManagePanel({ section }: { section: ManageSection }) {
             </form>
             <IntegrationList
               items={kubernetes}
-              onEdit={(item) => setKubernetesForm({ ...item, token: "" })}
+              editingId={editingKubernetesId}
+              onEdit={(item) => {
+                if (editingKubernetesId === item.id) {
+                  setEditingKubernetesId(null)
+                  setEditKubernetesForm(emptyKubernetes)
+                } else {
+                  setEditingKubernetesId(item.id)
+                  setEditKubernetesForm({ ...item, token: "" })
+                }
+              }}
               onDelete={(id) =>
                 void api
                   .deleteKubernetes(id)
-                  .then(load)
+                  .then(loadKubernetes)
                   .catch((error) => setMessage(error.message))
               }
+              renderEditForm={(item) => (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void saveKubernetes(editKubernetesForm, true)
+                      .then(() => {
+                        setEditingKubernetesId(null)
+                      })
+                      .catch((error) => setMessage(error.message))
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={editKubernetesForm.name}
+                    onChange={(name) =>
+                      setEditKubernetesForm((prev) => ({ ...prev, name }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="API URL"
+                    value={editKubernetesForm.apiUrl}
+                    onChange={(apiUrl) =>
+                      setEditKubernetesForm((prev) => ({ ...prev, apiUrl }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Namespaces"
+                    value={editKubernetesForm.namespaces.join(",")}
+                    onChange={(value) =>
+                      setEditKubernetesForm((prev) => ({
+                        ...prev,
+                        namespaces: splitList(value),
+                      }))
+                    }
+                  />
+                  <SecretInput
+                    configured={editKubernetesForm.tokenConfigured}
+                    value={editKubernetesForm.token}
+                    onChange={(token) =>
+                      setEditKubernetesForm((prev) => ({ ...prev, token }))
+                    }
+                  />
+                  <ActiveToggle
+                    id={`kubernetes-active-${item.id}`}
+                    checked={editKubernetesForm.active}
+                    onChange={(active) =>
+                      setEditKubernetesForm((prev) => ({ ...prev, active }))
+                    }
+                  />
+                  <FormActions onTest={() => api.testKubernetes(editKubernetesForm)} />
+                </form>
+              )}
             />
           </IntegrationCard>
           <IntegrationCard title="ArgoCD" configured={argocd.length}>
@@ -327,7 +435,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                void saveArgoCD().catch((error) => setMessage(error.message))
+                void saveArgoCD(argocdForm, false).catch((error) => setMessage(error.message))
               }}
             >
               <TextInput
@@ -354,6 +462,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 }
               />
               <ActiveToggle
+                id="argocd-active"
                 checked={argocdForm.active}
                 onChange={(active) =>
                   setArgoCDForm((prev) => ({ ...prev, active }))
@@ -363,13 +472,67 @@ export function ManagePanel({ section }: { section: ManageSection }) {
             </form>
             <IntegrationList
               items={argocd}
-              onEdit={(item) => setArgoCDForm({ ...item, token: "" })}
+              editingId={editingArgoCDId}
+              onEdit={(item) => {
+                if (editingArgoCDId === item.id) {
+                  setEditingArgoCDId(null)
+                  setEditArgoCDForm(emptyArgoCD)
+                } else {
+                  setEditingArgoCDId(item.id)
+                  setEditArgoCDForm({ ...item, token: "" })
+                }
+              }}
               onDelete={(id) =>
                 void api
                   .deleteArgoCD(id)
-                  .then(load)
+                  .then(loadArgoCD)
                   .catch((error) => setMessage(error.message))
               }
+              renderEditForm={(item) => (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void saveArgoCD(editArgoCDForm, true)
+                      .then(() => {
+                        setEditingArgoCDId(null)
+                      })
+                      .catch((error) => setMessage(error.message))
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={editArgoCDForm.name}
+                    onChange={(name) =>
+                      setEditArgoCDForm((prev) => ({ ...prev, name }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Base URL"
+                    value={editArgoCDForm.baseUrl}
+                    onChange={(baseUrl) =>
+                      setEditArgoCDForm((prev) => ({ ...prev, baseUrl }))
+                    }
+                    required
+                  />
+                  <SecretInput
+                    configured={editArgoCDForm.tokenConfigured}
+                    value={editArgoCDForm.token}
+                    onChange={(token) =>
+                      setEditArgoCDForm((prev) => ({ ...prev, token }))
+                    }
+                  />
+                  <ActiveToggle
+                    id={`argocd-active-${item.id}`}
+                    checked={editArgoCDForm.active}
+                    onChange={(active) =>
+                      setEditArgoCDForm((prev) => ({ ...prev, active }))
+                    }
+                  />
+                  <FormActions onTest={() => api.testArgoCD(editArgoCDForm)} />
+                </form>
+              )}
             />
           </IntegrationCard>
           <IntegrationCard title="GitLab" configured={gitlab.length}>
@@ -377,7 +540,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                void saveGitLab().catch((error) => setMessage(error.message))
+                void saveGitLab(gitlabForm, false).catch((error) => setMessage(error.message))
               }}
             >
               <TextInput
@@ -412,6 +575,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 }
               />
               <ActiveToggle
+                id="gitlab-active"
                 checked={gitlabForm.active}
                 onChange={(active) =>
                   setGitLabForm((prev) => ({ ...prev, active }))
@@ -428,28 +592,95 @@ export function ManagePanel({ section }: { section: ManageSection }) {
             </form>
             <IntegrationList
               items={gitlab}
-              onEdit={(item) =>
-                setGitLabForm({
-                  ...item,
-                  token: "",
-                  projectsText: (item.projects ?? [])
-                    .map((project) =>
-                      [
-                        project.name,
-                        project.path,
-                        project.defaultBranch,
-                        project.link ?? "",
-                      ].join("|")
-                    )
-                    .join("\n"),
-                })
-              }
+              editingId={editingGitLabId}
+              onEdit={(item) => {
+                if (editingGitLabId === item.id) {
+                  setEditingGitLabId(null)
+                  setEditGitLabForm(emptyGitLab)
+                } else {
+                  setEditingGitLabId(item.id)
+                  setEditGitLabForm({
+                    ...item,
+                    token: "",
+                    projectsText: (item.projects ?? [])
+                      .map((project) =>
+                        [
+                          project.name,
+                          project.path,
+                          project.defaultBranch,
+                          project.link ?? "",
+                        ].join("|")
+                      )
+                      .join("\n"),
+                  })
+                }
+              }}
               onDelete={(id) =>
                 void api
                   .deleteGitLab(id)
-                  .then(load)
+                  .then(loadGitLab)
                   .catch((error) => setMessage(error.message))
               }
+              renderEditForm={(item) => (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void saveGitLab(editGitLabForm, true)
+                      .then(() => {
+                        setEditingGitLabId(null)
+                      })
+                      .catch((error) => setMessage(error.message))
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={editGitLabForm.name}
+                    onChange={(name) =>
+                      setEditGitLabForm((prev) => ({ ...prev, name }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Base URL"
+                    value={editGitLabForm.baseUrl}
+                    onChange={(baseUrl) =>
+                      setEditGitLabForm((prev) => ({ ...prev, baseUrl }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Projects"
+                    value={editGitLabForm.projectsText}
+                    onChange={(projectsText) =>
+                      setEditGitLabForm((prev) => ({ ...prev, projectsText }))
+                    }
+                    placeholder="name|group/project|main"
+                  />
+                  <SecretInput
+                    configured={editGitLabForm.tokenConfigured}
+                    value={editGitLabForm.token}
+                    onChange={(token) =>
+                      setEditGitLabForm((prev) => ({ ...prev, token }))
+                    }
+                  />
+                  <ActiveToggle
+                    id={`gitlab-active-${item.id}`}
+                    checked={editGitLabForm.active}
+                    onChange={(active) =>
+                      setEditGitLabForm((prev) => ({ ...prev, active }))
+                    }
+                  />
+                  <FormActions
+                    onTest={() =>
+                      api.testGitLab({
+                        ...editGitLabForm,
+                        projects: parseProjects(editGitLabForm.projectsText),
+                      })
+                    }
+                  />
+                </form>
+              )}
             />
           </IntegrationCard>
           <IntegrationCard title="Nexus" configured={nexus.length}>
@@ -457,7 +688,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               className="flex flex-col gap-3"
               onSubmit={(e) => {
                 e.preventDefault()
-                void saveNexus().catch((error) => setMessage(error.message))
+                void saveNexus(nexusForm, false).catch((error) => setMessage(error.message))
               }}
             >
               <TextInput
@@ -473,6 +704,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 required
               />
               <ActiveToggle
+                id="nexus-active"
                 checked={nexusForm.active}
                 onChange={(active) =>
                   setNexusForm((prev) => ({ ...prev, active }))
@@ -482,13 +714,60 @@ export function ManagePanel({ section }: { section: ManageSection }) {
             </form>
             <IntegrationList
               items={nexus}
-              onEdit={setNexusForm}
+              editingId={editingNexusId}
+              onEdit={(item) => {
+                if (editingNexusId === item.id) {
+                  setEditingNexusId(null)
+                  setEditNexusForm(emptyNexus)
+                } else {
+                  setEditingNexusId(item.id)
+                  setEditNexusForm(item)
+                }
+              }}
               onDelete={(id) =>
                 void api
                   .deleteNexus(id)
-                  .then(load)
+                  .then(loadNexus)
                   .catch((error) => setMessage(error.message))
               }
+              renderEditForm={(item) => (
+                <form
+                  className="flex flex-col gap-3"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void saveNexus(editNexusForm, true)
+                      .then(() => {
+                        setEditingNexusId(null)
+                      })
+                      .catch((error) => setMessage(error.message))
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={editNexusForm.name}
+                    onChange={(name) =>
+                      setEditNexusForm((prev) => ({ ...prev, name }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="URL"
+                    value={editNexusForm.url}
+                    onChange={(url) =>
+                      setEditNexusForm((prev) => ({ ...prev, url }))
+                    }
+                    required
+                  />
+                  <ActiveToggle
+                    id={`nexus-active-${item.id}`}
+                    checked={editNexusForm.active}
+                    onChange={(active) =>
+                      setEditNexusForm((prev) => ({ ...prev, active }))
+                    }
+                  />
+                  <FormActions onTest={() => api.testNexus(editNexusForm)} />
+                </form>
+              )}
             />
           </IntegrationCard>
         </div>
@@ -706,37 +985,48 @@ function IntegrationList<
   items,
   onEdit,
   onDelete,
+  editingId,
+  renderEditForm,
 }: {
   items: T[]
   onEdit: (item: T) => void
   onDelete?: (id: string) => void
+  editingId?: string | null
+  renderEditForm?: (item: T) => React.ReactNode
 }) {
   return (
     <div className="flex flex-col gap-2">
       {items.map((item) => (
         <div
           key={item.id}
-          className="flex items-center justify-between gap-3 rounded-md border px-3 py-2 text-sm"
+          className="flex flex-col gap-3 rounded-md border p-3 text-sm"
         >
-          <div className="min-w-0 truncate">{item.name}</div>
-          <div className="flex items-center gap-2">
-            <Badge variant={item.active ? "secondary" : "outline"}>
-              {item.active ? "active" : "inactive"}
-            </Badge>
-            <Button variant="outline" size="sm" onClick={() => onEdit(item)}>
-              Edit
-            </Button>
-            {onDelete ? (
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="Delete integration"
-                onClick={() => onDelete(item.id)}
-              >
-                <Trash2 data-icon="inline-start" />
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 truncate font-medium">{item.name}</div>
+            <div className="flex items-center gap-2">
+              <Badge variant={item.active ? "secondary" : "outline"}>
+                {item.active ? "active" : "inactive"}
+              </Badge>
+              <Button variant="outline" size="sm" onClick={() => onEdit(item)}>
+                {editingId === item.id ? "Cancel" : "Edit"}
               </Button>
-            ) : null}
+              {onDelete ? (
+                <Button
+                  variant="outline"
+                  size="icon-sm"
+                  aria-label="Delete integration"
+                  onClick={() => onDelete(item.id)}
+                >
+                  <Trash2 data-icon="inline-start" />
+                </Button>
+              ) : null}
+            </div>
           </div>
+          {editingId === item.id && renderEditForm && (
+            <div className="border-t pt-3 flex flex-col gap-3">
+              {renderEditForm(item)}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -846,20 +1136,22 @@ function SecretInput({
 }
 
 function ActiveToggle({
+  id = "active-toggle",
   checked,
   onChange,
 }: {
+  id?: string
   checked: boolean
   onChange: (checked: boolean) => void
 }) {
   return (
     <div className="flex items-center gap-2">
       <Checkbox
-        id="active-toggle"
+        id={id}
         checked={checked}
         onCheckedChange={(checked) => onChange(!!checked)}
       />
-      <Label htmlFor="active-toggle" className="text-xs font-medium cursor-pointer">
+      <Label htmlFor={id} className="text-xs font-medium cursor-pointer">
         Active
       </Label>
     </div>

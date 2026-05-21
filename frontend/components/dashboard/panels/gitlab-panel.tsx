@@ -68,21 +68,23 @@ export function GitLabPanel({
                   </div>
                 </TableCell>
                 <TableCell>
-                  <StatusBadge
-                    status={
-                      project.latestPipeline?.status === "success"
-                        ? "ok"
-                        : project.latestPipeline
-                          ? "stale"
-                          : "unknown"
-                    }
-                    label={project.latestPipeline?.status ?? "missing"}
-                  />
+                  {project.latestPipeline ? (
+                    <StatusBadge
+                      status={
+                        project.latestPipeline.status === "success"
+                          ? "ok"
+                          : "stale"
+                      }
+                      label={project.latestPipeline.status}
+                    />
+                  ) : (
+                    "-"
+                  )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">
                   {project.latestPipeline
                     ? formatDateTime(project.latestPipeline.updatedAt)
-                    : "unknown"}
+                    : "-"}
                 </TableCell>
                 <TableCell>
                   <ExternalLinkButton

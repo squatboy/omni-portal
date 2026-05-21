@@ -1,52 +1,21 @@
 # Manage CRUD
 
-Manage는 self-hosted 사용자가 UI에서 자신의 인프라 리소스와 외부 도구 연동 정보를 관리하는 영역이다.
-기존 파일 기반 `inventory.json`은 runtime source of truth에서 제거하고 PostgreSQL을 기준으로 한다.
+관리자가 웹 UI를 통해 가상 머신(VM) 및 외부 연동 도구(Kubernetes, GitLab, ArgoCD, Nexus) 설정과 사용자 정보를 등록/수정/삭제하는 관리 기능
 
-## Scope
-- Sidebar에는 `Manage`를 다른 탭과 동일한 메뉴 아이템 형태로 두고, 클릭 시 하위 메뉴를 접고 펼친다.
-- 하위 메뉴는 `Virtual Machines`, `Integrations`, `Users`로 나눈다.
-- Manage 화면 내부에는 별도 tablist를 두지 않고, sidebar에서 선택한 section만 렌더링한다.
-- `Virtual Machines`는 VM 리소스를 관리한다.
-- `Integrations`는 Kubernetes, GitLab, ArgoCD, Nexus 연결 정보를 관리한다.
-- `Users`는 admin이 계정과 권한을 관리하는 영역이다.
-- IPAM 기능은 이번 범위에서 제외하되, PostgreSQL 선택은 향후 IPAM 확장을 고려한 결정이다.
+## 기능 동작 방식 및 플로우
 
-## Data Source Principle
-- PostgreSQL이 설정 데이터의 단일 source of truth다.
-- `deploy/config/inventory.json`과 `inventory.example.json`은 runtime 기준에서 제거한다.
-- 기존 inventory 파일 fallback은 제공하지 않는다.
-- collector는 30초 수집 주기마다 DB의 active 설정을 읽어 상태를 수집한다.
-- `/api/collect/snapshot`은 다중 integration을 표현하도록 breaking change를 허용한다.
+1. **메뉴 진입**: 사이드바의 Manage 메뉴를 통해 가상 머신, 연동 도구(Integrations), 사용자(Users) 중 하나를 선택.
+2. **설정 등록/수정**: UI 폼에 정보를 입력하여 전송하면 서버는 중요 Credential을 즉시 암호화하여 DB에 영구 저장.
+3. **연결성 검증 (Test Connection)**: 설정 수정 화면이나 목록에서 `Test connection`을 실행하여 외부 API가 제대로 동작하는지 수동으로 확인.
+4. **설정 비활성화 및 삭제**: 설정에서 active 여부를 토글하여 일시 중단하거나, 완전히 삭제하여 DB 레코드를 제거할 수 있음.
 
-## CRUD Model
-- 범용 JSON resource 테이블이 아니라 타입별 테이블을 사용한다.
-- VM, Kubernetes, GitLab, ArgoCD, Nexus는 각 도메인에 맞는 필드와 검증 규칙을 가진다.
-- 여러 Kubernetes cluster와 여러 tool instance 등록을 허용한다.
-- UI에서 active 여부를 조정할 수 있고, 삭제 API는 레코드를 제거한다.
-- 각 레코드는 `created_at`, `updated_at`, `created_by`, `updated_by` 수준의 변경 메타데이터를 가진다.
-- 별도 audit log는 이번 범위에서 제외한다.
+## 기능 구현 방식
 
-## Credential Principle
-- Kubernetes bearer token, GitLab token, ArgoCD token 같은 외부 접근 credential도 UI에서 관리한다.
-- DB에는 credential 평문을 저장하지 않는다.
-- 서버는 `OMNI_SECRET_KEY`를 사용해 AES-GCM 방식으로 credential을 암호화 저장한다.
-- 수정 화면에서는 기존 secret 값을 다시 보여주지 않는다.
-- UI는 `Configured` 상태와 교체 입력만 제공한다.
-- 새 값을 입력하면 기존 secret을 교체한다.
-
-## Validation Flow
-- 저장과 연결 검증은 분리한다.
-- 사용자는 네트워크가 일시적으로 막혀 있어도 설정을 저장할 수 있다.
-- 각 integration에는 `Test connection` 액션을 둔다.
-- GitLab projects 입력은 `group/project` 단일 라인 또는 `name|group/project|branch|link` 형식을 허용한다.
-- `Test connection` API는 외부 API 실패를 HTTP non-2xx로 반환한다.
-- 외부 API 원본 HTTP status는 응답 body의 `error.upstreamStatus`에서 확인한다.
-- `/api/collect/snapshot`은 dashboard 조회 계약을 유지하기 위해 source별 실패를 envelope에 담고 HTTP 200으로 응답한다.
-- 테스트 결과는 collector 상태와 별도로 마지막 검증 결과로 표시한다.
-- 실제 dashboard health는 collector가 수집한 snapshot을 기준으로 판단한다.
-
-## Access Rules
-- `admin`만 Manage 화면과 CRUD API에 접근할 수 있다.
-- `viewer`는 dashboard 조회만 가능하다.
-- 모든 Manage API는 로그인 세션을 요구한다.
+- **PostgreSQL 단일 Source of Truth**: 기존의 로컬 파일 설정 방식(`inventory.json`)을 완전히 제거하고 PostgreSQL 데이터베이스를 설정 데이터의 단일 진실 공급원(Source of Truth)으로 일원화함.
+- **자격 증명(Credential) 대칭 암호화**: Kubernetes Token, GitLab Token 등의 중요 정보는 DB에 평문으로 노출되지 않도록 `OMNI_SECRET_KEY`를 키로 활용해 AES-GCM 대칭 키 알고리즘으로 암호화하여 저장하며, UI 조회 시에는 마스킹 처리하여 역노출을 방지함.
+- **타입별 정적 스키마 테이블**: 단일 JSON 필드 저장 형식을 지양하고 VM, K8s, Gitlab 등 개별 도메인 구조에 맞는 스키마를 구성하여 강력한 DB 스키마 검증 및 데이터 무결성을 보장함.
+- **저장과 검증의 디커플링 (Decoupling)**: 외부 인프라의 일시적 장애가 설정 저장을 막지 않도록, CRUD 동작(저장)과 API 연결 검증(Test Connection)을 분리 설계함. 연결 테스트 실패 시에는 에러 상세(`upstreamStatus` 등)를 클라이언트에 명시적으로 전달함.
+- **동적 다중 연동 지원**: 다중 Kubernetes 클러스터 및 연동 도구(GitLab, ArgoCD 등)를 원활하게 등록할 수 있도록 snapshot 응답 포맷을 설계하고, 연동 실패 시 대시보드 조회가 완전히 굳어버리지 않도록 개별 도구 에러만 에러 봉투(envelope)에 감싸 200 OK로 반환함.
+- **인라인 수정 폼 UX**: 기존에 상단 생성 폼을 덮어쓰던 수정 방식을 개선하여, 개별 연동 도구 항목 아래에 독립된 인라인 수정 폼이 나타나도록 하여 더욱 직관적인 설정을 가능하게 함.
+- **리소스별 개별 갱신 (Granular API Reloading)**: 특정 툴의 저장 또는 삭제 작업 시 모든 연동 정보를 일괄 재조회(`load()`)하지 않고, 변경된 리소스 전용 로딩 함수(`loadKubernetes`, `loadArgoCD` 등)만 호출하여 클라이언트 성능 및 API 트래픽을 최적화함.
+- **Admin 전용 접근 제어**: `viewer` 권한 계정은 접근할 수 없도록, Manage API 및 웹 페이지 진입 경로에 `admin` 역할 검증 미들웨어를 두어 보호함.

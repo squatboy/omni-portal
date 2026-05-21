@@ -154,9 +154,6 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 			}
 
 			pipelines, err := fetchGitLabJSON[[]gitlabPipelineResponse](reqCtx, client, pipelinesUrl, target.Token, "pipelines")
-			if err == nil && len(pipelines) == 0 {
-				err = &gitlabAPIError{code: models.ErrUnknownError, status: models.StatusDown, message: "GitLab pipelines response was empty"}
-			}
 			if err != nil {
 				mu.Lock()
 				results[i] = projectStatus
@@ -165,23 +162,27 @@ func collectGitLabTarget(ctx context.Context, target models.GitLabCollectTarget,
 				return
 			}
 
-			pStatus := strings.ToLower(pipelines[0].Status)
-			mappedStatus := "unknown"
-			if pStatus == "success" || pStatus == "failed" || pStatus == "running" || pStatus == "pending" || pStatus == "canceled" {
-				mappedStatus = pStatus
-			}
+			if len(pipelines) > 0 {
+				pStatus := strings.ToLower(pipelines[0].Status)
+				mappedStatus := "unknown"
+				if pStatus == "success" || pStatus == "failed" || pStatus == "running" || pStatus == "pending" || pStatus == "canceled" {
+					mappedStatus = pStatus
+				}
 
-			projectStatus.LatestPipeline = &models.GitLabPipeline{
-				Id:        pipelines[0].Id,
-				Status:    mappedStatus,
-				Ref:       pipelines[0].Ref,
-				UpdatedAt: pipelines[0].UpdatedAt,
-				Link:      pipelines[0].WebUrl,
+				projectStatus.LatestPipeline = &models.GitLabPipeline{
+					Id:        pipelines[0].Id,
+					Status:    mappedStatus,
+					Ref:       pipelines[0].Ref,
+					UpdatedAt: pipelines[0].UpdatedAt,
+					Link:      pipelines[0].WebUrl,
+				}
+			} else {
+				projectStatus.LatestPipeline = nil
 			}
 
 			mu.Lock()
 			results[i] = projectStatus
-			if projectStatus.LatestPipeline.Status == "failed" || projectStatus.LatestPipeline.Status == "canceled" {
+			if projectStatus.LatestPipeline != nil && (projectStatus.LatestPipeline.Status == "failed" || projectStatus.LatestPipeline.Status == "canceled") {
 				isStale = true
 			}
 			mu.Unlock()

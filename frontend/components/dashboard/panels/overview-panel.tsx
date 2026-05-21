@@ -116,16 +116,18 @@ export function OverviewPanel({ snapshot }: { snapshot: DashboardSnapshot }) {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-2">
-                  <StatusBadge
-                    status={
-                      project.latestPipeline?.status === "success"
-                        ? "ok"
-                        : project.latestPipeline
-                          ? "stale"
-                          : "unknown"
-                    }
-                    label={project.latestPipeline?.status ?? "missing"}
-                  />
+                  {project.latestPipeline ? (
+                    <StatusBadge
+                      status={
+                        project.latestPipeline.status === "success"
+                          ? "ok"
+                          : "stale"
+                      }
+                      label={project.latestPipeline.status}
+                    />
+                  ) : (
+                    <span className="text-xs text-muted-foreground">-</span>
+                  )}
                   <ExternalLinkButton
                     href={project.link || "#"}
                     label={project.name}

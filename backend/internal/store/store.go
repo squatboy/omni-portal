@@ -18,6 +18,7 @@ import (
 	"omni-backend/internal/models"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/lib/pq"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -355,7 +356,7 @@ func (s *Store) ListKubernetesIntegrations(ctx context.Context) ([]models.Kubern
         items := []models.KubernetesIntegration{}
         for rows.Next() {
                 var item models.KubernetesIntegration
-                if err := rows.Scan(&item.ID, &item.Name, &item.APIURL, &item.Namespaces, &item.Active, &item.TokenConfigured); err != nil {
+                if err := rows.Scan(&item.ID, &item.Name, &item.APIURL, pq.Array(&item.Namespaces), &item.Active, &item.TokenConfigured); err != nil {
                         return nil, err
                 }
                 items = append(items, item)
@@ -368,7 +369,7 @@ func (s *Store) SaveKubernetesIntegration(ctx context.Context, actorID string, i
                 _, err := s.db.ExecContext(ctx, `
                         INSERT INTO kubernetes_integrations (id, name, api_url, namespaces, active, created_by, updated_by)
                         VALUES ($1,$2,$3,$4,$5,$6,$6)
-                `, item.ID, item.Name, item.APIURL, item.Namespaces, item.Active, actorID)
+                `, item.ID, item.Name, item.APIURL, pq.Array(item.Namespaces), item.Active, actorID)
                 if err != nil {
                         return models.KubernetesIntegration{}, err
                 }
@@ -377,7 +378,7 @@ func (s *Store) SaveKubernetesIntegration(ctx context.Context, actorID string, i
                         UPDATE kubernetes_integrations
                         SET name=$2, api_url=$3, namespaces=$4, active=$5, updated_at=now(), updated_by=$6
                         WHERE id=$1
-                `, item.ID, item.Name, item.APIURL, item.Namespaces, item.Active, actorID)
+                `, item.ID, item.Name, item.APIURL, pq.Array(item.Namespaces), item.Active, actorID)
                 if err != nil {
                         return models.KubernetesIntegration{}, err
                 }
