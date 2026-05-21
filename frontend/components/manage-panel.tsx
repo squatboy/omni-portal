@@ -327,6 +327,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 onChange={(apiUrl) =>
                   setKubernetesForm((prev) => ({ ...prev, apiUrl }))
                 }
+                placeholder="https://api.k8s.example.com"
                 required
               />
               <TextInput
@@ -338,6 +339,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     namespaces: splitList(value),
                   }))
                 }
+                placeholder="default,kube-system"
               />
               <SecretInput
                 configured={kubernetesForm.tokenConfigured}
@@ -399,6 +401,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     onChange={(apiUrl) =>
                       setEditKubernetesForm((prev) => ({ ...prev, apiUrl }))
                     }
+                    placeholder="https://api.k8s.example.com"
                     required
                   />
                   <TextInput
@@ -410,6 +413,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                         namespaces: splitList(value),
                       }))
                     }
+                    placeholder="default,kube-system"
                   />
                   <SecretInput
                     configured={editKubernetesForm.tokenConfigured}
@@ -452,6 +456,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 onChange={(baseUrl) =>
                   setArgoCDForm((prev) => ({ ...prev, baseUrl }))
                 }
+                placeholder="https://argocd.example.com"
                 required
               />
               <SecretInput
@@ -514,6 +519,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     onChange={(baseUrl) =>
                       setEditArgoCDForm((prev) => ({ ...prev, baseUrl }))
                     }
+                    placeholder="https://argocd.example.com"
                     required
                   />
                   <SecretInput
@@ -557,6 +563,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 onChange={(baseUrl) =>
                   setGitLabForm((prev) => ({ ...prev, baseUrl }))
                 }
+                placeholder="https://gitlab.example.com"
                 required
               />
               <TextInput
@@ -565,7 +572,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 onChange={(projectsText) =>
                   setGitLabForm((prev) => ({ ...prev, projectsText }))
                 }
-                placeholder="name|group/project|main"
+                placeholder="frontend-app|my-group/frontend-app|main"
               />
               <SecretInput
                 configured={gitlabForm.tokenConfigured}
@@ -647,6 +654,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     onChange={(baseUrl) =>
                       setEditGitLabForm((prev) => ({ ...prev, baseUrl }))
                     }
+                    placeholder="https://gitlab.example.com"
                     required
                   />
                   <TextInput
@@ -655,7 +663,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     onChange={(projectsText) =>
                       setEditGitLabForm((prev) => ({ ...prev, projectsText }))
                     }
-                    placeholder="name|group/project|main"
+                    placeholder="frontend-app|my-group/frontend-app|main"
                   />
                   <SecretInput
                     configured={editGitLabForm.tokenConfigured}
@@ -701,6 +709,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 label="URL"
                 value={nexusForm.url}
                 onChange={(url) => setNexusForm((prev) => ({ ...prev, url }))}
+                placeholder="https://nexus.example.com"
                 required
               />
               <ActiveToggle
@@ -756,6 +765,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                     onChange={(url) =>
                       setEditNexusForm((prev) => ({ ...prev, url }))
                     }
+                    placeholder="https://nexus.example.com"
                     required
                   />
                   <ActiveToggle
@@ -1023,7 +1033,7 @@ function IntegrationList<
             </div>
           </div>
           {editingId === item.id && renderEditForm && (
-            <div className="border-t pt-3 flex flex-col gap-3">
+            <div className="border-t pt-3 flex flex-col gap-3 animate-slide-down">
               {renderEditForm(item)}
             </div>
           )}
