@@ -1,7 +1,8 @@
 "use client"
 
 import * as React from "react"
-import { AlertTriangle, RefreshCw } from "lucide-react"
+import { AlertTriangle, RefreshCw, Sun, Moon } from "lucide-react"
+import { useTheme } from "next-themes"
 
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -86,6 +87,7 @@ function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
 }
 
 export function OmniDashboard() {
+  const { resolvedTheme, setTheme } = useTheme()
   const mounted = React.useSyncExternalStore(
     React.useCallback(() => () => {}, []),
     () => true,
@@ -242,6 +244,20 @@ export function OmniDashboard() {
                 }}
               >
                 Logout
+              </Button>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Toggle theme"
+                onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+              >
+                {!mounted ? (
+                  <Sun data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                ) : resolvedTheme === "dark" ? (
+                  <Sun data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                ) : (
+                  <Moon data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                )}
               </Button>
               <Button
                 variant="outline"
