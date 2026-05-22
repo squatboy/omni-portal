@@ -34,6 +34,7 @@ import {
 import { HealthBadge } from "./dashboard/shared/common"
 import { DashboardContent } from "./dashboard/shared/dashboard-content"
 import { DashboardSkeleton } from "./dashboard/shared/dashboard-skeleton"
+import { IPAMPanel } from "./ipam-panel"
 import { ManagePanel, type ManageSection } from "./manage-panel"
 
 const appViews: AppView[] = [
@@ -48,6 +49,7 @@ const appViews: AppView[] = [
   "manage-vm",
   "manage-integrations",
   "manage-users",
+  "ipam-home",
 ]
 
 const manageViewMap = {
@@ -83,6 +85,9 @@ function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
   if (manageSection) {
     const label = manageSection.charAt(0).toUpperCase() + manageSection.slice(1)
     return `Manage / ${label}`
+  }
+  if (view === "ipam-home") {
+    return "IPAM / Home"
   }
   if (activeTab === "overview") {
     return "Infrastructure Overview"
@@ -203,9 +208,9 @@ export function OmniDashboard() {
 
   const canManage = user.role === "admin"
   const manageSection = getManageSection(activeView)
-  const activeTab: DashboardTab = isManageView(activeView)
-    ? "overview"
-    : activeView
+  const isIPAMView = activeView === "ipam-home"
+  const activeTab: DashboardTab =
+    isManageView(activeView) || isIPAMView ? "overview" : activeView
 
   return (
     <SidebarProvider>
@@ -301,6 +306,8 @@ export function OmniDashboard() {
         <div className="flex flex-col gap-4 p-4 md:p-6">
           {manageSection ? (
             <ManagePanel section={manageSection} />
+          ) : isIPAMView ? (
+            <IPAMPanel canManage={canManage} />
           ) : snapshot ? (
             <DashboardContent
               snapshot={snapshot}

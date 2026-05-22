@@ -68,3 +68,78 @@ export type NexusIntegration = {
   url: string
   active: boolean
 }
+
+export type IPAMAddressStatus = "active" | "dead" | "offline"
+
+export type IPAMAddressSummary = {
+  total: number
+  active: number
+  dead: number
+  offline: number
+}
+
+export type IPAMSummary = {
+  locations: number
+  networks: number
+  subnets: number
+  addresses: IPAMAddressSummary
+}
+
+export type IPAMLocation = {
+  id: string
+  name: string
+  description?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type IPAMNetwork = {
+  id: string
+  locationId: string
+  name: string
+  description?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type IPAMSubnet = {
+  id: string
+  networkId: string
+  locationId?: string
+  name: string
+  cidr: string
+  description?: string | null
+  autoDiscovery: boolean
+  scanIntervalSeconds: number
+  lastScanStartedAt?: string | null
+  lastScanCompletedAt?: string | null
+  lastScanStatus?: string | null
+  lastScanError?: string | null
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type IPAMAddress = {
+  id: string
+  subnetId: string
+  address: string
+  status: IPAMAddressStatus
+  hostname?: string | null
+  description?: string | null
+  lastScannedAt?: string | null
+  lastSeenAt?: string | null
+  consecutiveFailures: number
+  createdAt?: string
+  updatedAt?: string
+}
+
+export type IPAMScanSummary = {
+  subnetId: string
+  total: number
+  active: number
+  dead: number
+  offline: number
+  startedAt: string
+  completedAt: string
+  subnet: IPAMSubnet
+}

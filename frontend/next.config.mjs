@@ -19,6 +19,10 @@ const nextConfig = {
         destination: `${process.env.API_URL || "http://localhost:8080"}/api/manage/:path*`,
       },
       {
+        source: "/api/ipam/:path*",
+        destination: `${process.env.API_URL || "http://localhost:8080"}/api/ipam/:path*`,
+      },
+      {
         source: "/api/health/ready",
         destination: `${process.env.API_URL || "http://localhost:8080"}/health/ready`,
       },

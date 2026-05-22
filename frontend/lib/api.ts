@@ -2,6 +2,12 @@ import type {
   ArgoCDIntegration,
   AuthMe,
   GitLabIntegration,
+  IPAMAddress,
+  IPAMScanSummary,
+  IPAMLocation,
+  IPAMNetwork,
+  IPAMSubnet,
+  IPAMSummary,
   KubernetesIntegration,
   NexusIntegration,
   User,
@@ -37,6 +43,67 @@ function mockResponse<T>(value: T) {
 
 function generateId(prefix: string) {
   return `${prefix}-${Math.random().toString(36).slice(2, 9)}`
+}
+
+function compactPayload<T extends Record<string, unknown>>(payload: T): T {
+  return Object.fromEntries(
+    Object.entries(payload).map(([key, value]) => [
+      key,
+      value === "" ? null : value,
+    ])
+  ) as T
+}
+
+function queryString(params: Record<string, string | undefined>) {
+  const searchParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value) {
+      searchParams.set(key, value)
+    }
+  }
+  const query = searchParams.toString()
+  return query ? `?${query}` : ""
+}
+
+function buildIPAMSummary(): IPAMSummary {
+  const store = getMockStore()
+  const counts = store.ipamAddresses.reduce(
+    (acc, address) => {
+      acc.total += 1
+      acc[address.status] += 1
+      return acc
+    },
+    { total: 0, active: 0, dead: 0, offline: 0 }
+  )
+
+  return {
+    locations: store.ipamLocations.length,
+    networks: store.ipamNetworks.length,
+    subnets: store.ipamSubnets.length,
+    addresses: counts,
+  }
+}
+
+function updateMockItem<T extends { id: string }>(
+  items: T[],
+  prefix: string,
+  payload: T
+) {
+  const now = new Date().toISOString()
+  const next = {
+    ...payload,
+    id: payload.id || generateId(prefix),
+    updatedAt: now,
+    createdAt:
+      "createdAt" in payload && payload.createdAt ? payload.createdAt : now,
+  }
+  const index = items.findIndex((item) => item.id === next.id)
+  if (index >= 0) {
+    items[index] = next
+  } else {
+    items.push(next)
+  }
+  return next
 }
 
 function resolveTokenConfigured(
@@ -333,6 +400,196 @@ export const api = {
           method: "POST",
           body: JSON.stringify(payload),
         }),
+  ipamSummary: () =>
+    isMockMode()
+      ? mockResponse(buildIPAMSummary())
+      : request<IPAMSummary>("/api/ipam/summary"),
+  listIPAMLocations: () =>
+    isMockMode()
+      ? mockResponse(getMockStore().ipamLocations)
+      : request<IPAMLocation[]>("/api/ipam/locations"),
+  saveIPAMLocation: (payload: IPAMLocation) => {
+    if (!isMockMode()) {
+      const method = payload.id ? "PUT" : "POST"
+      const url = payload.id
+        ? `/api/manage/ipam/locations/${payload.id}`
+        : "/api/manage/ipam/locations"
+      return request<IPAMLocation>(url, {
+        method,
+        body: JSON.stringify(compactPayload(payload)),
+      })
+    }
+    const store = getMockStore()
+    return mockResponse(updateMockItem(store.ipamLocations, "loc", payload))
+  },
+  deleteIPAMLocation: (id: string) => {
+    if (!isMockMode()) {
+      return request<{ ok: true }>(`/api/manage/ipam/locations/${id}`, {
+        method: "DELETE",
+      })
+    }
+    const store = getMockStore()
+    const networkIds = new Set(
+      store.ipamNetworks
+        .filter((network) => network.locationId === id)
+        .map((network) => network.id)
+    )
+    const subnetIds = new Set(
+      store.ipamSubnets
+        .filter((subnet) => networkIds.has(subnet.networkId))
+        .map((subnet) => subnet.id)
+    )
+    store.ipamLocations = store.ipamLocations.filter((item) => item.id !== id)
+    store.ipamNetworks = store.ipamNetworks.filter(
+      (item) => item.locationId !== id
+    )
+    store.ipamSubnets = store.ipamSubnets.filter(
+      (item) => !subnetIds.has(item.id)
+    )
+    store.ipamAddresses = store.ipamAddresses.filter(
+      (item) => !subnetIds.has(item.subnetId)
+    )
+    return mockResponse({ ok: true })
+  },
+  listIPAMNetworks: (locationId?: string) =>
+    isMockMode()
+      ? mockResponse(
+          getMockStore().ipamNetworks.filter(
+            (item) => !locationId || item.locationId === locationId
+          )
+        )
+      : request<IPAMNetwork[]>(
+          `/api/ipam/networks${queryString({ locationId })}`
+        ),
+  saveIPAMNetwork: (payload: IPAMNetwork) => {
+    if (!isMockMode()) {
+      const method = payload.id ? "PUT" : "POST"
+      const url = payload.id
+        ? `/api/manage/ipam/networks/${payload.id}`
+        : "/api/manage/ipam/networks"
+      return request<IPAMNetwork>(url, {
+        method,
+        body: JSON.stringify(compactPayload(payload)),
+      })
+    }
+    const store = getMockStore()
+    return mockResponse(updateMockItem(store.ipamNetworks, "net", payload))
+  },
+  deleteIPAMNetwork: (id: string) => {
+    if (!isMockMode()) {
+      return request<{ ok: true }>(`/api/manage/ipam/networks/${id}`, {
+        method: "DELETE",
+      })
+    }
+    const store = getMockStore()
+    const subnetIds = new Set(
+      store.ipamSubnets
+        .filter((subnet) => subnet.networkId === id)
+        .map((subnet) => subnet.id)
+    )
+    store.ipamNetworks = store.ipamNetworks.filter((item) => item.id !== id)
+    store.ipamSubnets = store.ipamSubnets.filter(
+      (item) => item.networkId !== id
+    )
+    store.ipamAddresses = store.ipamAddresses.filter(
+      (item) => !subnetIds.has(item.subnetId)
+    )
+    return mockResponse({ ok: true })
+  },
+  listIPAMSubnets: (
+    params: { locationId?: string; networkId?: string } = {}
+  ) =>
+    isMockMode()
+      ? mockResponse(
+          getMockStore().ipamSubnets.filter(
+            (item) =>
+              (!params.locationId || item.locationId === params.locationId) &&
+              (!params.networkId || item.networkId === params.networkId)
+          )
+        )
+      : request<IPAMSubnet[]>(
+          `/api/ipam/subnets${queryString({
+            locationId: params.locationId,
+            networkId: params.networkId,
+          })}`
+        ),
+  saveIPAMSubnet: (payload: IPAMSubnet) => {
+    if (!isMockMode()) {
+      const method = payload.id ? "PUT" : "POST"
+      const url = payload.id
+        ? `/api/manage/ipam/subnets/${payload.id}`
+        : "/api/manage/ipam/subnets"
+      return request<IPAMSubnet>(url, {
+        method,
+        body: JSON.stringify(compactPayload(payload)),
+      })
+    }
+    const store = getMockStore()
+    const network = store.ipamNetworks.find(
+      (item) => item.id === payload.networkId
+    )
+    const next = updateMockItem(store.ipamSubnets, "subnet", {
+      ...payload,
+      locationId: network?.locationId ?? payload.locationId,
+    })
+    return mockResponse(next)
+  },
+  deleteIPAMSubnet: (id: string) => {
+    if (!isMockMode()) {
+      return request<{ ok: true }>(`/api/manage/ipam/subnets/${id}`, {
+        method: "DELETE",
+      })
+    }
+    const store = getMockStore()
+    store.ipamSubnets = store.ipamSubnets.filter((item) => item.id !== id)
+    store.ipamAddresses = store.ipamAddresses.filter(
+      (item) => item.subnetId !== id
+    )
+    return mockResponse({ ok: true })
+  },
+  rescanIPAMSubnet: (id: string) =>
+    isMockMode()
+      ? mockResponse<IPAMScanSummary>({
+          subnetId: id,
+          total: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id
+          ).length,
+          active: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id && address.status === "active"
+          ).length,
+          dead: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id && address.status === "dead"
+          ).length,
+          offline: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id && address.status === "offline"
+          ).length,
+          startedAt: new Date().toISOString(),
+          completedAt: new Date().toISOString(),
+          subnet: getMockStore().ipamSubnets.find((item) => item.id === id)!,
+        })
+      : request<IPAMScanSummary>(`/api/manage/ipam/subnets/${id}/rescan`, {
+          method: "POST",
+          body: JSON.stringify({}),
+        }),
+  listIPAMAddresses: (subnetId: string) =>
+    isMockMode()
+      ? mockResponse(
+          getMockStore().ipamAddresses.filter(
+            (item) => item.subnetId === subnetId
+          )
+        )
+      : request<IPAMAddress[]>(`/api/ipam/subnets/${subnetId}/addresses`),
+  saveIPAMAddress: (payload: IPAMAddress) => {
+    if (!isMockMode()) {
+      return request<IPAMAddress>(`/api/manage/ipam/addresses/${payload.id}`, {
+        method: "PUT",
+        body: JSON.stringify(compactPayload(payload)),
+      })
+    }
+    const store = getMockStore()
+    const next = updateMockItem(store.ipamAddresses, "addr", payload)
+    return mockResponse(next)
+  },
 }
 
 export type TestResult = {
