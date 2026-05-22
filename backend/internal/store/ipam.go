@@ -16,8 +16,9 @@ import (
 )
 
 var (
-	ErrNotFound = errors.New("not found")
-	ErrConflict = errors.New("conflict")
+	ErrValidation = errors.New("validation")
+	ErrNotFound   = errors.New("not found")
+	ErrConflict   = errors.New("conflict")
 )
 
 var allowedIPAMScanIntervals = map[int]struct{}{
@@ -71,7 +72,7 @@ func (s *Store) CreateIPAMLocation(ctx context.Context, actorID string, item mod
 
 func (s *Store) UpdateIPAMLocation(ctx context.Context, actorID string, item models.IPAMLocation) (models.IPAMLocation, error) {
 	if strings.TrimSpace(item.ID) == "" {
-		return models.IPAMLocation{}, fmt.Errorf("location id is required")
+		return models.IPAMLocation{}, validationError("location id is required")
 	}
 	name, description, err := normalizeIPAMNameDescription(item.Name, item.Description)
 	if err != nil {
@@ -123,7 +124,7 @@ func (s *Store) ListIPAMNetworks(ctx context.Context, locationID string) ([]mode
 
 func (s *Store) CreateIPAMNetwork(ctx context.Context, actorID string, item models.IPAMNetwork) (models.IPAMNetwork, error) {
 	if strings.TrimSpace(item.LocationID) == "" {
-		return models.IPAMNetwork{}, fmt.Errorf("locationId is required")
+		return models.IPAMNetwork{}, validationError("locationId is required")
 	}
 	name, description, err := normalizeIPAMNameDescription(item.Name, item.Description)
 	if err != nil {
@@ -142,14 +143,14 @@ func (s *Store) CreateIPAMNetwork(ctx context.Context, actorID string, item mode
 
 func (s *Store) UpdateIPAMNetwork(ctx context.Context, actorID string, item models.IPAMNetwork) (models.IPAMNetwork, error) {
 	if strings.TrimSpace(item.ID) == "" {
-		return models.IPAMNetwork{}, fmt.Errorf("network id is required")
+		return models.IPAMNetwork{}, validationError("network id is required")
 	}
 	existing, err := s.ipamNetworkByID(ctx, item.ID)
 	if err != nil {
 		return models.IPAMNetwork{}, err
 	}
 	if strings.TrimSpace(item.LocationID) != "" && item.LocationID != existing.LocationID {
-		return models.IPAMNetwork{}, fmt.Errorf("network location is immutable")
+		return models.IPAMNetwork{}, validationError("network location is immutable")
 	}
 	name, description, err := normalizeIPAMNameDescription(item.Name, item.Description)
 	if err != nil {
@@ -212,7 +213,7 @@ func (s *Store) CreateIPAMSubnet(ctx context.Context, actorID string, item model
 		return models.IPAMSubnet{}, err
 	}
 	if strings.TrimSpace(item.NetworkID) == "" {
-		return models.IPAMSubnet{}, fmt.Errorf("networkId is required")
+		return models.IPAMSubnet{}, validationError("networkId is required")
 	}
 
 	tx, err := s.db.BeginTx(ctx, nil)
@@ -266,14 +267,14 @@ func (s *Store) CreateIPAMSubnet(ctx context.Context, actorID string, item model
 
 func (s *Store) UpdateIPAMSubnet(ctx context.Context, actorID string, item models.IPAMSubnet) (models.IPAMSubnet, error) {
 	if strings.TrimSpace(item.ID) == "" {
-		return models.IPAMSubnet{}, fmt.Errorf("subnet id is required")
+		return models.IPAMSubnet{}, validationError("subnet id is required")
 	}
 	existing, err := s.ipamSubnetByID(ctx, item.ID)
 	if err != nil {
 		return models.IPAMSubnet{}, err
 	}
 	if strings.TrimSpace(item.NetworkID) != "" && item.NetworkID != existing.NetworkID {
-		return models.IPAMSubnet{}, fmt.Errorf("subnet network is immutable")
+		return models.IPAMSubnet{}, validationError("subnet network is immutable")
 	}
 	if strings.TrimSpace(item.CIDR) != "" {
 		cidr, _, err := validateSubnetCIDR(item.CIDR)
@@ -281,7 +282,7 @@ func (s *Store) UpdateIPAMSubnet(ctx context.Context, actorID string, item model
 			return models.IPAMSubnet{}, err
 		}
 		if cidr != existing.CIDR {
-			return models.IPAMSubnet{}, fmt.Errorf("subnet CIDR is immutable")
+			return models.IPAMSubnet{}, validationError("subnet CIDR is immutable")
 		}
 	}
 	name, description, err := normalizeIPAMNameDescription(item.Name, item.Description)
@@ -313,7 +314,7 @@ func (s *Store) DeleteIPAMSubnet(ctx context.Context, id string) error {
 
 func (s *Store) ListIPAMAddresses(ctx context.Context, subnetID string) ([]models.IPAMAddress, error) {
 	if strings.TrimSpace(subnetID) == "" {
-		return nil, fmt.Errorf("subnet id is required")
+		return nil, validationError("subnet id is required")
 	}
 	if _, err := s.ipamSubnetByID(ctx, subnetID); err != nil {
 		return nil, err
@@ -343,7 +344,7 @@ func (s *Store) ListIPAMAddresses(ctx context.Context, subnetID string) ([]model
 
 func (s *Store) UpdateIPAMAddress(ctx context.Context, actorID string, item models.IPAMAddress) (models.IPAMAddress, error) {
 	if strings.TrimSpace(item.ID) == "" {
-		return models.IPAMAddress{}, fmt.Errorf("address id is required")
+		return models.IPAMAddress{}, validationError("address id is required")
 	}
 	hostname := normalizeOptionalString(item.Hostname)
 	description := normalizeOptionalString(item.Description)
@@ -485,29 +486,25 @@ func ensureNoIPAMSubnetOverlap(ctx context.Context, tx *sql.Tx, locationID, cidr
 func validateSubnetCIDR(raw string) (string, *net.IPNet, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return "", nil, fmt.Errorf("cidr is required")
+		return "", nil, validationError("cidr is required")
 	}
 	ip, ipNet, err := net.ParseCIDR(raw)
 	if err != nil {
-		return "", nil, fmt.Errorf("invalid cidr")
+		return "", nil, validationError("invalid cidr")
 	}
 	ipv4 := ip.To4()
 	if ipv4 == nil {
-		return "", nil, fmt.Errorf("cidr must be IPv4")
+		return "", nil, validationError("cidr must be IPv4")
 	}
 	ones, bits := ipNet.Mask.Size()
 	if bits != 32 {
-		return "", nil, fmt.Errorf("cidr must be IPv4")
+		return "", nil, validationError("cidr must be IPv4")
 	}
 	if ones < 24 {
-		return "", nil, fmt.Errorf("cidr must be /24 or smaller")
+		return "", nil, validationError("cidr must be /24 or smaller")
 	}
 	ipNet.IP = ipNet.IP.To4()
 	return ipNet.String(), ipNet, nil
-}
-
-func cidrsOverlap(a, b *net.IPNet) bool {
-	return a.Contains(b.IP) || b.Contains(a.IP)
 }
 
 func usableIPv4Addresses(ipNet *net.IPNet) []string {
@@ -537,7 +534,7 @@ func usableIPv4Addresses(ipNet *net.IPNet) []string {
 func normalizeIPAMNameDescription(name string, description *string) (string, *string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" {
-		return "", nil, fmt.Errorf("name is required")
+		return "", nil, validationError("name is required")
 	}
 	return name, normalizeOptionalString(description), nil
 }
@@ -547,9 +544,13 @@ func normalizeIPAMScanInterval(interval int) (int, error) {
 		return 3600, nil
 	}
 	if _, ok := allowedIPAMScanIntervals[interval]; !ok {
-		return 0, fmt.Errorf("scanIntervalSeconds must be one of 1800, 3600, 14400, 43200, 86400")
+		return 0, validationError("scanIntervalSeconds must be one of 1800, 3600, 14400, 43200, 86400")
 	}
 	return interval, nil
+}
+
+func validationError(message string) error {
+	return fmt.Errorf("%w: %s", ErrValidation, message)
 }
 
 func normalizeOptionalString(value *string) *string {
@@ -665,7 +666,7 @@ func scanIPAMAddress(row ipamAddressScanner) (models.IPAMAddress, error) {
 
 func (s *Store) deleteIPAMRow(ctx context.Context, query, id string) error {
 	if strings.TrimSpace(id) == "" {
-		return fmt.Errorf("id is required")
+		return validationError("id is required")
 	}
 	result, err := s.db.ExecContext(ctx, query, id)
 	if err != nil {

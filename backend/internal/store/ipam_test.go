@@ -71,28 +71,6 @@ func TestUsableIPv4Addresses(t *testing.T) {
 	}
 }
 
-func TestCIDRsOverlap(t *testing.T) {
-	_, first, err := validateSubnetCIDR("10.0.0.0/24")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	_, overlapping, err := validateSubnetCIDR("10.0.0.128/25")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	_, adjacent, err := validateSubnetCIDR("10.0.1.0/24")
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if !cidrsOverlap(first, overlapping) {
-		t.Fatalf("expected CIDRs to overlap")
-	}
-	if cidrsOverlap(first, adjacent) {
-		t.Fatalf("expected adjacent CIDRs not to overlap")
-	}
-}
-
 func TestNormalizeIPAMScanInterval(t *testing.T) {
 	if got, err := normalizeIPAMScanInterval(0); err != nil || got != 3600 {
 		t.Fatalf("expected default 3600, got %d err=%v", got, err)
@@ -104,6 +82,18 @@ func TestNormalizeIPAMScanInterval(t *testing.T) {
 	}
 	if _, err := normalizeIPAMScanInterval(60); err == nil {
 		t.Fatalf("expected unsupported interval error")
+	}
+}
+
+func TestValidationErrorsAreClassified(t *testing.T) {
+	if _, _, err := validateSubnetCIDR("10.0.0.0/23"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if _, _, err := normalizeIPAMNameDescription("", nil); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+	if _, err := normalizeIPAMScanInterval(60); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
 	}
 }
 

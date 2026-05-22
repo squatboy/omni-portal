@@ -591,12 +591,14 @@ func writeJSON(c *gin.Context, payload any, err error) {
 func writeStoreJSON(c *gin.Context, successStatus int, payload any, err error) {
 	if err != nil {
 		switch {
+		case errors.Is(err, store.ErrValidation):
+			writeError(c, http.StatusBadRequest, err)
 		case errors.Is(err, store.ErrNotFound):
 			writeError(c, http.StatusNotFound, err)
 		case errors.Is(err, store.ErrConflict):
 			writeError(c, http.StatusConflict, err)
 		default:
-			writeError(c, http.StatusBadRequest, err)
+			writeError(c, http.StatusInternalServerError, err)
 		}
 		return
 	}

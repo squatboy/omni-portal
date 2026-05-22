@@ -3,6 +3,7 @@ package api
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"omni-backend/internal/collector"
@@ -77,6 +78,33 @@ func TestManageIPAMRouteRequiresAdmin(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestWriteStoreJSONErrorStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "validation", err: store.ErrValidation, want: http.StatusBadRequest},
+		{name: "not found", err: store.ErrNotFound, want: http.StatusNotFound},
+		{name: "conflict", err: store.ErrConflict, want: http.StatusConflict},
+		{name: "unknown store error", err: errors.New("database unavailable"), want: http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+
+			writeStoreJSON(ctx, http.StatusOK, gin.H{"ok": true}, tt.err)
+
+			if rec.Code != tt.want {
+				t.Fatalf("expected status %d, got %d", tt.want, rec.Code)
+			}
+		})
 	}
 }
 

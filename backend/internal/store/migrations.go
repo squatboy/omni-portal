@@ -145,6 +145,24 @@ var migrations = []string{
 		created_by text,
 		updated_by text
 	)`,
+	`DO $$
+	BEGIN
+		IF NOT EXISTS (
+			SELECT 1 FROM pg_constraint WHERE conname = 'ipam_subnets_cidr_ipv4_check'
+		) THEN
+			ALTER TABLE ipam_subnets
+			ADD CONSTRAINT ipam_subnets_cidr_ipv4_check CHECK (family(cidr) = 4);
+		END IF;
+	END $$`,
+	`DO $$
+	BEGIN
+		IF NOT EXISTS (
+			SELECT 1 FROM pg_constraint WHERE conname = 'ipam_subnets_cidr_masklen_check'
+		) THEN
+			ALTER TABLE ipam_subnets
+			ADD CONSTRAINT ipam_subnets_cidr_masklen_check CHECK (masklen(cidr) >= 24);
+		END IF;
+	END $$`,
 	`CREATE TABLE IF NOT EXISTS ipam_addresses (
 		id text PRIMARY KEY,
 		subnet_id text NOT NULL REFERENCES ipam_subnets(id) ON DELETE CASCADE,
