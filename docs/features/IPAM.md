@@ -6,7 +6,8 @@
 - `Network` is a logical group inside a Location, not a CIDR owner.
 - Viewer routes are under `/api/ipam/*` and require login.
 - Admin mutation routes are under `/api/manage/ipam/*`.
-- Scanner and scheduler behavior is not implemented in Task 1.
+- Scanner uses ICMP ping only. MAC and hostname auto discovery are out of v1 scope.
+- Scheduler runs separately from the collect runner and scans due Auto Discovery subnets.
 
 ## Backend API
 
@@ -24,6 +25,7 @@
 - `POST /api/manage/ipam/subnets`
 - `PUT /api/manage/ipam/subnets/:id`
 - `DELETE /api/manage/ipam/subnets/:id`
+- `POST /api/manage/ipam/subnets/:id/rescan`
 - `PUT /api/manage/ipam/addresses/:id`
 
 ## Validation
@@ -37,6 +39,22 @@
   - `/31` and `/32`: all addresses are retained.
 - IP status values are `active`, `dead`, `offline`.
 - Auto Discovery interval values are `1800`, `3600`, `14400`, `43200`, `86400` seconds; default is `3600`.
+
+## Scanning
+
+- Worker pool size is fixed at `64`.
+- Manual rescan is admin-only: `POST /api/manage/ipam/subnets/:id/rescan`.
+- Auto Discovery scans due subnets on a scheduler that is independent from dashboard collection.
+- Scan lifecycle is tracked on Subnet:
+  - `lastScanStatus=running` when scan starts.
+  - `lastScanStatus=completed` when bulk address updates commit.
+  - `lastScanStatus=failed` when address lookup or bulk persistence fails.
+- Scan result persistence uses one store bulk path in a transaction.
+- Status transitions:
+  - Ping success sets IP status to `active`, resets `consecutiveFailures`, and updates `lastSeenAt`.
+  - Ping failure increments `consecutiveFailures`.
+  - IPs with prior success history stay `active` until the third consecutive failure, then become `dead`.
+  - IPs without success history remain `offline` on failures.
 
 ## Delete Behavior
 

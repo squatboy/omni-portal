@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type CollectSource string
 
 const (
@@ -382,6 +384,34 @@ type IPAMAddress struct {
 	ConsecutiveFailures int               `json:"consecutiveFailures"`
 	CreatedAt           string            `json:"createdAt,omitempty"`
 	UpdatedAt           string            `json:"updatedAt,omitempty"`
+}
+
+type IPAMScanAddress struct {
+	ID                  string
+	SubnetID            string
+	Address             string
+	Status              IPAMAddressStatus
+	LastSeenAt          *time.Time
+	ConsecutiveFailures int
+}
+
+type IPAMScanResult struct {
+	AddressID           string
+	Status              IPAMAddressStatus
+	LastScannedAt       time.Time
+	LastSeenAt          *time.Time
+	ConsecutiveFailures int
+}
+
+type IPAMScanSummary struct {
+	SubnetID    string     `json:"subnetId"`
+	Total       int        `json:"total"`
+	Active      int        `json:"active"`
+	Dead        int        `json:"dead"`
+	Offline     int        `json:"offline"`
+	StartedAt   string     `json:"startedAt"`
+	CompletedAt string     `json:"completedAt"`
+	Subnet      IPAMSubnet `json:"subnet"`
 }
 
 type IPAMAddressSummary struct {

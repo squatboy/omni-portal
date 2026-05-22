@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strings"
@@ -15,16 +16,24 @@ import (
 )
 
 type API struct {
-	cache  *collector.Cache
-	runner *collector.Runner
-	store  *store.Store
-	config *config.AppConfig
+	cache       *collector.Cache
+	runner      *collector.Runner
+	store       *store.Store
+	config      *config.AppConfig
+	ipamScanner ipamRescanner
+}
+
+type ipamRescanner interface {
+	ScanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error)
 }
 
 type authedUserKey struct{}
 
-func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Store, cfg *config.AppConfig) *gin.Engine {
+func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Store, cfg *config.AppConfig, ipamScanners ...ipamRescanner) *gin.Engine {
 	api := &API{cache: cache, runner: runner, store: st, config: cfg}
+	if len(ipamScanners) > 0 {
+		api.ipamScanner = ipamScanners[0]
+	}
 	r := gin.Default()
 
 	auth := r.Group("/api/auth")
@@ -122,6 +131,7 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 		manage.POST("/ipam/subnets", api.handleCreateIPAMSubnet)
 		manage.PUT("/ipam/subnets/:id", api.handleUpdateIPAMSubnet)
 		manage.DELETE("/ipam/subnets/:id", api.handleDeleteIPAMSubnet)
+		manage.POST("/ipam/subnets/:id/rescan", api.handleRescanIPAMSubnet)
 		manage.PUT("/ipam/addresses/:id", api.handleUpdateIPAMAddress)
 	}
 
@@ -469,6 +479,15 @@ func (api *API) handleUpdateIPAMSubnet(c *gin.Context) {
 func (api *API) handleDeleteIPAMSubnet(c *gin.Context) {
 	err := api.store.DeleteIPAMSubnet(c.Request.Context(), c.Param("id"))
 	writeStoreJSON(c, http.StatusOK, gin.H{"ok": true}, err)
+}
+
+func (api *API) handleRescanIPAMSubnet(c *gin.Context) {
+	if api.ipamScanner == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ipam scanner unavailable"})
+		return
+	}
+	summary, err := api.ipamScanner.ScanSubnet(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, summary, err)
 }
 
 func (api *API) handleListIPAMAddresses(c *gin.Context) {

@@ -7,6 +7,7 @@ import (
 	"omni-backend/internal/api"
 	"omni-backend/internal/collector"
 	"omni-backend/internal/config"
+	ipamservice "omni-backend/internal/ipam"
 	"omni-backend/internal/store"
 	"os"
 	"os/signal"
@@ -39,11 +40,16 @@ func main() {
 
 	cache := collector.NewCache()
 	runner := collector.NewRunner(cache, st)
+	ipamScanner := ipamservice.NewScanner(st, nil)
+	ipamScheduler := ipamservice.NewScheduler(st, ipamScanner, 0)
 
 	log.Println("Starting collector runner...")
 	runner.Start(ctx)
 
-	router := api.SetupRouter(cache, runner, st, cfg)
+	log.Println("Starting IPAM scheduler...")
+	ipamScheduler.Start(ctx)
+
+	router := api.SetupRouter(cache, runner, st, cfg, ipamScanner)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,

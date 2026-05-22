@@ -385,6 +385,182 @@ func (s *Store) IPAMSummary(ctx context.Context) (models.IPAMSummary, error) {
 	return summary, err
 }
 
+func (s *Store) ListDueIPAMSubnets(ctx context.Context, now time.Time, limit int) ([]models.IPAMSubnet, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT s.id, s.network_id, n.location_id, s.name, s.cidr::text, s.description,
+			s.auto_discovery, s.scan_interval_seconds, s.last_scan_started_at,
+			s.last_scan_completed_at, s.last_scan_status, s.last_scan_error,
+			s.created_at, s.updated_at
+		FROM ipam_subnets s
+		JOIN ipam_networks n ON n.id = s.network_id
+		WHERE s.auto_discovery = true
+			AND (
+				s.last_scan_started_at IS NULL
+				OR (s.last_scan_status = 'running' AND s.last_scan_started_at <= $1::timestamptz - interval '15 minutes')
+				OR (
+					(s.last_scan_status IS NULL OR s.last_scan_status <> 'running')
+					AND (
+						s.last_scan_completed_at IS NULL
+						OR s.last_scan_completed_at <= $1::timestamptz - (s.scan_interval_seconds * interval '1 second')
+					)
+				)
+			)
+		ORDER BY COALESCE(s.last_scan_completed_at, s.last_scan_started_at, 'epoch'::timestamptz), s.name
+		LIMIT $2
+	`, now.UTC(), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.IPAMSubnet{}
+	for rows.Next() {
+		item, err := scanIPAMSubnet(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) MarkIPAMScanStarted(ctx context.Context, subnetID string, startedAt time.Time) error {
+	if strings.TrimSpace(subnetID) == "" {
+		return validationError("subnet id is required")
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE ipam_subnets
+		SET last_scan_started_at=$2, last_scan_status='running', last_scan_error=NULL, updated_at=$2
+		WHERE id=$1
+			AND (last_scan_status IS DISTINCT FROM 'running' OR last_scan_started_at <= $2::timestamptz - interval '15 minutes')
+	`, subnetID, startedAt.UTC())
+	if err != nil {
+		return err
+	}
+	if changed, _ := result.RowsAffected(); changed > 0 {
+		return nil
+	}
+	if _, err := s.ipamSubnetByID(ctx, subnetID); err != nil {
+		return err
+	}
+	return fmt.Errorf("%w: subnet scan already running", ErrConflict)
+}
+
+func (s *Store) MarkIPAMScanFailed(ctx context.Context, subnetID string, completedAt time.Time, message string) (models.IPAMSubnet, error) {
+	if strings.TrimSpace(subnetID) == "" {
+		return models.IPAMSubnet{}, validationError("subnet id is required")
+	}
+	message = strings.TrimSpace(message)
+	if len(message) > 500 {
+		message = message[:500]
+	}
+	result, err := s.db.ExecContext(ctx, `
+		UPDATE ipam_subnets
+		SET last_scan_completed_at=$2, last_scan_status='failed', last_scan_error=$3, updated_at=$2
+		WHERE id=$1
+	`, subnetID, completedAt.UTC(), message)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if changed, _ := result.RowsAffected(); changed == 0 {
+		return models.IPAMSubnet{}, ErrNotFound
+	}
+	return s.ipamSubnetByID(ctx, subnetID)
+}
+
+func (s *Store) ListIPAMScanAddresses(ctx context.Context, subnetID string) ([]models.IPAMScanAddress, error) {
+	if strings.TrimSpace(subnetID) == "" {
+		return nil, validationError("subnet id is required")
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, subnet_id, address::text, status, last_seen_at, consecutive_failures
+		FROM ipam_addresses
+		WHERE subnet_id=$1
+		ORDER BY address
+	`, subnetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.IPAMScanAddress{}
+	for rows.Next() {
+		var item models.IPAMScanAddress
+		var status string
+		var lastSeenAt sql.NullTime
+		if err := rows.Scan(&item.ID, &item.SubnetID, &item.Address, &status, &lastSeenAt, &item.ConsecutiveFailures); err != nil {
+			return nil, err
+		}
+		item.Status = models.IPAMAddressStatus(status)
+		if lastSeenAt.Valid {
+			seenAt := lastSeenAt.Time
+			item.LastSeenAt = &seenAt
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error) {
+	if strings.TrimSpace(subnetID) == "" {
+		return models.IPAMSubnet{}, validationError("subnet id is required")
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.PrepareContext(ctx, `
+		UPDATE ipam_addresses
+		SET status=$2, last_scanned_at=$3, last_seen_at=$4,
+			consecutive_failures=$5, updated_at=$6, updated_by='ipam-scanner'
+		WHERE id=$1 AND subnet_id=$7
+	`)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	defer stmt.Close()
+
+	appliedAt := completedAt.UTC()
+	for _, result := range results {
+		updateResult, err := stmt.ExecContext(ctx,
+			result.AddressID,
+			string(result.Status),
+			result.LastScannedAt.UTC(),
+			result.LastSeenAt,
+			result.ConsecutiveFailures,
+			appliedAt,
+			subnetID,
+		)
+		if err != nil {
+			return models.IPAMSubnet{}, err
+		}
+		if changed, _ := updateResult.RowsAffected(); changed == 0 {
+			return models.IPAMSubnet{}, ErrNotFound
+		}
+	}
+
+	updateResult, err := tx.ExecContext(ctx, `
+		UPDATE ipam_subnets
+		SET last_scan_completed_at=$2, last_scan_status='completed', last_scan_error=NULL, updated_at=$2
+		WHERE id=$1
+	`, subnetID, appliedAt)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if changed, _ := updateResult.RowsAffected(); changed == 0 {
+		return models.IPAMSubnet{}, ErrNotFound
+	}
+	if err := tx.Commit(); err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	return s.ipamSubnetByID(ctx, subnetID)
+}
+
 func (s *Store) ipamLocationByID(ctx context.Context, id string) (models.IPAMLocation, error) {
 	var item models.IPAMLocation
 	var createdAt, updatedAt time.Time

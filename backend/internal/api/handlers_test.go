@@ -81,6 +81,20 @@ func TestManageIPAMRouteRequiresAdmin(t *testing.T) {
 	}
 }
 
+func TestManageIPAMRescanRouteRequiresAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/manage/ipam/subnets/subnet-1/rescan", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
 func TestWriteStoreJSONErrorStatus(t *testing.T) {
 	tests := []struct {
 		name string
