@@ -82,7 +82,7 @@
 
 ### 10. Manage/Auth/PostgreSQL 도입
 
-- 상태: 진행 중
+- 상태: 완료 (`2026-05-22`)
 - 파일 기반 inventory runtime 의존 제거.
 - PostgreSQL migration, ID/PW auth, admin/viewer 권한, Manage CRUD를 추가.
 - collector는 매 수집 시 DB의 active 설정과 암호화 credential을 읽어 사용.

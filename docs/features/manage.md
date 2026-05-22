@@ -17,5 +17,5 @@
 - **저장과 검증의 디커플링 (Decoupling)**: 외부 인프라의 일시적 장애가 설정 저장을 막지 않도록, CRUD 동작(저장)과 API 연결 검증(Test Connection)을 분리 설계함. 연결 테스트 실패 시에는 에러 상세(`upstreamStatus` 등)를 클라이언트에 명시적으로 전달함.
 - **동적 다중 연동 지원**: 다중 Kubernetes 클러스터 및 연동 도구(GitLab, ArgoCD 등)를 원활하게 등록할 수 있도록 snapshot 응답 포맷을 설계함. 연동 실패 상세는 에러 봉투(envelope)에 담고, snapshot은 부분 실패 시 `207 Multi-Status`, 전체 runtime source 실패 시 `502 Bad Gateway`로 반환함.
 - **인라인 수정 폼 UX**: 기존에 상단 생성 폼을 덮어쓰던 수정 방식을 개선하여, 개별 연동 도구 항목 아래에 독립된 인라인 수정 폼이 나타나도록 하여 더욱 직관적인 설정을 가능하게 함.
-- **리소스별 개별 갱신 (Granular API Reloading)**: 특정 툴의 저장 또는 삭제 작업 시 모든 연동 정보를 일괄 재조회(`load()`)하지 않고, 변경된 리소스 전용 로딩 함수(`loadKubernetes`, `loadArgoCD` 등)만 호출하여 클라이언트 성능 및 API 트래픽을 최적화함.
+- **리소스별 개별 갱신 (Granular API Reloading)**: 특정 툴의 저장 또는 삭제 작업 시 모든 연동 정보를 일괄 재조회하지 않고, 변경된 리소스 전용 로딩 로직만 호출하여 클라이언트 성능 및 API 트래픽을 최적화함.
 - **Admin 전용 접근 제어**: `viewer` 권한 계정은 접근할 수 없도록, Manage API 및 웹 페이지 진입 경로에 `admin` 역할 검증 미들웨어를 두어 보호함.

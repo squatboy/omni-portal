@@ -28,7 +28,7 @@ Common rules and each rule when working on frontend & backend
 - Do not use obsidian vault about this project
 
 ### Frontend Rules
-- Use 'shadcn' agent skill for UX/UI work.
+- Use shadcn components, preset and 'shadcn' agent skill, mcp for UX/UI work.
 - Use the existing installed shadcn preset
 
 ### Backend Rules

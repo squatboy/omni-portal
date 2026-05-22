@@ -5,7 +5,7 @@ Omni 대시보드는 각 리소스 소스로부터 수집된 데이터를 바탕
 ---
 
 ### 1. Overview Status (Rollup)
-전체 대시보드 상단의 롤업 상태는 모든 소스의 상태(`CollectEnvelope.Status`)를 종합하여 결정됩니다.
+전체 대시보드 상단의 롤업 상태는 모든 소스의 수집 결과(Envelope) 상태값을 종합하여 결정됩니다.
 
 * **OK**: 모든 소스의 수집 상태가 `ok`일 때.
 * **STALE**: 하나 이상의 소스가 `stale`, `timeout`, 또는 `permission_error` 상태일 때.
