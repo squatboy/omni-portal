@@ -1,11 +1,13 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"omni-backend/internal/collector"
 	"omni-backend/internal/models"
+	"omni-backend/internal/store"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +34,49 @@ func TestCollectSnapshotRoute(t *testing.T) {
 		if _, ok := snapshot[key]; !ok {
 			t.Fatalf("expected snapshot key %q", key)
 		}
+	}
+}
+
+func TestIPAMReadRouteRequiresStore(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ipam/summary", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("expected status %d, got %d", http.StatusServiceUnavailable, rec.Code)
+	}
+}
+
+func TestIPAMReadRouteRequiresAuth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, new(store.Store), nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ipam/summary", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestManageIPAMRouteRequiresAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/manage/ipam/locations", bytes.NewBufferString(`{"name":"HQ"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
 	}
 }
 
