@@ -43,8 +43,9 @@ Omni는 가상 머신(VM), Kubernetes 클러스터, 주요 개발 도구(ArgoCD,
 1. IPAM 자원은 PostgreSQL에 `Location -> Network -> Subnet -> IP Address` 계층으로 저장됩니다.
 2. Subnet 생성 시 IPv4 CIDR의 사용 가능한 host IP row를 생성합니다.
 3. IPAM scanner는 ICMP ping 결과를 수집하고 store bulk update 경로로 IP 상태를 반영합니다.
-4. IPAM scheduler는 dashboard collect runner와 별도로 due Auto Discovery Subnet을 스캔합니다.
-5. Viewer는 `/api/ipam/*` 조회 API만 사용하고, Admin은 `/api/manage/ipam/*` mutation과 rescan API를 사용합니다.
+4. 같은 트랜잭션에서 scan summary history와 status transition diff만 저장하고, 전체 IP 스냅샷은 저장하지 않습니다.
+5. IPAM scheduler는 dashboard collect runner와 별도로 due Auto Discovery Subnet을 스캔합니다.
+6. Viewer는 `/api/ipam/*` 조회 API만 사용하고, Admin은 `/api/manage/ipam/*` mutation과 rescan API를 사용합니다.
 
 ### User Request Path (Pull from Cache)
 

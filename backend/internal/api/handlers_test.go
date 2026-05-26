@@ -2,14 +2,18 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"omni-backend/internal/collector"
 	"omni-backend/internal/models"
 	"omni-backend/internal/store"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -63,6 +67,91 @@ func TestIPAMReadRouteRequiresAuth(t *testing.T) {
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestIPAMScanHistoryRouteRequiresAuth(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, new(store.Store), nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ipam/scan-history", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("expected status %d, got %d", http.StatusUnauthorized, rec.Code)
+	}
+}
+
+func TestIPAMScanHistoryViewerAccessAndNotFound(t *testing.T) {
+	databaseURL := os.Getenv("OMNI_IPAM_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set OMNI_IPAM_TEST_DATABASE_URL to run PostgreSQL-backed IPAM API tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	st, err := store.Open(ctx, databaseURL, []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer st.Close()
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	suffix := time.Now().UnixNano()
+	admin, err := st.CreateUser(ctx, nil, fmt.Sprintf("api-admin-%d", suffix), models.RoleAdmin, "password", false)
+	if err != nil {
+		t.Fatalf("create admin: %v", err)
+	}
+	viewer, err := st.CreateUser(ctx, &admin.ID, fmt.Sprintf("api-viewer-%d", suffix), models.RoleViewer, "password", false)
+	if err != nil {
+		t.Fatalf("create viewer: %v", err)
+	}
+	_, viewerToken, err := st.Authenticate(ctx, viewer.Username, "password")
+	if err != nil {
+		t.Fatalf("authenticate viewer: %v", err)
+	}
+
+	location, err := st.CreateIPAMLocation(ctx, admin.ID, models.IPAMLocation{Name: fmt.Sprintf("api-history-%d", suffix)})
+	if err != nil {
+		t.Fatalf("create location: %v", err)
+	}
+	defer st.DeleteIPAMLocation(context.Background(), location.ID)
+	network, err := st.CreateIPAMNetwork(ctx, admin.ID, models.IPAMNetwork{LocationID: location.ID, Name: "network-a"})
+	if err != nil {
+		t.Fatalf("create network: %v", err)
+	}
+	subnet, err := st.CreateIPAMSubnet(ctx, admin.ID, models.IPAMSubnet{NetworkID: network.ID, Name: "subnet-a", CIDR: "10.214.0.0/30"})
+	if err != nil {
+		t.Fatalf("create subnet: %v", err)
+	}
+	if _, err := st.MarkIPAMScanFailed(ctx, subnet.ID, time.Now().UTC(), "scan failed"); err != nil {
+		t.Fatalf("mark failed: %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(collector.NewCache(), nil, st, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/ipam/scan-history", nil)
+	req.AddCookie(&http.Cookie{Name: store.SessionCookieName, Value: viewerToken})
+	rec := httptest.NewRecorder()
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected viewer list status %d, got %d body=%s", http.StatusOK, rec.Code, rec.Body.String())
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/ipam/scan-history/missing-history", nil)
+	req.AddCookie(&http.Cookie{Name: store.SessionCookieName, Value: viewerToken})
+	rec = httptest.NewRecorder()
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected missing detail status %d, got %d", http.StatusNotFound, rec.Code)
 	}
 }
 

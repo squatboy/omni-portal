@@ -414,6 +414,45 @@ type IPAMScanSummary struct {
 	Subnet      IPAMSubnet `json:"subnet"`
 }
 
+type IPAMScanHistoryStatus string
+
+const (
+	IPAMScanHistoryCompleted IPAMScanHistoryStatus = "completed"
+	IPAMScanHistoryFailed    IPAMScanHistoryStatus = "failed"
+)
+
+type IPAMScanHistory struct {
+	ID          string                `json:"id"`
+	SubnetID    string                `json:"subnetId"`
+	SubnetName  string                `json:"subnetName"`
+	SubnetCIDR  string                `json:"subnetCidr"`
+	StartedAt   *string               `json:"startedAt,omitempty"`
+	CompletedAt string                `json:"completedAt"`
+	Status      IPAMScanHistoryStatus `json:"status"`
+	Total       *int                  `json:"total,omitempty"`
+	Used        *int                  `json:"used,omitempty"`
+	Offline     *int                  `json:"offline,omitempty"`
+	Free        *int                  `json:"free,omitempty"`
+	Error       *string               `json:"error,omitempty"`
+}
+
+type IPAMScanHistoryChange struct {
+	ID                          string            `json:"id"`
+	HistoryID                   string            `json:"historyId"`
+	Address                     string            `json:"address"`
+	PreviousStatus              IPAMAddressStatus `json:"previousStatus"`
+	CurrentStatus               IPAMAddressStatus `json:"currentStatus"`
+	PreviousLastSeenAt          *string           `json:"previousLastSeenAt,omitempty"`
+	CurrentLastSeenAt           *string           `json:"currentLastSeenAt,omitempty"`
+	PreviousConsecutiveFailures int               `json:"previousConsecutiveFailures"`
+	CurrentConsecutiveFailures  int               `json:"currentConsecutiveFailures"`
+}
+
+type IPAMScanHistoryDetail struct {
+	History IPAMScanHistory         `json:"history"`
+	Changes []IPAMScanHistoryChange `json:"changes"`
+}
+
 type IPAMAddressSummary struct {
 	Total   int `json:"total"`
 	Used    int `json:"used"`

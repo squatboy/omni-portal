@@ -15,6 +15,8 @@ import type {
   IPAMAddress,
   IPAMLocation,
   IPAMNetwork,
+  IPAMScanHistory,
+  IPAMScanHistoryChange,
   IPAMSubnet,
   KubernetesIntegration,
   NexusIntegration,
@@ -65,6 +67,8 @@ type MockStore = {
   ipamNetworks: IPAMNetwork[]
   ipamSubnets: IPAMSubnet[]
   ipamAddresses: IPAMAddress[]
+  ipamScanHistory: IPAMScanHistory[]
+  ipamScanHistoryChanges: IPAMScanHistoryChange[]
 }
 
 let mockStore: MockStore | null = null
@@ -79,6 +83,62 @@ export function getMockStore(): MockStore {
 function createDefaultMockStore(): MockStore {
   const createdAt = mockUserCreatedAt
   const updatedAt = mockUserCreatedAt
+
+  const ipamScanHistory: IPAMScanHistory[] = [
+    {
+      id: "scan-platform-core-1",
+      subnetId: "subnet-platform-core",
+      subnetName: "Platform Core",
+      subnetCidr: "10.40.0.0/29",
+      startedAt: createdAt,
+      completedAt: updatedAt,
+      status: "completed",
+      total: 6,
+      used: 4,
+      offline: 1,
+      free: 1,
+      error: null,
+    },
+    {
+      id: "scan-office-users-1",
+      subnetId: "subnet-office-users",
+      subnetName: "Office Users",
+      subnetCidr: "10.40.10.0/28",
+      startedAt: createdAt,
+      completedAt: updatedAt,
+      status: "failed",
+      total: null,
+      used: null,
+      offline: null,
+      free: null,
+      error: "ping command timed out",
+    },
+  ]
+
+  const ipamScanHistoryChanges: IPAMScanHistoryChange[] = [
+    {
+      id: "scan-change-1",
+      historyId: "scan-platform-core-1",
+      address: "10.40.0.1",
+      previousStatus: "free",
+      currentStatus: "used",
+      previousLastSeenAt: null,
+      currentLastSeenAt: updatedAt,
+      previousConsecutiveFailures: 1,
+      currentConsecutiveFailures: 0,
+    },
+    {
+      id: "scan-change-2",
+      historyId: "scan-platform-core-1",
+      address: "10.40.0.2",
+      previousStatus: "used",
+      currentStatus: "offline",
+      previousLastSeenAt: createdAt,
+      currentLastSeenAt: createdAt,
+      previousConsecutiveFailures: 2,
+      currentConsecutiveFailures: 3,
+    },
+  ]
 
   return {
     vms: [
@@ -259,6 +319,8 @@ function createDefaultMockStore(): MockStore {
       ...createMockIPAMAddresses("subnet-office-users", "10.40.10", 1, 14),
       ...createMockIPAMAddresses("subnet-busan-services", "10.50.0", 1, 6),
     ],
+    ipamScanHistory,
+    ipamScanHistoryChanges,
   }
 }
 

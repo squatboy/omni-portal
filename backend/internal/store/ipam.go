@@ -29,6 +29,8 @@ var allowedIPAMScanIntervals = map[int]struct{}{
 	86400: {},
 }
 
+const ipamScanHistoryRetentionPerSubnet = 20
+
 func (s *Store) ListIPAMLocations(ctx context.Context) ([]models.IPAMLocation, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, description, created_at, updated_at
@@ -457,7 +459,18 @@ func (s *Store) MarkIPAMScanFailed(ctx context.Context, subnetID string, complet
 	if len(message) > 500 {
 		message = message[:500]
 	}
-	result, err := s.db.ExecContext(ctx, `
+
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	defer tx.Rollback()
+
+	snapshot, err := ipamScanSubnetSnapshot(ctx, tx, subnetID)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	result, err := tx.ExecContext(ctx, `
 		UPDATE ipam_subnets
 		SET last_scan_completed_at=$2, last_scan_status='failed', last_scan_error=$3, updated_at=$2
 		WHERE id=$1
@@ -467,6 +480,23 @@ func (s *Store) MarkIPAMScanFailed(ctx context.Context, subnetID string, complet
 	}
 	if changed, _ := result.RowsAffected(); changed == 0 {
 		return models.IPAMSubnet{}, ErrNotFound
+	}
+	if _, err := insertIPAMScanHistory(ctx, tx, ipamScanHistoryInsert{
+		SubnetID:    subnetID,
+		SubnetName:  snapshot.name,
+		SubnetCIDR:  snapshot.cidr,
+		StartedAt:   snapshot.startedAt,
+		CompletedAt: completedAt.UTC(),
+		Status:      models.IPAMScanHistoryFailed,
+		Error:       normalizeOptionalString(&message),
+	}); err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := pruneIPAMScanHistory(ctx, tx, subnetID); err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return models.IPAMSubnet{}, err
 	}
 	return s.ipamSubnetByID(ctx, subnetID)
 }
@@ -514,6 +544,15 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 	}
 	defer tx.Rollback()
 
+	snapshot, err := ipamScanSubnetSnapshot(ctx, tx, subnetID)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	previous, err := ipamScanAddressSnapshots(ctx, tx, subnetID)
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+
 	stmt, err := tx.PrepareContext(ctx, `
 		UPDATE ipam_addresses
 		SET status=$2, last_scanned_at=$3, last_seen_at=$4,
@@ -526,7 +565,13 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 	defer stmt.Close()
 
 	appliedAt := completedAt.UTC()
+	counts := models.IPAMAddressSummary{}
+	changes := make([]models.IPAMScanHistoryChange, 0)
 	for _, result := range results {
+		before, ok := previous[result.AddressID]
+		if !ok {
+			return models.IPAMSubnet{}, ErrNotFound
+		}
 		updateResult, err := stmt.ExecContext(ctx,
 			result.AddressID,
 			string(result.Status),
@@ -542,6 +587,26 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 		if changed, _ := updateResult.RowsAffected(); changed == 0 {
 			return models.IPAMSubnet{}, ErrNotFound
 		}
+		counts.Total++
+		switch result.Status {
+		case models.IPAMAddressUsed:
+			counts.Used++
+		case models.IPAMAddressOffline:
+			counts.Offline++
+		default:
+			counts.Free++
+		}
+		if before.status != result.Status {
+			changes = append(changes, models.IPAMScanHistoryChange{
+				Address:                     before.address,
+				PreviousStatus:              before.status,
+				CurrentStatus:               result.Status,
+				PreviousLastSeenAt:          timeStringPtr(before.lastSeenAt),
+				CurrentLastSeenAt:           timeStringPtr(result.LastSeenAt),
+				PreviousConsecutiveFailures: before.consecutiveFailures,
+				CurrentConsecutiveFailures:  result.ConsecutiveFailures,
+			})
+		}
 	}
 
 	updateResult, err := tx.ExecContext(ctx, `
@@ -555,10 +620,105 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 	if changed, _ := updateResult.RowsAffected(); changed == 0 {
 		return models.IPAMSubnet{}, ErrNotFound
 	}
+	historyID, err := insertIPAMScanHistory(ctx, tx, ipamScanHistoryInsert{
+		SubnetID:    subnetID,
+		SubnetName:  snapshot.name,
+		SubnetCIDR:  snapshot.cidr,
+		StartedAt:   snapshot.startedAt,
+		CompletedAt: appliedAt,
+		Status:      models.IPAMScanHistoryCompleted,
+		Total:       &counts.Total,
+		Used:        &counts.Used,
+		Offline:     &counts.Offline,
+		Free:        &counts.Free,
+	})
+	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := insertIPAMScanHistoryChanges(ctx, tx, historyID, changes); err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := pruneIPAMScanHistory(ctx, tx, subnetID); err != nil {
+		return models.IPAMSubnet{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return models.IPAMSubnet{}, err
 	}
 	return s.ipamSubnetByID(ctx, subnetID)
+}
+
+func (s *Store) ListIPAMScanHistory(ctx context.Context, limit int) ([]models.IPAMScanHistory, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, subnet_id, subnet_name, subnet_cidr::text, started_at, completed_at,
+			status, total_count, used_count, offline_count, free_count, error
+		FROM ipam_scan_history
+		ORDER BY completed_at DESC, created_at DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.IPAMScanHistory{}
+	for rows.Next() {
+		item, err := scanIPAMScanHistory(rows)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) IPAMScanHistoryDetail(ctx context.Context, id string) (models.IPAMScanHistoryDetail, error) {
+	if strings.TrimSpace(id) == "" {
+		return models.IPAMScanHistoryDetail{}, validationError("history id is required")
+	}
+	row := s.db.QueryRowContext(ctx, `
+		SELECT id, subnet_id, subnet_name, subnet_cidr::text, started_at, completed_at,
+			status, total_count, used_count, offline_count, free_count, error
+		FROM ipam_scan_history
+		WHERE id=$1
+	`, id)
+	history, err := scanIPAMScanHistory(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return models.IPAMScanHistoryDetail{}, ErrNotFound
+	}
+	if err != nil {
+		return models.IPAMScanHistoryDetail{}, err
+	}
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, history_id, address::text, previous_status, current_status,
+			previous_last_seen_at, current_last_seen_at,
+			previous_consecutive_failures, current_consecutive_failures
+		FROM ipam_scan_history_changes
+		WHERE history_id=$1
+		ORDER BY address
+	`, id)
+	if err != nil {
+		return models.IPAMScanHistoryDetail{}, err
+	}
+	defer rows.Close()
+
+	changes := []models.IPAMScanHistoryChange{}
+	for rows.Next() {
+		change, err := scanIPAMScanHistoryChange(rows)
+		if err != nil {
+			return models.IPAMScanHistoryDetail{}, err
+		}
+		changes = append(changes, change)
+	}
+	if err := rows.Err(); err != nil {
+		return models.IPAMScanHistoryDetail{}, err
+	}
+	return models.IPAMScanHistoryDetail{History: history, Changes: changes}, nil
 }
 
 func (s *Store) ipamLocationByID(ctx context.Context, id string) (models.IPAMLocation, error) {
@@ -628,6 +788,177 @@ func (s *Store) ipamAddressByID(ctx context.Context, id string) (models.IPAMAddr
 		return models.IPAMAddress{}, ErrNotFound
 	}
 	return item, err
+}
+
+type ipamScanSubnetSnapshotRow struct {
+	name      string
+	cidr      string
+	startedAt *time.Time
+}
+
+func ipamScanSubnetSnapshot(ctx context.Context, tx *sql.Tx, subnetID string) (ipamScanSubnetSnapshotRow, error) {
+	var snapshot ipamScanSubnetSnapshotRow
+	var startedAt sql.NullTime
+	err := tx.QueryRowContext(ctx, `
+		SELECT name, cidr::text, last_scan_started_at
+		FROM ipam_subnets
+		WHERE id=$1
+		FOR UPDATE
+	`, subnetID).Scan(&snapshot.name, &snapshot.cidr, &startedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ipamScanSubnetSnapshotRow{}, ErrNotFound
+	}
+	if err != nil {
+		return ipamScanSubnetSnapshotRow{}, err
+	}
+	if startedAt.Valid {
+		value := startedAt.Time
+		snapshot.startedAt = &value
+	}
+	return snapshot, nil
+}
+
+type ipamScanAddressSnapshotRow struct {
+	address             string
+	status              models.IPAMAddressStatus
+	lastSeenAt          *time.Time
+	consecutiveFailures int
+}
+
+func ipamScanAddressSnapshots(ctx context.Context, tx *sql.Tx, subnetID string) (map[string]ipamScanAddressSnapshotRow, error) {
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id, address::text, status, last_seen_at, consecutive_failures
+		FROM ipam_addresses
+		WHERE subnet_id=$1
+		FOR UPDATE
+	`, subnetID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := map[string]ipamScanAddressSnapshotRow{}
+	for rows.Next() {
+		var id string
+		var item ipamScanAddressSnapshotRow
+		var status string
+		var lastSeenAt sql.NullTime
+		if err := rows.Scan(&id, &item.address, &status, &lastSeenAt, &item.consecutiveFailures); err != nil {
+			return nil, err
+		}
+		item.status = models.IPAMAddressStatus(status)
+		if lastSeenAt.Valid {
+			value := lastSeenAt.Time
+			item.lastSeenAt = &value
+		}
+		items[id] = item
+	}
+	return items, rows.Err()
+}
+
+type ipamScanHistoryInsert struct {
+	SubnetID    string
+	SubnetName  string
+	SubnetCIDR  string
+	StartedAt   *time.Time
+	CompletedAt time.Time
+	Status      models.IPAMScanHistoryStatus
+	Total       *int
+	Used        *int
+	Offline     *int
+	Free        *int
+	Error       *string
+}
+
+func insertIPAMScanHistory(ctx context.Context, tx *sql.Tx, item ipamScanHistoryInsert) (string, error) {
+	id := newID("scan")
+	_, err := tx.ExecContext(ctx, `
+		INSERT INTO ipam_scan_history (
+			id, subnet_id, subnet_name, subnet_cidr, started_at, completed_at,
+			status, total_count, used_count, offline_count, free_count, error
+		)
+		VALUES ($1,$2,$3,$4::cidr,$5,$6,$7,$8,$9,$10,$11,$12)
+	`,
+		id,
+		item.SubnetID,
+		item.SubnetName,
+		item.SubnetCIDR,
+		item.StartedAt,
+		item.CompletedAt.UTC(),
+		string(item.Status),
+		item.Total,
+		item.Used,
+		item.Offline,
+		item.Free,
+		item.Error,
+	)
+	if err != nil {
+		return "", err
+	}
+	return id, nil
+}
+
+func insertIPAMScanHistoryChanges(ctx context.Context, tx *sql.Tx, historyID string, changes []models.IPAMScanHistoryChange) error {
+	if len(changes) == 0 {
+		return nil
+	}
+	stmt, err := tx.PrepareContext(ctx, `
+		INSERT INTO ipam_scan_history_changes (
+			id, history_id, address, previous_status, current_status,
+			previous_last_seen_at, current_last_seen_at,
+			previous_consecutive_failures, current_consecutive_failures
+		)
+		VALUES ($1,$2,$3::inet,$4,$5,$6,$7,$8,$9)
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, change := range changes {
+		previousLastSeenAt, err := parseTimeStringPtr(change.PreviousLastSeenAt)
+		if err != nil {
+			return err
+		}
+		currentLastSeenAt, err := parseTimeStringPtr(change.CurrentLastSeenAt)
+		if err != nil {
+			return err
+		}
+		if _, err := stmt.ExecContext(ctx,
+			newID("chg"),
+			historyID,
+			change.Address,
+			string(change.PreviousStatus),
+			string(change.CurrentStatus),
+			previousLastSeenAt,
+			currentLastSeenAt,
+			change.PreviousConsecutiveFailures,
+			change.CurrentConsecutiveFailures,
+		); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func pruneIPAMScanHistory(ctx context.Context, tx *sql.Tx, subnetID string) error {
+	_, err := tx.ExecContext(ctx, `
+		DELETE FROM ipam_scan_history
+		WHERE id IN (
+			SELECT id
+			FROM (
+				SELECT id,
+					row_number() OVER (
+						PARTITION BY subnet_id
+						ORDER BY completed_at DESC, created_at DESC
+					) AS rn
+				FROM ipam_scan_history
+				WHERE subnet_id=$1
+			) ranked
+			WHERE rn > $2
+		)
+	`, subnetID, ipamScanHistoryRetentionPerSubnet)
+	return err
 }
 
 func ipamLocationIDForNetwork(ctx context.Context, tx *sql.Tx, networkID string) (string, error) {
@@ -748,6 +1079,34 @@ func formatNullTime(value sql.NullTime) *string {
 	return &formatted
 }
 
+func timeStringPtr(value *time.Time) *string {
+	if value == nil {
+		return nil
+	}
+	formatted := value.Format(time.RFC3339)
+	return &formatted
+}
+
+func nullIntPtr(value sql.NullInt64) *int {
+	if !value.Valid {
+		return nil
+	}
+	next := int(value.Int64)
+	return &next
+}
+
+func parseTimeStringPtr(value *string) (*time.Time, error) {
+	if value == nil {
+		return nil, nil
+	}
+	parsed, err := time.Parse(time.RFC3339, *value)
+	if err != nil {
+		return nil, err
+	}
+	parsed = parsed.UTC()
+	return &parsed, nil
+}
+
 func stringFromNull(value sql.NullString) *string {
 	if !value.Valid {
 		return nil
@@ -809,6 +1168,66 @@ func scanIPAMSubnet(row ipamSubnetScanner) (models.IPAMSubnet, error) {
 
 type ipamAddressScanner interface {
 	Scan(dest ...any) error
+}
+
+func scanIPAMScanHistory(row ipamSubnetScanner) (models.IPAMScanHistory, error) {
+	var item models.IPAMScanHistory
+	var startedAt sql.NullTime
+	var completedAt time.Time
+	var status string
+	var total, used, offline, free sql.NullInt64
+	var errorText sql.NullString
+	err := row.Scan(
+		&item.ID,
+		&item.SubnetID,
+		&item.SubnetName,
+		&item.SubnetCIDR,
+		&startedAt,
+		&completedAt,
+		&status,
+		&total,
+		&used,
+		&offline,
+		&free,
+		&errorText,
+	)
+	if err != nil {
+		return models.IPAMScanHistory{}, err
+	}
+	item.StartedAt = formatNullTime(startedAt)
+	item.CompletedAt = completedAt.Format(time.RFC3339)
+	item.Status = models.IPAMScanHistoryStatus(status)
+	item.Total = nullIntPtr(total)
+	item.Used = nullIntPtr(used)
+	item.Offline = nullIntPtr(offline)
+	item.Free = nullIntPtr(free)
+	item.Error = stringFromNull(errorText)
+	return item, nil
+}
+
+func scanIPAMScanHistoryChange(row ipamSubnetScanner) (models.IPAMScanHistoryChange, error) {
+	var item models.IPAMScanHistoryChange
+	var previousStatus, currentStatus string
+	var previousLastSeenAt, currentLastSeenAt sql.NullTime
+	err := row.Scan(
+		&item.ID,
+		&item.HistoryID,
+		&item.Address,
+		&previousStatus,
+		&currentStatus,
+		&previousLastSeenAt,
+		&currentLastSeenAt,
+		&item.PreviousConsecutiveFailures,
+		&item.CurrentConsecutiveFailures,
+	)
+	if err != nil {
+		return models.IPAMScanHistoryChange{}, err
+	}
+	item.PreviousStatus = models.IPAMAddressStatus(previousStatus)
+	item.CurrentStatus = models.IPAMAddressStatus(currentStatus)
+	item.PreviousLastSeenAt = formatNullTime(previousLastSeenAt)
+	item.CurrentLastSeenAt = formatNullTime(currentLastSeenAt)
+	return item, nil
 }
 
 func scanIPAMAddress(row ipamAddressScanner) (models.IPAMAddress, error) {

@@ -179,10 +179,40 @@ var migrations = []string{
 		updated_by text,
 		UNIQUE (subnet_id, address)
 	)`,
+	`CREATE TABLE IF NOT EXISTS ipam_scan_history (
+		id text PRIMARY KEY,
+		subnet_id text NOT NULL REFERENCES ipam_subnets(id) ON DELETE CASCADE,
+		subnet_name text NOT NULL,
+		subnet_cidr cidr NOT NULL,
+		started_at timestamptz,
+		completed_at timestamptz NOT NULL,
+		status text NOT NULL CHECK (status IN ('completed','failed')),
+		total_count integer,
+		used_count integer,
+		offline_count integer,
+		free_count integer,
+		error text,
+		created_at timestamptz NOT NULL DEFAULT now()
+	)`,
+	`CREATE TABLE IF NOT EXISTS ipam_scan_history_changes (
+		id text PRIMARY KEY,
+		history_id text NOT NULL REFERENCES ipam_scan_history(id) ON DELETE CASCADE,
+		address inet NOT NULL,
+		previous_status text NOT NULL CHECK (previous_status IN ('used','offline','free')),
+		current_status text NOT NULL CHECK (current_status IN ('used','offline','free')),
+		previous_last_seen_at timestamptz,
+		current_last_seen_at timestamptz,
+		previous_consecutive_failures integer NOT NULL,
+		current_consecutive_failures integer NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT now()
+	)`,
 	`CREATE INDEX IF NOT EXISTS ipam_networks_location_id_idx ON ipam_networks(location_id)`,
 	`CREATE INDEX IF NOT EXISTS ipam_subnets_network_id_idx ON ipam_subnets(network_id)`,
 	`CREATE INDEX IF NOT EXISTS ipam_subnets_cidr_idx ON ipam_subnets(cidr)`,
 	`CREATE INDEX IF NOT EXISTS ipam_addresses_subnet_id_idx ON ipam_addresses(subnet_id)`,
+	`CREATE INDEX IF NOT EXISTS ipam_scan_history_subnet_completed_idx ON ipam_scan_history(subnet_id, completed_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS ipam_scan_history_completed_idx ON ipam_scan_history(completed_at DESC)`,
+	`CREATE INDEX IF NOT EXISTS ipam_scan_history_changes_history_id_idx ON ipam_scan_history_changes(history_id)`,
 	`DO $$
 	BEGIN
 		IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 1) THEN

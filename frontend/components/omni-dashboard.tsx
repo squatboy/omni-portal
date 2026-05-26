@@ -34,7 +34,7 @@ import {
 import { HealthBadge } from "./dashboard/shared/common"
 import { DashboardContent } from "./dashboard/shared/dashboard-content"
 import { DashboardSkeleton } from "./dashboard/shared/dashboard-skeleton"
-import { IPAMPanel } from "./ipam-panel"
+import { IPAMPanel, IPAMScanHistoryPanel } from "./ipam-panel"
 import { ManagePanel, type ManageSection } from "./manage-panel"
 
 const appViews: AppView[] = [
@@ -50,6 +50,7 @@ const appViews: AppView[] = [
   "manage-integrations",
   "manage-users",
   "ipam-home",
+  "ipam-scan-history",
 ]
 
 const manageViewMap = {
@@ -58,7 +59,7 @@ const manageViewMap = {
   "manage-users": "users",
 } satisfies Record<string, ManageSection>
 
-function resolveInitialView(mockMode: boolean): AppView {
+export function resolveInitialView(mockMode: boolean): AppView {
   if (!mockMode) {
     return "overview"
   }
@@ -88,6 +89,9 @@ function getHeaderTitle(view: AppView, activeTab: DashboardTab) {
   }
   if (view === "ipam-home") {
     return "IPAM / Home"
+  }
+  if (view === "ipam-scan-history") {
+    return "IPAM / Scan History"
   }
   if (activeTab === "overview") {
     return "Infrastructure Overview"
@@ -208,7 +212,8 @@ export function OmniDashboard() {
 
   const canManage = user.role === "admin"
   const manageSection = getManageSection(activeView)
-  const isIPAMView = activeView === "ipam-home"
+  const isIPAMView =
+    activeView === "ipam-home" || activeView === "ipam-scan-history"
   const activeTab: DashboardTab =
     isManageView(activeView) || isIPAMView ? "overview" : activeView
 
@@ -306,6 +311,8 @@ export function OmniDashboard() {
         <div className="flex flex-col gap-4 p-4 md:p-6">
           {manageSection ? (
             <ManagePanel section={manageSection} />
+          ) : activeView === "ipam-scan-history" ? (
+            <IPAMScanHistoryPanel />
           ) : isIPAMView ? (
             <IPAMPanel canManage={canManage} />
           ) : snapshot ? (

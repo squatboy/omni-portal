@@ -143,3 +143,37 @@ export type IPAMScanSummary = {
   completedAt: string
   subnet: IPAMSubnet
 }
+
+export type IPAMScanHistoryStatus = "completed" | "failed"
+
+export type IPAMScanHistory = {
+  id: string
+  subnetId: string
+  subnetName: string
+  subnetCidr: string
+  startedAt?: string | null
+  completedAt: string
+  status: IPAMScanHistoryStatus
+  total?: number | null
+  used?: number | null
+  offline?: number | null
+  free?: number | null
+  error?: string | null
+}
+
+export type IPAMScanHistoryChange = {
+  id: string
+  historyId: string
+  address: string
+  previousStatus: IPAMAddressStatus
+  currentStatus: IPAMAddressStatus
+  previousLastSeenAt?: string | null
+  currentLastSeenAt?: string | null
+  previousConsecutiveFailures: number
+  currentConsecutiveFailures: number
+}
+
+export type IPAMScanHistoryDetail = {
+  history: IPAMScanHistory
+  changes: IPAMScanHistoryChange[]
+}

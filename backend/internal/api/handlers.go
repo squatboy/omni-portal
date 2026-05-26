@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -86,6 +87,8 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 	ipam.Use(api.requireStore())
 	{
 		ipam.GET("/summary", api.handleIPAMSummary)
+		ipam.GET("/scan-history", api.handleListIPAMScanHistory)
+		ipam.GET("/scan-history/:id", api.handleIPAMScanHistoryDetail)
 		ipam.GET("/locations", api.handleListIPAMLocations)
 		ipam.GET("/networks", api.handleListIPAMNetworks)
 		ipam.GET("/subnets", api.handleListIPAMSubnets)
@@ -386,6 +389,25 @@ func (api *API) handleCreateUser(c *gin.Context) {
 func (api *API) handleIPAMSummary(c *gin.Context) {
 	summary, err := api.store.IPAMSummary(c.Request.Context())
 	writeStoreJSON(c, http.StatusOK, summary, err)
+}
+
+func (api *API) handleListIPAMScanHistory(c *gin.Context) {
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil {
+			writeStoreJSON(c, http.StatusBadRequest, nil, store.ErrValidation)
+			return
+		}
+		limit = parsed
+	}
+	items, err := api.store.ListIPAMScanHistory(c.Request.Context(), limit)
+	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleIPAMScanHistoryDetail(c *gin.Context) {
+	item, err := api.store.IPAMScanHistoryDetail(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, item, err)
 }
 
 func (api *API) handleListIPAMLocations(c *gin.Context) {

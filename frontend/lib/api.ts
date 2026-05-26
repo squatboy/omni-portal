@@ -3,6 +3,8 @@ import type {
   AuthMe,
   GitLabIntegration,
   IPAMAddress,
+  IPAMScanHistory,
+  IPAMScanHistoryDetail,
   IPAMScanSummary,
   IPAMLocation,
   IPAMNetwork,
@@ -571,6 +573,34 @@ export const api = {
           method: "POST",
           body: JSON.stringify({}),
         }),
+  listIPAMScanHistory: (limit = 20) =>
+    isMockMode()
+      ? mockResponse(
+          [...getMockStore().ipamScanHistory]
+            .sort(
+              (a, b) =>
+                new Date(b.completedAt).getTime() -
+                new Date(a.completedAt).getTime()
+            )
+            .slice(0, limit)
+        )
+      : request<IPAMScanHistory[]>(`/api/ipam/scan-history?limit=${limit}`),
+  getIPAMScanHistory: (id: string) =>
+    isMockMode()
+      ? (() => {
+          const store = getMockStore()
+          const history = store.ipamScanHistory.find((item) => item.id === id)
+          if (!history) {
+            throw new Error("not found")
+          }
+          return mockResponse<IPAMScanHistoryDetail>({
+            history,
+            changes: store.ipamScanHistoryChanges.filter(
+              (item) => item.historyId === id
+            ),
+          })
+        })()
+      : request<IPAMScanHistoryDetail>(`/api/ipam/scan-history/${id}`),
   listIPAMAddresses: (subnetId: string) =>
     isMockMode()
       ? mockResponse(

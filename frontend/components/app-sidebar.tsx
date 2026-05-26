@@ -40,7 +40,7 @@ import { StatusDot } from "./dashboard/shared/status-badge"
 
 export type ManageView = "manage-vm" | "manage-integrations" | "manage-users"
 
-export type IPAMView = "ipam-home"
+export type IPAMView = "ipam-home" | "ipam-scan-history"
 
 export type AppView = DashboardTab | ManageView | IPAMView
 
@@ -48,6 +48,11 @@ const manageItems: { label: string; view: ManageView }[] = [
   { label: "Virtual Machines", view: "manage-vm" },
   { label: "Integrations", view: "manage-integrations" },
   { label: "Users", view: "manage-users" },
+]
+
+export const ipamItems: { label: string; view: IPAMView }[] = [
+  { label: "Home", view: "ipam-home" },
+  { label: "Scan History", view: "ipam-scan-history" },
 ]
 
 export function AppSidebar({
@@ -67,7 +72,7 @@ export function AppSidebar({
   const sources = snapshot?.overview.data.sources ?? []
   const { state } = useSidebar()
   const isManageActive = manageItems.some((item) => item.view === activeView)
-  const isIPAMActive = activeView === "ipam-home"
+  const isIPAMActive = ipamItems.some((item) => item.view === activeView)
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" {...props}>
@@ -204,17 +209,22 @@ export function AppSidebar({
               </CollapsibleTrigger>
               <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-[collapsible-up_0.1s_cubic-bezier(0.87,_0,_0.13,_1)] data-[state=open]:animate-[collapsible-down_0.2s_cubic-bezier(0.87,_0,_0.13,_1)]">
                 <SidebarMenuSub>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={isIPAMActive}>
-                      <button
-                        type="button"
-                        onClick={() => onViewChange("ipam-home")}
-                        className="flex w-full items-center justify-start"
+                  {ipamItems.map((item) => (
+                    <SidebarMenuSubItem key={item.view}>
+                      <SidebarMenuSubButton
+                        asChild
+                        isActive={activeView === item.view}
                       >
-                        <span>Home</span>
-                      </button>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
+                        <button
+                          type="button"
+                          onClick={() => onViewChange(item.view)}
+                          className="flex w-full items-center justify-start"
+                        >
+                          <span>{item.label}</span>
+                        </button>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  ))}
                 </SidebarMenuSub>
               </CollapsibleContent>
             </SidebarMenuItem>

@@ -3,11 +3,18 @@ import { describe, expect, it } from "vitest"
 import {
   countIPAMAddresses,
   ipamAddressButtonLabel,
+  scanHistoryCountLabel,
   sortIPAMAddressesByIPv4,
+  statusTransitionLabel,
   topIPv4SubnetRows,
   visibleIPAMActions,
 } from "./ipam-panel"
-import type { IPAMAddress, IPAMSubnet } from "@/lib/types"
+import type {
+  IPAMAddress,
+  IPAMScanHistory,
+  IPAMScanHistoryChange,
+  IPAMSubnet,
+} from "@/lib/types"
 
 describe("visibleIPAMActions", () => {
   it("hides admin-only actions for viewers", () => {
@@ -105,5 +112,46 @@ describe("IPAM helpers", () => {
       { id: "subnet-b", name: "Large", cidr: "10.0.1.0/29", hosts: 2 },
       { id: "subnet-a", name: "Small", cidr: "10.0.0.0/30", hosts: 1 },
     ])
+  })
+
+  it("formats scan history count labels", () => {
+    const completed: IPAMScanHistory = {
+      id: "scan-1",
+      subnetId: "subnet-a",
+      subnetName: "Small",
+      subnetCidr: "10.0.0.0/30",
+      completedAt: "2026-05-26T00:00:00Z",
+      status: "completed",
+      total: 3,
+      used: 1,
+      offline: 1,
+      free: 1,
+    }
+    const failed: IPAMScanHistory = {
+      ...completed,
+      id: "scan-2",
+      status: "failed",
+      total: null,
+      used: null,
+      offline: null,
+      free: null,
+    }
+
+    expect(scanHistoryCountLabel(completed)).toBe("1 used / 1 offline / 1 free")
+    expect(scanHistoryCountLabel(failed)).toBe("Failed")
+  })
+
+  it("formats status transition labels", () => {
+    const change: IPAMScanHistoryChange = {
+      id: "change-1",
+      historyId: "scan-1",
+      address: "10.0.0.1",
+      previousStatus: "free",
+      currentStatus: "used",
+      previousConsecutiveFailures: 1,
+      currentConsecutiveFailures: 0,
+    }
+
+    expect(statusTransitionLabel(change)).toBe("free -> used")
   })
 })
