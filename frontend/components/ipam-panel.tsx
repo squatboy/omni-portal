@@ -83,6 +83,12 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 
 type ResourceKind = "location" | "network" | "subnet"
 type AddressIndex = Record<string, IPAMAddress[]>
@@ -891,14 +897,21 @@ function SubnetTable({
               {canManage ? (
                 <TableCell>
                   <div className="flex items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="icon-sm"
-                      aria-label={`Rescan ${subnet.name}`}
-                      onClick={() => onRescan(subnet)}
-                    >
-                      <Radar data-icon="inline-start" />
-                    </Button>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label={`Rescan ${subnet.name}`}
+                            onClick={() => onRescan(subnet)}
+                          >
+                            <Radar data-icon="inline-start" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom">Scan</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     <RowActions
                       onEdit={() => onEdit(subnet)}
                       onDelete={() => onDelete(subnet)}
@@ -930,22 +943,36 @@ function RowActions({
 }) {
   return (
     <div className="flex items-center gap-1">
-      <Button
-        variant="outline"
-        size="icon-sm"
-        aria-label="Edit"
-        onClick={onEdit}
-      >
-        <Edit data-icon="inline-start" />
-      </Button>
-      <Button
-        variant="destructive"
-        size="icon-sm"
-        aria-label="Delete"
-        onClick={onDelete}
-      >
-        <Trash2 data-icon="inline-start" />
-      </Button>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon-sm"
+              aria-label="Edit"
+              onClick={onEdit}
+            >
+              <Edit data-icon="inline-start" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Edit</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="destructive"
+              size="icon-sm"
+              aria-label="Delete"
+              onClick={onDelete}
+            >
+              <Trash2 data-icon="inline-start" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent side="bottom">Delete</TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
     </div>
   )
 }
