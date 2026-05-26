@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os/exec"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -160,6 +161,9 @@ type CommandPingExecutor struct {
 }
 
 func (p CommandPingExecutor) Ping(ctx context.Context, address string) error {
+	if idx := strings.Index(address, "/"); idx != -1 {
+		address = address[:idx]
+	}
 	timeout := p.Timeout
 	if timeout <= 0 {
 		timeout = 2 * time.Second
