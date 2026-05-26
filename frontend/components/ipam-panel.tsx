@@ -149,6 +149,44 @@ export function topIPv4SubnetRows(
     .slice(0, limit)
 }
 
+function stripCIDRSuffix(address: string) {
+  return address.split("/")[0]
+}
+
+function ipv4SortKey(address: string) {
+  const parts = stripCIDRSuffix(address).split(".").map(Number)
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
+    return null
+  }
+  return parts.reduce((acc, part) => acc * 256 + part, 0)
+}
+
+export function ipamAddressButtonLabel(address: string) {
+  const hostAddress = stripCIDRSuffix(address)
+  const lastOctet = hostAddress.split(".").at(-1)
+  return lastOctet ? `.${lastOctet}` : hostAddress
+}
+
+export function sortIPAMAddressesByIPv4(addresses: IPAMAddress[]) {
+  return [...addresses].sort((a, b) => {
+    const left = ipv4SortKey(a.address)
+    const right = ipv4SortKey(b.address)
+    if (left !== null && right !== null) {
+      return left - right
+    }
+    if (left !== null) {
+      return -1
+    }
+    if (right !== null) {
+      return 1
+    }
+    return a.address.localeCompare(b.address)
+  })
+}
+
 export function IPAMPanel({ canManage }: { canManage: boolean }) {
   const actions = visibleIPAMActions(canManage)
   const [summary, setSummary] = React.useState<IPAMSummary | null>(null)
@@ -921,6 +959,7 @@ function SubnetAddressDetails({
   onOpenAddress: (address: IPAMAddress) => void
 }) {
   const counts = countIPAMAddresses(addresses)
+  const sortedAddresses = sortIPAMAddressesByIPv4(addresses)
 
   return (
     <Card>
@@ -956,7 +995,7 @@ function SubnetAddressDetails({
           </TableBody>
         </Table>
         <div className="grid grid-cols-[repeat(auto-fill,minmax(5.75rem,1fr))] gap-2">
-          {addresses.map((address) => (
+          {sortedAddresses.map((address) => (
             <Button
               key={address.id}
               variant="outline"
@@ -964,14 +1003,14 @@ function SubnetAddressDetails({
               className={cn(
                 "justify-start font-mono",
                 address.status === "active" &&
-                  "border-primary/30 bg-primary/10",
+                  "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)] hover:bg-[color:color-mix(in_oklch,var(--status-ok)_20%,transparent)]",
                 address.status === "dead" &&
                   "border-destructive/30 bg-destructive/10 text-destructive",
                 address.status === "offline" && "bg-muted"
               )}
               onClick={() => onOpenAddress(address)}
             >
-              {address.address.split(".").slice(-1)[0]}
+              {ipamAddressButtonLabel(address.address)}
             </Button>
           ))}
         </div>
@@ -1352,6 +1391,10 @@ function StatusBadge({
             ? "secondary"
             : "outline"
       }
+      className={cn(
+        status === "active" &&
+          "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]"
+      )}
     >
       {status}
       {count === null ? null : ` ${count}`}

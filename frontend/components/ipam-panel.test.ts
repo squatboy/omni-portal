@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest"
 
 import {
   countIPAMAddresses,
+  ipamAddressButtonLabel,
+  sortIPAMAddressesByIPv4,
   topIPv4SubnetRows,
   visibleIPAMActions,
 } from "./ipam-panel"
@@ -71,6 +73,23 @@ describe("IPAM helpers", () => {
         address("3", "subnet-a", "offline"),
       ])
     ).toEqual({ total: 3, active: 1, dead: 1, offline: 1 })
+  })
+
+  it("uses the last octet as the IP button label after removing CIDR", () => {
+    expect(ipamAddressButtonLabel("10.0.0.1/32")).toBe(".1")
+    expect(ipamAddressButtonLabel("10.0.0.10")).toBe(".10")
+  })
+
+  it("sorts addresses by IPv4 numeric order", () => {
+    const unsorted: IPAMAddress[] = [
+      { ...address("10", "subnet-a", "active"), address: "10.0.0.10/32" },
+      { ...address("2", "subnet-a", "active"), address: "10.0.0.2/32" },
+      { ...address("1", "subnet-a", "active"), address: "10.0.0.1/32" },
+    ]
+
+    expect(
+      sortIPAMAddressesByIPv4(unsorted).map((item) => item.address)
+    ).toEqual(["10.0.0.1/32", "10.0.0.2/32", "10.0.0.10/32"])
   })
 
   it("sorts top subnet chart rows by loaded host count", () => {

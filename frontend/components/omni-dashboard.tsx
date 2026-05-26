@@ -222,7 +222,7 @@ export function OmniDashboard() {
         canManage={canManage}
       />
       <SidebarInset>
-        <header className="sticky top-0 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur md:px-6">
+        <header className="sticky top-0 z-20 flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur md:px-6">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
           <div className="flex flex-1 items-center justify-between gap-3">
