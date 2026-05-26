@@ -86,9 +86,10 @@ func (s *Scanner) scanAddresses(ctx context.Context, scannedAt time.Time, addres
 	jobs := make(chan models.IPAMScanAddress)
 	results := make(chan models.IPAMScanResult, len(addresses))
 
+	workers := min(WorkerCount, len(addresses))
 	var wg sync.WaitGroup
-	wg.Add(WorkerCount)
-	for i := 0; i < WorkerCount; i++ {
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
 			for address := range jobs {
