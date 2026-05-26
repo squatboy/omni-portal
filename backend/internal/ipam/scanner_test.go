@@ -15,9 +15,9 @@ func TestScannerStatusTransitions(t *testing.T) {
 	seenAt := time.Date(2026, 5, 22, 9, 0, 0, 0, time.UTC)
 	st := &fakeStore{
 		addresses: []models.IPAMScanAddress{
-			{ID: "ip-1", SubnetID: "subnet-1", Address: "10.0.0.1", Status: models.IPAMAddressOffline},
-			{ID: "ip-2", SubnetID: "subnet-1", Address: "10.0.0.2", Status: models.IPAMAddressActive, LastSeenAt: &seenAt, ConsecutiveFailures: 2},
-			{ID: "ip-3", SubnetID: "subnet-1", Address: "10.0.0.3", Status: models.IPAMAddressOffline, ConsecutiveFailures: 2},
+			{ID: "ip-1", SubnetID: "subnet-1", Address: "10.0.0.1", Status: models.IPAMAddressFree},
+			{ID: "ip-2", SubnetID: "subnet-1", Address: "10.0.0.2", Status: models.IPAMAddressUsed, LastSeenAt: &seenAt, ConsecutiveFailures: 2},
+			{ID: "ip-3", SubnetID: "subnet-1", Address: "10.0.0.3", Status: models.IPAMAddressFree, ConsecutiveFailures: 2},
 		},
 	}
 	scanner := NewScanner(st, fakePing{success: map[string]bool{"10.0.0.1": true}})
@@ -26,19 +26,19 @@ func TestScannerStatusTransitions(t *testing.T) {
 	if err != nil {
 		t.Fatalf("scan subnet: %v", err)
 	}
-	if summary.Total != 3 || summary.Active != 1 || summary.Dead != 1 || summary.Offline != 1 {
+	if summary.Total != 3 || summary.Used != 1 || summary.Offline != 1 || summary.Free != 1 {
 		t.Fatalf("unexpected summary: %#v", summary)
 	}
 
 	results := st.resultsByAddressID()
-	if got := results["ip-1"]; got.Status != models.IPAMAddressActive || got.ConsecutiveFailures != 0 || got.LastSeenAt == nil {
-		t.Fatalf("expected offline success to become active, got %#v", got)
+	if got := results["ip-1"]; got.Status != models.IPAMAddressUsed || got.ConsecutiveFailures != 0 || got.LastSeenAt == nil {
+		t.Fatalf("expected free success to become used, got %#v", got)
 	}
-	if got := results["ip-2"]; got.Status != models.IPAMAddressDead || got.ConsecutiveFailures != 3 {
-		t.Fatalf("expected third failure after success history to become dead, got %#v", got)
+	if got := results["ip-2"]; got.Status != models.IPAMAddressOffline || got.ConsecutiveFailures != 3 {
+		t.Fatalf("expected third failure after success history to become offline, got %#v", got)
 	}
-	if got := results["ip-3"]; got.Status != models.IPAMAddressOffline || got.ConsecutiveFailures != 3 {
-		t.Fatalf("expected never-success failure to remain offline, got %#v", got)
+	if got := results["ip-3"]; got.Status != models.IPAMAddressFree || got.ConsecutiveFailures != 3 {
+		t.Fatalf("expected never-success failure to remain free, got %#v", got)
 	}
 	if st.bulkCalls != 1 {
 		t.Fatalf("expected one bulk apply call, got %d", st.bulkCalls)
@@ -53,7 +53,7 @@ func TestScannerUsesFixedWorkerPoolAndBulkApply(t *testing.T) {
 			ID:       "ip-" + octet,
 			SubnetID: "subnet-1",
 			Address:  "10.0.1." + octet,
-			Status:   models.IPAMAddressOffline,
+			Status:   models.IPAMAddressFree,
 		}
 	}
 	st := &fakeStore{addresses: addresses}

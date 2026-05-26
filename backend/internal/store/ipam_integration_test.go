@@ -156,8 +156,8 @@ func TestIPAMPostgresBulkApplyScanResults(t *testing.T) {
 	scannedAt := time.Now().UTC()
 	seenAt := scannedAt
 	updated, err := st.BulkApplyIPAMScanResults(ctx, subnet.ID, scannedAt, []models.IPAMScanResult{
-		{AddressID: addresses[0].ID, Status: models.IPAMAddressActive, LastScannedAt: scannedAt, LastSeenAt: &seenAt},
-		{AddressID: addresses[1].ID, Status: models.IPAMAddressOffline, LastScannedAt: scannedAt, ConsecutiveFailures: 1},
+		{AddressID: addresses[0].ID, Status: models.IPAMAddressUsed, LastScannedAt: scannedAt, LastSeenAt: &seenAt},
+		{AddressID: addresses[1].ID, Status: models.IPAMAddressFree, LastScannedAt: scannedAt, ConsecutiveFailures: 1},
 	})
 	if err != nil {
 		t.Fatalf("bulk apply scan results: %v", err)
@@ -170,11 +170,11 @@ func TestIPAMPostgresBulkApplyScanResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("list addresses: %v", err)
 	}
-	if items[0].Status != models.IPAMAddressActive || items[0].LastSeenAt == nil {
-		t.Fatalf("expected first address active with lastSeenAt, got %#v", items[0])
+	if items[0].Status != models.IPAMAddressUsed || items[0].LastSeenAt == nil {
+		t.Fatalf("expected first address used with lastSeenAt, got %#v", items[0])
 	}
-	if items[1].Status != models.IPAMAddressOffline || items[1].ConsecutiveFailures != 1 {
-		t.Fatalf("expected second address offline with one failure, got %#v", items[1])
+	if items[1].Status != models.IPAMAddressFree || items[1].ConsecutiveFailures != 1 {
+		t.Fatalf("expected second address free with one failure, got %#v", items[1])
 	}
 }
 

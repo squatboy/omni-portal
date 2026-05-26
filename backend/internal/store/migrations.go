@@ -167,7 +167,7 @@ var migrations = []string{
 		id text PRIMARY KEY,
 		subnet_id text NOT NULL REFERENCES ipam_subnets(id) ON DELETE CASCADE,
 		address inet NOT NULL,
-		status text NOT NULL DEFAULT 'offline' CHECK (status IN ('active','dead','offline')),
+		status text NOT NULL DEFAULT 'free' CHECK (status IN ('used','offline','free')),
 		hostname text,
 		description text,
 		last_scanned_at timestamptz,
@@ -183,4 +183,23 @@ var migrations = []string{
 	`CREATE INDEX IF NOT EXISTS ipam_subnets_network_id_idx ON ipam_subnets(network_id)`,
 	`CREATE INDEX IF NOT EXISTS ipam_subnets_cidr_idx ON ipam_subnets(cidr)`,
 	`CREATE INDEX IF NOT EXISTS ipam_addresses_subnet_id_idx ON ipam_addresses(subnet_id)`,
+	`DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 1) THEN
+			ALTER TABLE ipam_addresses DROP CONSTRAINT IF EXISTS ipam_addresses_status_check;
+			
+			UPDATE ipam_addresses
+			SET status = CASE
+				WHEN status = 'active' THEN 'used'
+				WHEN status = 'dead' THEN 'offline'
+				WHEN status = 'offline' THEN 'free'
+				ELSE status
+			END;
+			
+			ALTER TABLE ipam_addresses ALTER COLUMN status SET DEFAULT 'free';
+			ALTER TABLE ipam_addresses ADD CONSTRAINT ipam_addresses_status_check CHECK (status IN ('used', 'offline', 'free'));
+			
+			INSERT INTO schema_migrations (version) VALUES (1);
+		END IF;
+	END $$`,
 }

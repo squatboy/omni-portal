@@ -129,7 +129,7 @@ export function countIPAMAddresses(addresses: IPAMAddress[]) {
       acc[address.status] += 1
       return acc
     },
-    { total: 0, active: 0, dead: 0, offline: 0 }
+    { total: 0, used: 0, offline: 0, free: 0 }
   )
 }
 
@@ -558,8 +558,9 @@ function SummaryCards({
     { label: "Networks", value: summary?.networks },
     { label: "Subnets", value: summary?.subnets },
     { label: "Addresses", value: summary?.addresses.total },
-    { label: "Active", value: summary?.addresses.active },
-    { label: "Dead", value: summary?.addresses.dead },
+    { label: "Used", value: summary?.addresses.used },
+    { label: "Offline", value: summary?.addresses.offline },
+    { label: "Free", value: summary?.addresses.free },
   ]
 
   return (
@@ -661,16 +662,16 @@ function IPAMTree({
                               </span>
                               <span className="flex items-center gap-1">
                                 <StatusBadge
-                                  status="active"
-                                  count={counts.active}
-                                />
-                                <StatusBadge
-                                  status="dead"
-                                  count={counts.dead}
+                                  status="used"
+                                  count={counts.used}
                                 />
                                 <StatusBadge
                                   status="offline"
                                   count={counts.offline}
+                                />
+                                <StatusBadge
+                                  status="free"
+                                  count={counts.free}
                                 />
                               </span>
                             </Button>
@@ -877,9 +878,9 @@ function SubnetTable({
               </TableCell>
               <TableCell>
                 <span className="flex items-center gap-1">
-                  <StatusBadge status="active" count={counts.active} />
-                  <StatusBadge status="dead" count={counts.dead} />
+                  <StatusBadge status="used" count={counts.used} />
                   <StatusBadge status="offline" count={counts.offline} />
+                  <StatusBadge status="free" count={counts.free} />
                 </span>
               </TableCell>
               <TableCell>
@@ -977,7 +978,7 @@ function SubnetAddressDetails({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(["active", "dead", "offline"] as IPAMAddressStatus[]).map(
+            {(["used", "offline", "free"] as IPAMAddressStatus[]).map(
               (status) => (
                 <TableRow key={status}>
                   <TableCell>
@@ -1002,11 +1003,11 @@ function SubnetAddressDetails({
               size="sm"
               className={cn(
                 "w-full justify-center font-mono",
-                address.status === "active" &&
+                address.status === "used" &&
                   "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)] hover:bg-[color:color-mix(in_oklch,var(--status-ok)_20%,transparent)]",
-                address.status === "dead" &&
+                address.status === "offline" &&
                   "border-destructive/30 bg-destructive/10 text-destructive",
-                address.status === "offline" && "bg-muted"
+                address.status === "free" && "bg-muted"
               )}
               onClick={() => onOpenAddress(address)}
             >
@@ -1385,14 +1386,14 @@ function StatusBadge({
   return (
     <Badge
       variant={
-        status === "dead"
+        status === "offline"
           ? "destructive"
-          : status === "active"
+          : status === "used"
             ? "secondary"
             : "outline"
       }
       className={cn(
-        status === "active" &&
+        status === "used" &&
           "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]"
       )}
     >

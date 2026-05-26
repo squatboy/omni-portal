@@ -69,13 +69,13 @@ export type NexusIntegration = {
   active: boolean
 }
 
-export type IPAMAddressStatus = "active" | "dead" | "offline"
+export type IPAMAddressStatus = "used" | "offline" | "free"
 
 export type IPAMAddressSummary = {
   total: number
-  active: number
-  dead: number
+  used: number
   offline: number
+  free: number
 }
 
 export type IPAMSummary = {
@@ -136,9 +136,9 @@ export type IPAMAddress = {
 export type IPAMScanSummary = {
   subnetId: string
   total: number
-  active: number
-  dead: number
+  used: number
   offline: number
+  free: number
   startedAt: string
   completedAt: string
   subnet: IPAMSubnet

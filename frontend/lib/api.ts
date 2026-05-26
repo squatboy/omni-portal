@@ -73,7 +73,7 @@ function buildIPAMSummary(): IPAMSummary {
       acc[address.status] += 1
       return acc
     },
-    { total: 0, active: 0, dead: 0, offline: 0 }
+    { total: 0, used: 0, offline: 0, free: 0 }
   )
 
   return {
@@ -554,14 +554,14 @@ export const api = {
           total: getMockStore().ipamAddresses.filter(
             (address) => address.subnetId === id
           ).length,
-          active: getMockStore().ipamAddresses.filter(
-            (address) => address.subnetId === id && address.status === "active"
-          ).length,
-          dead: getMockStore().ipamAddresses.filter(
-            (address) => address.subnetId === id && address.status === "dead"
+          used: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id && address.status === "used"
           ).length,
           offline: getMockStore().ipamAddresses.filter(
             (address) => address.subnetId === id && address.status === "offline"
+          ).length,
+          free: getMockStore().ipamAddresses.filter(
+            (address) => address.subnetId === id && address.status === "free"
           ).length,
           startedAt: new Date().toISOString(),
           completedAt: new Date().toISOString(),

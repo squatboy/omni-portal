@@ -333,9 +333,9 @@ type NexusIntegration struct {
 type IPAMAddressStatus string
 
 const (
-	IPAMAddressActive  IPAMAddressStatus = "active"
-	IPAMAddressDead    IPAMAddressStatus = "dead"
+	IPAMAddressUsed    IPAMAddressStatus = "used"
 	IPAMAddressOffline IPAMAddressStatus = "offline"
+	IPAMAddressFree    IPAMAddressStatus = "free"
 )
 
 type IPAMLocation struct {
@@ -406,9 +406,9 @@ type IPAMScanResult struct {
 type IPAMScanSummary struct {
 	SubnetID    string     `json:"subnetId"`
 	Total       int        `json:"total"`
-	Active      int        `json:"active"`
-	Dead        int        `json:"dead"`
+	Used        int        `json:"used"`
 	Offline     int        `json:"offline"`
+	Free        int        `json:"free"`
 	StartedAt   string     `json:"startedAt"`
 	CompletedAt string     `json:"completedAt"`
 	Subnet      IPAMSubnet `json:"subnet"`
@@ -416,9 +416,9 @@ type IPAMScanSummary struct {
 
 type IPAMAddressSummary struct {
 	Total   int `json:"total"`
-	Active  int `json:"active"`
-	Dead    int `json:"dead"`
+	Used    int `json:"used"`
 	Offline int `json:"offline"`
+	Free    int `json:"free"`
 }
 
 type IPAMSummary struct {

@@ -62,17 +62,17 @@ describe("IPAM helpers", () => {
     subnetId,
     address: `10.0.0.${id}`,
     status,
-    consecutiveFailures: status === "active" ? 0 : 3,
+    consecutiveFailures: status === "used" ? 0 : 3,
   })
 
   it("counts active, dead, and offline addresses", () => {
     expect(
       countIPAMAddresses([
-        address("1", "subnet-a", "active"),
-        address("2", "subnet-a", "dead"),
-        address("3", "subnet-a", "offline"),
+        address("1", "subnet-a", "used"),
+        address("2", "subnet-a", "offline"),
+        address("3", "subnet-a", "free"),
       ])
-    ).toEqual({ total: 3, active: 1, dead: 1, offline: 1 })
+    ).toEqual({ total: 3, used: 1, offline: 1, free: 1 })
   })
 
   it("uses the last octet as the IP button label after removing CIDR", () => {
@@ -82,9 +82,9 @@ describe("IPAM helpers", () => {
 
   it("sorts addresses by IPv4 numeric order", () => {
     const unsorted: IPAMAddress[] = [
-      { ...address("10", "subnet-a", "active"), address: "10.0.0.10/32" },
-      { ...address("2", "subnet-a", "active"), address: "10.0.0.2/32" },
-      { ...address("1", "subnet-a", "active"), address: "10.0.0.1/32" },
+      { ...address("10", "subnet-a", "used"), address: "10.0.0.10/32" },
+      { ...address("2", "subnet-a", "used"), address: "10.0.0.2/32" },
+      { ...address("1", "subnet-a", "used"), address: "10.0.0.1/32" },
     ]
 
     expect(
@@ -95,10 +95,10 @@ describe("IPAM helpers", () => {
   it("sorts top subnet chart rows by loaded host count", () => {
     expect(
       topIPv4SubnetRows(subnets, {
-        "subnet-a": [address("1", "subnet-a", "active")],
+        "subnet-a": [address("1", "subnet-a", "used")],
         "subnet-b": [
-          address("2", "subnet-b", "active"),
-          address("3", "subnet-b", "dead"),
+          address("2", "subnet-b", "used"),
+          address("3", "subnet-b", "offline"),
         ],
       })
     ).toEqual([

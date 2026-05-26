@@ -248,7 +248,7 @@ func (s *Store) CreateIPAMSubnet(ctx context.Context, actorID string, item model
 	addresses := usableIPv4Addresses(ipNet)
 	stmt, err := tx.PrepareContext(ctx, `
 		INSERT INTO ipam_addresses (id, subnet_id, address, status, created_by, updated_by)
-		VALUES ($1,$2,$3::inet,'offline',$4,$4)
+		VALUES ($1,$2,$3::inet,'free',$4,$4)
 	`)
 	if err != nil {
 		return models.IPAMSubnet{}, err
@@ -370,17 +370,17 @@ func (s *Store) IPAMSummary(ctx context.Context) (models.IPAMSummary, error) {
 			(SELECT count(*) FROM ipam_networks),
 			(SELECT count(*) FROM ipam_subnets),
 			(SELECT count(*) FROM ipam_addresses),
-			(SELECT count(*) FROM ipam_addresses WHERE status='active'),
-			(SELECT count(*) FROM ipam_addresses WHERE status='dead'),
-			(SELECT count(*) FROM ipam_addresses WHERE status='offline')
+			(SELECT count(*) FROM ipam_addresses WHERE status='used'),
+			(SELECT count(*) FROM ipam_addresses WHERE status='offline'),
+			(SELECT count(*) FROM ipam_addresses WHERE status='free')
 	`).Scan(
 		&summary.Locations,
 		&summary.Networks,
 		&summary.Subnets,
 		&summary.Addresses.Total,
-		&summary.Addresses.Active,
-		&summary.Addresses.Dead,
+		&summary.Addresses.Used,
 		&summary.Addresses.Offline,
+		&summary.Addresses.Free,
 	)
 	return summary, err
 }

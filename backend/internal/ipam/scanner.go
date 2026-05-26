@@ -70,12 +70,12 @@ func (s *Scanner) ScanSubnet(ctx context.Context, subnetID string) (models.IPAMS
 	for _, result := range results {
 		summary.Total++
 		switch result.Status {
-		case models.IPAMAddressActive:
-			summary.Active++
-		case models.IPAMAddressDead:
-			summary.Dead++
-		default:
+		case models.IPAMAddressUsed:
+			summary.Used++
+		case models.IPAMAddressOffline:
 			summary.Offline++
+		default:
+			summary.Free++
 		}
 	}
 	return summary, nil
@@ -131,7 +131,7 @@ func classifyScanResult(address models.IPAMScanAddress, scannedAt time.Time, suc
 	}
 	if success {
 		seenAt := scannedAt
-		result.Status = models.IPAMAddressActive
+		result.Status = models.IPAMAddressUsed
 		result.LastSeenAt = &seenAt
 		result.ConsecutiveFailures = 0
 		return result
@@ -139,14 +139,14 @@ func classifyScanResult(address models.IPAMScanAddress, scannedAt time.Time, suc
 
 	failures := address.ConsecutiveFailures + 1
 	result.ConsecutiveFailures = failures
-	hadSuccess := address.LastSeenAt != nil || address.Status == models.IPAMAddressActive || address.Status == models.IPAMAddressDead
+	hadSuccess := address.LastSeenAt != nil || address.Status == models.IPAMAddressUsed || address.Status == models.IPAMAddressOffline
 	switch {
 	case !hadSuccess:
-		result.Status = models.IPAMAddressOffline
+		result.Status = models.IPAMAddressFree
 	case failures >= 3:
-		result.Status = models.IPAMAddressDead
+		result.Status = models.IPAMAddressOffline
 	default:
-		result.Status = models.IPAMAddressActive
+		result.Status = models.IPAMAddressUsed
 	}
 	return result
 }

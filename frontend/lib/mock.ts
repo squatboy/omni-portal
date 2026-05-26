@@ -273,18 +273,18 @@ function createMockIPAMAddresses(
   return Array.from({ length: count }, (_, index) => {
     const host = start + index
     const status =
-      index % 7 === 0 ? "dead" : index % 5 === 0 ? "offline" : "active"
+      index % 7 === 0 ? "offline" : index % 5 === 0 ? "free" : "used"
 
     return {
       id: `${subnetId}-${host}`,
       subnetId,
       address: `${prefix}.${host}`,
       status,
-      hostname: status === "active" ? `host-${host}` : null,
+      hostname: status === "used" ? `host-${host}` : null,
       description: null,
       lastScannedAt: now,
-      lastSeenAt: status === "active" ? now : null,
-      consecutiveFailures: status === "active" ? 0 : status === "dead" ? 3 : 1,
+      lastSeenAt: status === "used" ? now : null,
+      consecutiveFailures: status === "used" ? 0 : status === "offline" ? 3 : 1,
       createdAt: now,
       updatedAt: now,
     }
