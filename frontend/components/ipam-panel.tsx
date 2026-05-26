@@ -217,6 +217,7 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
   const [refreshing, setRefreshing] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
   const loadRequestRef = React.useRef(0)
+  const [scanningSubnets, setScanningSubnets] = React.useState<Record<string, boolean>>({})
 
   const loadAll = React.useCallback(async () => {
     const requestId = ++loadRequestRef.current
@@ -332,9 +333,14 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
   }
 
   async function rescanSubnet(subnet: IPAMSubnet) {
-    await api.rescanIPAMSubnet(subnet.id)
-    toast.success(`Rescan completed for ${subnet.name}.`)
-    await loadAll()
+    setScanningSubnets((prev) => ({ ...prev, [subnet.id]: true }))
+    try {
+      await api.rescanIPAMSubnet(subnet.id)
+      toast.success(`Rescan completed for ${subnet.name}.`)
+      await loadAll()
+    } finally {
+      setScanningSubnets((prev) => ({ ...prev, [subnet.id]: false }))
+    }
   }
 
   async function saveAddress(address: IPAMAddress) {
@@ -466,6 +472,7 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
                 onSelect={setSelectedSubnetId}
                 onEdit={(item) => setResourceSheet({ kind: "subnet", item })}
                 onDelete={(item) => setDeleteTarget({ kind: "subnet", item })}
+                scanningSubnets={scanningSubnets}
                 onRescan={(item) =>
                   void rescanSubnet(item).catch((rescanError) =>
                     toast.error(
@@ -834,6 +841,7 @@ function SubnetTable({
   onSelect,
   onEdit,
   onDelete,
+  scanningSubnets = {},
   onRescan,
 }: {
   networks: IPAMNetwork[]
@@ -844,6 +852,7 @@ function SubnetTable({
   onSelect: (id: string) => void
   onEdit: (item: IPAMSubnet) => void
   onDelete: (item: IPAMSubnet) => void
+  scanningSubnets?: Record<string, boolean>
   onRescan: (item: IPAMSubnet) => void
 }) {
   return (
@@ -905,8 +914,13 @@ function SubnetTable({
                             size="icon-sm"
                             aria-label={`Rescan ${subnet.name}`}
                             onClick={() => onRescan(subnet)}
+                            disabled={scanningSubnets[subnet.id]}
                           >
-                            <Radar data-icon="inline-start" />
+                            {scanningSubnets[subnet.id] ? (
+                              <Loader2 className="animate-spin" />
+                            ) : (
+                              <Radar data-icon="inline-start" />
+                            )}
                           </Button>
                         </TooltipTrigger>
                         <TooltipContent side="bottom">Scan</TooltipContent>
