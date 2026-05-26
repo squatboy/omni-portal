@@ -12,6 +12,10 @@ import type {
 import type {
   ArgoCDIntegration,
   GitLabIntegration,
+  IPAMAddress,
+  IPAMLocation,
+  IPAMNetwork,
+  IPAMSubnet,
   KubernetesIntegration,
   NexusIntegration,
   User,
@@ -57,6 +61,10 @@ type MockStore = {
   gitlab: GitLabIntegration[]
   nexus: NexusIntegration[]
   users: User[]
+  ipamLocations: IPAMLocation[]
+  ipamNetworks: IPAMNetwork[]
+  ipamSubnets: IPAMSubnet[]
+  ipamAddresses: IPAMAddress[]
 }
 
 let mockStore: MockStore | null = null
@@ -154,7 +162,133 @@ function createDefaultMockStore(): MockStore {
         updatedAt,
       },
     ],
+    ipamLocations: [
+      {
+        id: "loc-seoul",
+        name: "Seoul DC",
+        description: "Primary office network",
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "loc-busan",
+        name: "Busan Edge",
+        description: "Remote edge site",
+        createdAt,
+        updatedAt,
+      },
+    ],
+    ipamNetworks: [
+      {
+        id: "net-seoul-platform",
+        locationId: "loc-seoul",
+        name: "Platform",
+        description: "Shared infrastructure VLANs",
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "net-seoul-office",
+        locationId: "loc-seoul",
+        name: "Office",
+        description: "Office devices",
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "net-busan-edge",
+        locationId: "loc-busan",
+        name: "Edge",
+        description: "Busan service segment",
+        createdAt,
+        updatedAt,
+      },
+    ],
+    ipamSubnets: [
+      {
+        id: "subnet-platform-core",
+        locationId: "loc-seoul",
+        networkId: "net-seoul-platform",
+        name: "Platform Core",
+        cidr: "10.40.0.0/29",
+        description: "Core platform services",
+        autoDiscovery: true,
+        scanIntervalSeconds: 3600,
+        lastScanStartedAt: createdAt,
+        lastScanCompletedAt: updatedAt,
+        lastScanStatus: "ok",
+        lastScanError: null,
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "subnet-office-users",
+        locationId: "loc-seoul",
+        networkId: "net-seoul-office",
+        name: "Office Users",
+        cidr: "10.40.10.0/28",
+        description: "Client devices",
+        autoDiscovery: true,
+        scanIntervalSeconds: 14400,
+        lastScanStartedAt: createdAt,
+        lastScanCompletedAt: updatedAt,
+        lastScanStatus: "degraded",
+        lastScanError: "2 addresses timed out",
+        createdAt,
+        updatedAt,
+      },
+      {
+        id: "subnet-busan-services",
+        locationId: "loc-busan",
+        networkId: "net-busan-edge",
+        name: "Busan Services",
+        cidr: "10.50.0.0/29",
+        description: "Edge services",
+        autoDiscovery: false,
+        scanIntervalSeconds: 3600,
+        lastScanStartedAt: null,
+        lastScanCompletedAt: null,
+        lastScanStatus: null,
+        lastScanError: null,
+        createdAt,
+        updatedAt,
+      },
+    ],
+    ipamAddresses: [
+      ...createMockIPAMAddresses("subnet-platform-core", "10.40.0", 1, 6),
+      ...createMockIPAMAddresses("subnet-office-users", "10.40.10", 1, 14),
+      ...createMockIPAMAddresses("subnet-busan-services", "10.50.0", 1, 6),
+    ],
   }
+}
+
+function createMockIPAMAddresses(
+  subnetId: string,
+  prefix: string,
+  start: number,
+  count: number
+): IPAMAddress[] {
+  const now = new Date().toISOString()
+
+  return Array.from({ length: count }, (_, index) => {
+    const host = start + index
+    const status =
+      index % 7 === 0 ? "dead" : index % 5 === 0 ? "offline" : "active"
+
+    return {
+      id: `${subnetId}-${host}`,
+      subnetId,
+      address: `${prefix}.${host}`,
+      status,
+      hostname: status === "active" ? `host-${host}` : null,
+      description: null,
+      lastScannedAt: now,
+      lastSeenAt: status === "active" ? now : null,
+      consecutiveFailures: status === "active" ? 0 : status === "dead" ? 3 : 1,
+      createdAt: now,
+      updatedAt: now,
+    }
+  })
 }
 
 export function createMockSnapshot(): DashboardSnapshot {

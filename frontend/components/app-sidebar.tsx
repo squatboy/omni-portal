@@ -6,6 +6,7 @@ import {
   ChevronRight,
   HeartPulse,
   LayoutDashboard,
+  Network,
   Settings,
 } from "lucide-react"
 
@@ -43,7 +44,9 @@ export type ManageView =
   | "manage-integrations"
   | "manage-users"
 
-export type AppView = DashboardTab | ManageView
+export type IPAMView = "ipam-home"
+
+export type AppView = DashboardTab | ManageView | IPAMView
 
 const manageItems: { label: string; view: ManageView }[] = [
   { label: "Virtual Machines", view: "manage-vm" },
@@ -68,6 +71,7 @@ export function AppSidebar({
   const sources = snapshot?.overview.data.sources ?? []
   const { state } = useSidebar()
   const isManageActive = manageItems.some((item) => item.view === activeView)
+  const isIPAMActive = activeView === "ipam-home"
 
   return (
     <Sidebar variant="sidebar" collapsible="icon" {...props}>
@@ -183,6 +187,37 @@ export function AppSidebar({
               </Collapsible>
             </>
           ) : null}
+          <Separator className="my-2" />
+          <Collapsible
+            asChild
+            defaultOpen={isIPAMActive}
+            className="group/collapsible"
+          >
+            <SidebarMenuItem>
+              <CollapsibleTrigger asChild>
+                <SidebarMenuButton isActive={isIPAMActive} tooltip="IPAM">
+                  <Network />
+                  <span>IPAM</span>
+                  <ChevronRight className="ml-auto transition-transform group-data-[state=open]/collapsible:rotate-90" />
+                </SidebarMenuButton>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-[collapsible-up_0.1s_cubic-bezier(0.87,_0,_0.13,_1)] data-[state=open]:animate-[collapsible-down_0.2s_cubic-bezier(0.87,_0,_0.13,_1)]">
+                <SidebarMenuSub>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={isIPAMActive}>
+                      <button
+                        type="button"
+                        onClick={() => onViewChange("ipam-home")}
+                        className="flex w-full items-center justify-start"
+                      >
+                        <span>Home</span>
+                      </button>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>

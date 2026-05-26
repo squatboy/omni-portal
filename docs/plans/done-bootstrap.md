@@ -4,8 +4,8 @@
 
 - 입력 문서: `docs/PRD.md`
 - 목표: VM IP와 포트로 인프라 현재 상태를 빠르게 확인하는 v1 대시보드 구현
-- 범위: 현재 상태 중심 dashboard, collect API, Manage/Auth, 외부 VM Docker Compose 배포 준비
-- 제외: 알림, 시계열 분석, 상세 로그 분석, IPAM
+- 범위: 현재 상태 중심 dashboard, collect API, Manage/Auth, IPAM, 외부 VM Docker Compose 배포 준비
+- 제외: 알림, 시계열 분석, 상세 로그 분석
 
 ## 전제
 
@@ -88,10 +88,20 @@
 - collector는 매 수집 시 DB의 active 설정과 암호화 credential을 읽어 사용.
 - Docker Compose에 PostgreSQL service와 volume 추가.
 
+### 11. IPAM v1 확장
+
+- 상태: 구현 완료 (`2026-05-22`)
+- Location -> Network -> Subnet -> IP Address 계층을 PostgreSQL에 추가.
+- Subnet IPv4 `/24` 제한, Location 내부 CIDR overlap 차단, CIDR immutable 정책 적용.
+- ICMP 기반 scanner, fixed 64 worker pool, Auto Discovery scheduler를 collect runner와 분리해 추가.
+- Viewer 조회 API(`/api/ipam/*`)와 Admin mutation/rescan API(`/api/manage/ipam/*`)를 분리.
+- IPAM Home UI, 요약 지표, Subnet chart, 계층 tree, Sheet form, cascade AlertDialog, IP detail Sheet를 추가.
+
 ## 우선순위
 
 1. Manage/Auth/PostgreSQL 배포 검증
-2. UI 피드백 반영 및 버그 수정
+2. IPAM 실제 PostgreSQL 통합 테스트 환경 검증
+3. UI 피드백 반영 및 버그 수정
 
 ## 후속 backlog
 
@@ -100,4 +110,4 @@
 - GitLab job 로그 상세 분석
 - Nexus artifact/image 목록 조회
 - VM agent 기반 CPU/메모리/디스크 수집
-- IPAM
+- IPAM subnet count/summary API 최적화

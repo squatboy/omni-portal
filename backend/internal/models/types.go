@@ -1,5 +1,7 @@
 package models
 
+import "time"
+
 type CollectSource string
 
 const (
@@ -326,4 +328,102 @@ type NexusIntegration struct {
 	Name   string `json:"name"`
 	URL    string `json:"url"`
 	Active bool   `json:"active"`
+}
+
+type IPAMAddressStatus string
+
+const (
+	IPAMAddressActive  IPAMAddressStatus = "active"
+	IPAMAddressDead    IPAMAddressStatus = "dead"
+	IPAMAddressOffline IPAMAddressStatus = "offline"
+)
+
+type IPAMLocation struct {
+	ID          string  `json:"id"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   string  `json:"createdAt,omitempty"`
+	UpdatedAt   string  `json:"updatedAt,omitempty"`
+}
+
+type IPAMNetwork struct {
+	ID          string  `json:"id"`
+	LocationID  string  `json:"locationId"`
+	Name        string  `json:"name"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   string  `json:"createdAt,omitempty"`
+	UpdatedAt   string  `json:"updatedAt,omitempty"`
+}
+
+type IPAMSubnet struct {
+	ID                  string  `json:"id"`
+	NetworkID           string  `json:"networkId"`
+	LocationID          string  `json:"locationId,omitempty"`
+	Name                string  `json:"name"`
+	CIDR                string  `json:"cidr"`
+	Description         *string `json:"description,omitempty"`
+	AutoDiscovery       bool    `json:"autoDiscovery"`
+	ScanIntervalSeconds int     `json:"scanIntervalSeconds"`
+	LastScanStartedAt   *string `json:"lastScanStartedAt,omitempty"`
+	LastScanCompletedAt *string `json:"lastScanCompletedAt,omitempty"`
+	LastScanStatus      *string `json:"lastScanStatus,omitempty"`
+	LastScanError       *string `json:"lastScanError,omitempty"`
+	CreatedAt           string  `json:"createdAt,omitempty"`
+	UpdatedAt           string  `json:"updatedAt,omitempty"`
+}
+
+type IPAMAddress struct {
+	ID                  string            `json:"id"`
+	SubnetID            string            `json:"subnetId"`
+	Address             string            `json:"address"`
+	Status              IPAMAddressStatus `json:"status"`
+	Hostname            *string           `json:"hostname,omitempty"`
+	Description         *string           `json:"description,omitempty"`
+	LastScannedAt       *string           `json:"lastScannedAt,omitempty"`
+	LastSeenAt          *string           `json:"lastSeenAt,omitempty"`
+	ConsecutiveFailures int               `json:"consecutiveFailures"`
+	CreatedAt           string            `json:"createdAt,omitempty"`
+	UpdatedAt           string            `json:"updatedAt,omitempty"`
+}
+
+type IPAMScanAddress struct {
+	ID                  string
+	SubnetID            string
+	Address             string
+	Status              IPAMAddressStatus
+	LastSeenAt          *time.Time
+	ConsecutiveFailures int
+}
+
+type IPAMScanResult struct {
+	AddressID           string
+	Status              IPAMAddressStatus
+	LastScannedAt       time.Time
+	LastSeenAt          *time.Time
+	ConsecutiveFailures int
+}
+
+type IPAMScanSummary struct {
+	SubnetID    string     `json:"subnetId"`
+	Total       int        `json:"total"`
+	Active      int        `json:"active"`
+	Dead        int        `json:"dead"`
+	Offline     int        `json:"offline"`
+	StartedAt   string     `json:"startedAt"`
+	CompletedAt string     `json:"completedAt"`
+	Subnet      IPAMSubnet `json:"subnet"`
+}
+
+type IPAMAddressSummary struct {
+	Total   int `json:"total"`
+	Active  int `json:"active"`
+	Dead    int `json:"dead"`
+	Offline int `json:"offline"`
+}
+
+type IPAMSummary struct {
+	Locations int                `json:"locations"`
+	Networks  int                `json:"networks"`
+	Subnets   int                `json:"subnets"`
+	Addresses IPAMAddressSummary `json:"addresses"`
 }

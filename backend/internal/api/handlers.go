@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -14,16 +16,24 @@ import (
 )
 
 type API struct {
-	cache  *collector.Cache
-	runner *collector.Runner
-	store  *store.Store
-	config *config.AppConfig
+	cache       *collector.Cache
+	runner      *collector.Runner
+	store       *store.Store
+	config      *config.AppConfig
+	ipamScanner ipamRescanner
+}
+
+type ipamRescanner interface {
+	ScanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error)
 }
 
 type authedUserKey struct{}
 
-func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Store, cfg *config.AppConfig) *gin.Engine {
+func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Store, cfg *config.AppConfig, ipamScanners ...ipamRescanner) *gin.Engine {
 	api := &API{cache: cache, runner: runner, store: st, config: cfg}
+	if len(ipamScanners) > 0 {
+		api.ipamScanner = ipamScanners[0]
+	}
 	r := gin.Default()
 
 	auth := r.Group("/api/auth")
@@ -71,6 +81,17 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 		})
 	}
 
+	ipam := r.Group("/api/ipam")
+	ipam.Use(api.requireAuthMiddleware())
+	ipam.Use(api.requireStore())
+	{
+		ipam.GET("/summary", api.handleIPAMSummary)
+		ipam.GET("/locations", api.handleListIPAMLocations)
+		ipam.GET("/networks", api.handleListIPAMNetworks)
+		ipam.GET("/subnets", api.handleListIPAMSubnets)
+		ipam.GET("/subnets/:id/addresses", api.handleListIPAMAddresses)
+	}
+
 	manage := r.Group("/api/manage")
 	manage.Use(api.requireAdmin())
 	{
@@ -100,6 +121,18 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 
 		manage.GET("/users", api.handleListUsers)
 		manage.POST("/users", api.handleCreateUser)
+
+		manage.POST("/ipam/locations", api.handleCreateIPAMLocation)
+		manage.PUT("/ipam/locations/:id", api.handleUpdateIPAMLocation)
+		manage.DELETE("/ipam/locations/:id", api.handleDeleteIPAMLocation)
+		manage.POST("/ipam/networks", api.handleCreateIPAMNetwork)
+		manage.PUT("/ipam/networks/:id", api.handleUpdateIPAMNetwork)
+		manage.DELETE("/ipam/networks/:id", api.handleDeleteIPAMNetwork)
+		manage.POST("/ipam/subnets", api.handleCreateIPAMSubnet)
+		manage.PUT("/ipam/subnets/:id", api.handleUpdateIPAMSubnet)
+		manage.DELETE("/ipam/subnets/:id", api.handleDeleteIPAMSubnet)
+		manage.POST("/ipam/subnets/:id/rescan", api.handleRescanIPAMSubnet)
+		manage.PUT("/ipam/addresses/:id", api.handleUpdateIPAMAddress)
 	}
 
 	r.GET("/health/ready", func(c *gin.Context) {
@@ -350,9 +383,142 @@ func (api *API) handleCreateUser(c *gin.Context) {
 	writeJSON(c, created, err)
 }
 
+func (api *API) handleIPAMSummary(c *gin.Context) {
+	summary, err := api.store.IPAMSummary(c.Request.Context())
+	writeStoreJSON(c, http.StatusOK, summary, err)
+}
+
+func (api *API) handleListIPAMLocations(c *gin.Context) {
+	items, err := api.store.ListIPAMLocations(c.Request.Context())
+	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleCreateIPAMLocation(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMLocation
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := api.store.CreateIPAMLocation(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusCreated, item, err)
+}
+
+func (api *API) handleUpdateIPAMLocation(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMLocation
+	if !bindJSON(c, &req) {
+		return
+	}
+	req.ID = c.Param("id")
+	item, err := api.store.UpdateIPAMLocation(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusOK, item, err)
+}
+
+func (api *API) handleDeleteIPAMLocation(c *gin.Context) {
+	err := api.store.DeleteIPAMLocation(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, gin.H{"ok": true}, err)
+}
+
+func (api *API) handleListIPAMNetworks(c *gin.Context) {
+	items, err := api.store.ListIPAMNetworks(c.Request.Context(), c.Query("locationId"))
+	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleCreateIPAMNetwork(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMNetwork
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := api.store.CreateIPAMNetwork(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusCreated, item, err)
+}
+
+func (api *API) handleUpdateIPAMNetwork(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMNetwork
+	if !bindJSON(c, &req) {
+		return
+	}
+	req.ID = c.Param("id")
+	item, err := api.store.UpdateIPAMNetwork(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusOK, item, err)
+}
+
+func (api *API) handleDeleteIPAMNetwork(c *gin.Context) {
+	err := api.store.DeleteIPAMNetwork(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, gin.H{"ok": true}, err)
+}
+
+func (api *API) handleListIPAMSubnets(c *gin.Context) {
+	items, err := api.store.ListIPAMSubnets(c.Request.Context(), c.Query("locationId"), c.Query("networkId"))
+	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleCreateIPAMSubnet(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMSubnet
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := api.store.CreateIPAMSubnet(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusCreated, item, err)
+}
+
+func (api *API) handleUpdateIPAMSubnet(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMSubnet
+	if !bindJSON(c, &req) {
+		return
+	}
+	req.ID = c.Param("id")
+	item, err := api.store.UpdateIPAMSubnet(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusOK, item, err)
+}
+
+func (api *API) handleDeleteIPAMSubnet(c *gin.Context) {
+	err := api.store.DeleteIPAMSubnet(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, gin.H{"ok": true}, err)
+}
+
+func (api *API) handleRescanIPAMSubnet(c *gin.Context) {
+	if api.ipamScanner == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ipam scanner unavailable"})
+		return
+	}
+	summary, err := api.ipamScanner.ScanSubnet(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, summary, err)
+}
+
+func (api *API) handleListIPAMAddresses(c *gin.Context) {
+	items, err := api.store.ListIPAMAddresses(c.Request.Context(), c.Param("id"))
+	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleUpdateIPAMAddress(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req models.IPAMAddress
+	if !bindJSON(c, &req) {
+		return
+	}
+	req.ID = c.Param("id")
+	item, err := api.store.UpdateIPAMAddress(c.Request.Context(), user.ID, req)
+	writeStoreJSON(c, http.StatusOK, item, err)
+}
+
 func (api *API) optionalAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		api.loadSession(c)
+		c.Next()
+	}
+}
+
+func (api *API) requireStore() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if api.store == nil {
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "store unavailable"})
+			return
+		}
 		c.Next()
 	}
 }
@@ -439,6 +605,23 @@ func writeJSON(c *gin.Context, payload any, err error) {
 		return
 	}
 	c.JSON(http.StatusOK, payload)
+}
+
+func writeStoreJSON(c *gin.Context, successStatus int, payload any, err error) {
+	if err != nil {
+		switch {
+		case errors.Is(err, store.ErrValidation):
+			writeError(c, http.StatusBadRequest, err)
+		case errors.Is(err, store.ErrNotFound):
+			writeError(c, http.StatusNotFound, err)
+		case errors.Is(err, store.ErrConflict):
+			writeError(c, http.StatusConflict, err)
+		default:
+			writeError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	c.JSON(successStatus, payload)
 }
 
 func writeError(c *gin.Context, status int, err error) {
