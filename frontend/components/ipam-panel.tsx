@@ -994,14 +994,14 @@ function SubnetAddressDetails({
             )}
           </TableBody>
         </Table>
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(5.75rem,1fr))] gap-2">
+        <div className="grid grid-cols-[repeat(auto-fill,4rem)] gap-2">
           {sortedAddresses.map((address) => (
             <Button
               key={address.id}
               variant="outline"
               size="sm"
               className={cn(
-                "justify-start font-mono",
+                "w-full justify-center font-mono",
                 address.status === "active" &&
                   "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)] hover:bg-[color:color-mix(in_oklch,var(--status-ok)_20%,transparent)]",
                 address.status === "dead" &&
