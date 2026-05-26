@@ -139,6 +139,7 @@
     @apply font-sans;
     scrollbar-gutter: stable;
   }
+
 }
 
 @keyframes slideDown {

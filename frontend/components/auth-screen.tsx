@@ -33,6 +33,8 @@ export function AuthScreen({
   const [password, setPassword] = React.useState("")
   const [error, setError] = React.useState<string | null>(null)
 
+  useHideScrollbar()
+
   async function submit() {
     setError(null)
     try {
@@ -55,9 +57,23 @@ export function AuthScreen({
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-background p-6">
+    <main
+      className="flex min-h-screen items-center justify-center p-6"
+      style={{
+        backgroundImage: "url('/login-background.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+      }}
+    >
       <Card className="w-full max-w-sm">
-        <CardHeader>
+        <CardHeader className="flex flex-col items-center text-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/main-icon.svg"
+            alt="Omni"
+            className="mb-3 w-full max-w-[400px] mx-auto"
+          />
           <CardTitle>{setupRequired ? "Omni setup" : "Omni login"}</CardTitle>
           <CardDescription>
             {setupRequired
@@ -173,4 +189,25 @@ function PasswordField({
       </div>
     </div>
   )
+}
+
+/** 마운트된 동안 html/body의 스크롤바와 gutter를 숨기고, 언마운트 시 원래 값으로 복원 */
+function useHideScrollbar() {
+  React.useEffect(() => {
+    const html = document.documentElement
+    const body = document.body
+    const prev = {
+      htmlOverflow: html.style.overflow,
+      htmlGutter: html.style.scrollbarGutter,
+      bodyOverflow: body.style.overflow,
+    }
+    html.style.overflow = "hidden"
+    html.style.scrollbarGutter = "auto"
+    body.style.overflow = "hidden"
+    return () => {
+      html.style.overflow = prev.htmlOverflow
+      html.style.scrollbarGutter = prev.htmlGutter
+      body.style.overflow = prev.bodyOverflow
+    }
+  }, [])
 }

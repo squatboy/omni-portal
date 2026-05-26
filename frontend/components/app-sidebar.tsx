@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import {
-  Activity,
   ChevronRight,
   HeartPulse,
   LayoutDashboard,
@@ -39,10 +38,7 @@ import type { DashboardSnapshot, DashboardTab } from "./dashboard/lib/types"
 import { formatTime } from "./dashboard/lib/utils"
 import { StatusDot } from "./dashboard/shared/status-badge"
 
-export type ManageView =
-  | "manage-vm"
-  | "manage-integrations"
-  | "manage-users"
+export type ManageView = "manage-vm" | "manage-integrations" | "manage-users"
 
 export type IPAMView = "ipam-home"
 
@@ -80,8 +76,13 @@ export function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild>
               <div className="flex items-center gap-3">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-                  <Activity className="size-4" />
+                <div className="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-md">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/main-icon.svg"
+                    alt="Omni"
+                    className="size-12 max-w-none object-cover"
+                  />
                 </div>
                 {state !== "collapsed" && (
                   <div className="flex flex-col gap-0.5 leading-none">

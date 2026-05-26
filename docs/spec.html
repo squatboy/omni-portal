@@ -1,0 +1,4647 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Omni Portal — 스펙 문서 v2</title>
+  <style>
+    :root {
+      --bg: #0d0f18;
+      --bg-card: #13161f;
+      --bg-card2: #181b27;
+      --border: #232638;
+      --border2: #2e3248;
+      --accent: #6c63ff;
+      --accent2: #8b85ff;
+      --accent-m: #6c63ff28;
+      --text: #dde1f5;
+      --muted: #7b80a0;
+      --dim: #4a4d65;
+      --green: #22c55e;
+      --green-m: #22c55e22;
+      --yellow: #eab308;
+      --yellow-m: #eab30822;
+      --red: #ef4444;
+      --red-m: #ef444422;
+      --blue: #3b82f6;
+      --blue-m: #3b82f622;
+      --cyan: #06b6d4;
+      --cyan-m: #06b6d422;
+      --orange: #f97316;
+      --orange-m: #f9731622;
+      --purple: #a855f7;
+      --purple-m: #a855f722;
+      --pink: #ec4899;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.65;
+    }
+
+    /* ── Layout ── */
+    .layout {
+      display: flex;
+      min-height: 100vh;
+    }
+
+    .sidebar {
+      width: 250px;
+      flex-shrink: 0;
+      background: var(--bg-card);
+      border-right: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow-y: auto;
+      padding: 24px 0;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    .main {
+      flex: 1;
+      min-width: 0;
+      padding: 52px 56px;
+      max-width: 980px;
+    }
+
+    @media(max-width:860px) {
+      .sidebar {
+        display: none;
+      }
+
+      .main {
+        padding: 28px 18px;
+      }
+    }
+
+    /* ── Sidebar ── */
+    .sb-logo {
+      padding: 0 18px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+
+    .sb-name {
+      font-size: 18px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--accent2), var(--cyan));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.5px;
+    }
+
+    .sb-tag {
+      font-size: 10px;
+      background: var(--accent-m);
+      color: var(--accent2);
+      padding: 2px 7px;
+      border-radius: 99px;
+      margin-left: 5px;
+      vertical-align: middle;
+      -webkit-text-fill-color: var(--accent2);
+    }
+
+    .sb-sub {
+      font-size: 11px;
+      color: var(--dim);
+      margin-top: 3px;
+    }
+
+    .nav-label {
+      padding: 10px 18px 3px;
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: var(--dim);
+    }
+
+    .nav-a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 18px;
+      font-size: 12.5px;
+      color: var(--muted);
+      text-decoration: none;
+      transition: all 0.15s;
+      cursor: pointer;
+      border-right: 2px solid transparent;
+    }
+
+    .nav-a:hover {
+      background: var(--accent-m);
+      color: var(--text);
+    }
+
+    .nav-a.active {
+      background: var(--accent-m);
+      color: var(--accent2);
+      font-weight: 600;
+      border-right-color: var(--accent);
+    }
+
+    .nav-icon {
+      font-size: 13px;
+      width: 16px;
+      text-align: center;
+    }
+
+    /* ── Section ── */
+    .section {
+      margin-bottom: 80px;
+    }
+
+    .sec-hd {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .sec-ico {
+      width: 38px;
+      height: 38px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 17px;
+      flex-shrink: 0;
+    }
+
+    .sec-title {
+      font-size: 20px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .sec-sub {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(140deg, #14172a 0%, #0d0f18 50%, #14172a 100%);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 44px;
+      margin-bottom: 56px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      right: -80px;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #6c63ff14 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -60px;
+      left: 30%;
+      width: 200px;
+      height: 200px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #06b6d410 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero-eye {
+      font-size: 10.5px;
+      font-weight: 700;
+      letter-spacing: 1.8px;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 10px;
+    }
+
+    .hero-title {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, #e2e4ef 20%, var(--accent2) 80%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 14px;
+    }
+
+    .hero-desc {
+      font-size: 14.5px;
+      color: var(--muted);
+      max-width: 580px;
+      margin-bottom: 24px;
+      line-height: 1.85;
+    }
+
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 10px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+    }
+
+    .tag.g {
+      color: var(--green);
+      background: var(--green-m);
+      border-color: #22c55e30;
+    }
+
+    .tag.b {
+      color: var(--blue);
+      background: var(--blue-m);
+      border-color: #3b82f630;
+    }
+
+    .tag.p {
+      color: var(--purple);
+      background: var(--purple-m);
+      border-color: #a855f730;
+    }
+
+    .tag.c {
+      color: var(--cyan);
+      background: var(--cyan-m);
+      border-color: #06b6d430;
+    }
+
+    .tag.o {
+      color: var(--orange);
+      background: var(--orange-m);
+      border-color: #f9731630;
+    }
+
+    /* ── Cards ── */
+    .grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .g2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .g3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .g4 {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    @media(max-width:700px) {
+
+      .g2,
+      .g3,
+      .g4 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 18px 20px;
+      transition: border-color .2s, background .2s;
+    }
+
+    .card:hover {
+      border-color: var(--accent);
+      background: var(--bg-card2);
+    }
+
+    .c-label {
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 5px;
+    }
+
+    .c-val {
+      font-size: 14.5px;
+      font-weight: 600;
+    }
+
+    .c-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 4px;
+      line-height: 1.6;
+    }
+
+    /* ── Info Block ── */
+    .ib {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 11px;
+      padding: 20px 24px;
+      margin-bottom: 14px;
+    }
+
+    .ib h3 {
+      font-size: 13.5px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .ib ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .ib li {
+      font-size: 13px;
+      color: var(--muted);
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .ib li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--dim);
+    }
+
+    .ib li strong {
+      color: var(--text);
+    }
+
+    /* ── Callout ── */
+    .callout {
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      margin-bottom: 14px;
+      display: flex;
+      gap: 9px;
+      align-items: flex-start;
+      line-height: 1.6;
+    }
+
+    .callout.info {
+      background: var(--blue-m);
+      border: 1px solid #3b82f630;
+      color: #93c5fd;
+    }
+
+    .callout.warn {
+      background: var(--yellow-m);
+      border: 1px solid #eab30830;
+      color: #fde68a;
+    }
+
+    .callout.success {
+      background: var(--green-m);
+      border: 1px solid #22c55e30;
+      color: #86efac;
+    }
+
+    .callout.danger {
+      background: var(--red-m);
+      border: 1px solid #ef444430;
+      color: #fca5a5;
+    }
+
+    .ci {
+      font-size: 15px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    /* ── Code ── */
+    code {
+      font-family: 'JetBrains Mono', 'Fira Code', monospace;
+      font-size: 11.5px;
+      background: #0a0c14;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--cyan);
+    }
+
+    pre {
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 20px;
+      overflow-x: auto;
+      font-size: 12.5px;
+      line-height: 1.75;
+      margin-bottom: 14px;
+      color: var(--muted);
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: inherit;
+    }
+
+    /* ── API Table ── */
+    .api-t {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+    }
+
+    .api-t th {
+      text-align: left;
+      padding: 9px 13px;
+      background: #1a1d2a;
+      color: var(--dim);
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .api-t td {
+      padding: 9px 13px;
+      border-bottom: 1px solid var(--border);
+      color: var(--muted);
+      vertical-align: top;
+    }
+
+    .api-t tr:last-child td {
+      border-bottom: none;
+    }
+
+    .api-t tr:hover td {
+      background: var(--bg-card2);
+    }
+
+    .api-t .sec-row td {
+      background: #1a1d2a;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--dim);
+      padding: 6px 13px;
+    }
+
+    .m {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: monospace;
+      letter-spacing: .5px;
+    }
+
+    .m.get {
+      background: var(--green-m);
+      color: var(--green);
+    }
+
+    .m.post {
+      background: var(--blue-m);
+      color: var(--blue);
+    }
+
+    .m.put {
+      background: var(--orange-m);
+      color: var(--orange);
+    }
+
+    .m.del {
+      background: var(--red-m);
+      color: var(--red);
+    }
+
+    .ep {
+      font-family: monospace;
+      font-size: 12px;
+      color: var(--text);
+    }
+
+    .rb {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 7px;
+      border-radius: 4px;
+    }
+
+    .rb.admin {
+      background: var(--red-m);
+      color: var(--red);
+    }
+
+    .rb.auth {
+      background: var(--blue-m);
+      color: var(--blue);
+    }
+
+    .rb.pub {
+      background: var(--green-m);
+      color: var(--green);
+    }
+
+    /* ── Status dots ── */
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      flex-shrink: 0;
+    }
+
+    .dot.g {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .dot.y {
+      background: var(--yellow);
+      box-shadow: 0 0 6px var(--yellow);
+    }
+
+    .dot.r {
+      background: var(--red);
+      box-shadow: 0 0 6px var(--red);
+    }
+
+    .dot.gray {
+      background: var(--dim);
+    }
+
+    .dot.b {
+      background: var(--blue);
+      box-shadow: 0 0 6px var(--blue);
+    }
+
+    .dot-anim {
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .3;
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Flow Diagram (data collect)
+       ════════════════════════════════════════════ */
+    .flow-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+
+    .flow-diagram h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--muted);
+    }
+
+    .fd-nodes {
+      display: flex;
+      align-items: center;
+      gap: 0;
+      flex-wrap: wrap;
+    }
+
+    .fd-node {
+      background: var(--bg-card2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 14px 18px;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all .25s;
+      position: relative;
+      min-width: 110px;
+    }
+
+    .fd-node:hover,
+    .fd-node.hi {
+      border-color: var(--accent);
+      background: var(--accent-m);
+      color: var(--accent2);
+    }
+
+    .fd-node .nd-icon {
+      font-size: 20px;
+      margin-bottom: 6px;
+    }
+
+    .fd-node .nd-label {
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .fd-node .nd-sub {
+      font-size: 10px;
+      color: var(--dim);
+      margin-top: 2px;
+      font-weight: 400;
+    }
+
+    .fd-arrow {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-width: 30px;
+      padding: 0 4px;
+    }
+
+    .fd-arrow svg {
+      width: 100%;
+      max-width: 60px;
+    }
+
+    .fd-arrow-label {
+      font-size: 9.5px;
+      color: var(--dim);
+      margin-top: 3px;
+      text-align: center;
+    }
+
+    .fd-detail {
+      background: var(--bg-card2);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-top: 16px;
+      font-size: 12.5px;
+      color: var(--muted);
+      display: none;
+      animation: fadeIn .2s ease;
+    }
+
+    .fd-detail.show {
+      display: block;
+    }
+
+    .fd-detail strong {
+      color: var(--text);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(4px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: IPAM Scanner Animation
+       ════════════════════════════════════════════ */
+    .scan-demo {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .scan-demo h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .scan-ctrl {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 7px 16px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .2s;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent2);
+    }
+
+    .btn-ghost {
+      background: var(--bg-card2);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--accent);
+      color: var(--text);
+    }
+
+    .btn:disabled {
+      opacity: .4;
+      cursor: not-allowed;
+    }
+
+    .scan-stats {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .scan-stat {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      font-size: 12px;
+    }
+
+    .scan-stat-val {
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    .scan-stat-lbl {
+      font-size: 10px;
+      color: var(--dim);
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    .scan-stat-val.act {
+      color: var(--green);
+    }
+
+    .scan-stat-val.dead {
+      color: var(--red);
+    }
+
+    .scan-stat-val.off {
+      color: var(--muted);
+    }
+
+    .scan-stat-val.prog {
+      color: var(--yellow);
+    }
+
+    .ip-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+      gap: 5px;
+      max-height: 280px;
+      overflow-y: auto;
+    }
+
+    .ip-cell {
+      border-radius: 6px;
+      padding: 5px 4px;
+      font-size: 9.5px;
+      text-align: center;
+      font-family: monospace;
+      transition: all .3s;
+      cursor: default;
+      border: 1px solid transparent;
+    }
+
+    .ip-cell.offline {
+      background: #1a1d27;
+      color: var(--dim);
+      border-color: var(--border);
+    }
+
+    .ip-cell.scanning {
+      background: #eab30814;
+      color: var(--yellow);
+      border-color: #eab30840;
+      animation: scanPulse .8s infinite;
+    }
+
+    .ip-cell.active {
+      background: var(--green-m);
+      color: var(--green);
+      border-color: #22c55e40;
+    }
+
+    .ip-cell.dead {
+      background: var(--red-m);
+      color: var(--red);
+      border-color: #ef444440;
+    }
+
+    .ip-cell.worker {
+      background: var(--blue-m);
+      color: var(--blue);
+      border-color: #3b82f640;
+    }
+
+    @keyframes scanPulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .5;
+      }
+    }
+
+    .scan-log {
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-family: monospace;
+      font-size: 11px;
+      height: 90px;
+      overflow-y: auto;
+      color: var(--muted);
+      margin-top: 10px;
+    }
+
+    .log-line {
+      margin-bottom: 2px;
+    }
+
+    .log-line.ok {
+      color: var(--green);
+    }
+
+    .log-line.fail {
+      color: var(--red);
+    }
+
+    .log-line.info {
+      color: var(--cyan);
+    }
+
+    .log-line.warn {
+      color: var(--yellow);
+    }
+
+    .progress-bar {
+      height: 3px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+      margin-bottom: 12px;
+    }
+
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--cyan));
+      border-radius: 99px;
+      transition: width .3s ease;
+      width: 0%;
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: State Transition Diagram
+       ════════════════════════════════════════════ */
+    .state-diagram {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .state-diagram h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 18px;
+    }
+
+    .sd-states {
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .sd-state {
+      border-radius: 12px;
+      padding: 16px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all .25s;
+      min-width: 100px;
+      border: 2px solid transparent;
+    }
+
+    .sd-state.offline-s {
+      background: #1a1d27;
+      border-color: var(--dim);
+    }
+
+    .sd-state.offline-s:hover,
+    .sd-state.offline-s.sel {
+      border-color: var(--muted);
+      background: #23263a;
+    }
+
+    .sd-state.active-s {
+      background: var(--green-m);
+      border-color: #22c55e40;
+    }
+
+    .sd-state.active-s:hover,
+    .sd-state.active-s.sel {
+      border-color: var(--green);
+    }
+
+    .sd-state.dead-s {
+      background: var(--red-m);
+      border-color: #ef444440;
+    }
+
+    .sd-state.dead-s:hover,
+    .sd-state.dead-s.sel {
+      border-color: var(--red);
+    }
+
+    .sd-icon {
+      font-size: 24px;
+      margin-bottom: 6px;
+    }
+
+    .sd-name {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .sd-desc {
+      font-size: 10.5px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .sd-arrows {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 12px;
+      padding: 0 8px;
+    }
+
+    .sd-arrow-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-card2);
+      border-radius: 8px;
+      padding: 8px 12px;
+      border: 1px solid var(--border);
+    }
+
+    .sd-arrow-row .from {
+      color: var(--muted);
+      min-width: 80px;
+    }
+
+    .sd-arrow-row .cond {
+      color: var(--yellow);
+      flex: 1;
+    }
+
+    .sd-arrow-row .to {
+      font-weight: 600;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .sd-arrow-row .arr {
+      color: var(--dim);
+    }
+
+    .sd-detail {
+      background: var(--bg-card2);
+      border-radius: 10px;
+      padding: 14px 16px;
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-top: 6px;
+      min-height: 56px;
+      border: 1px solid var(--border);
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Worker Pool Visualizer
+       ════════════════════════════════════════════ */
+    .wp-vis {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .wp-vis h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .wp-grid {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 4px;
+      margin-bottom: 12px;
+    }
+
+    .wp-worker {
+      height: 28px;
+      border-radius: 5px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      transition: all .2s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 8px;
+      color: var(--dim);
+    }
+
+    .wp-worker.busy {
+      background: var(--blue-m);
+      border-color: #3b82f640;
+      color: var(--blue);
+    }
+
+    .wp-worker.done {
+      background: var(--green-m);
+      border-color: #22c55e40;
+      color: var(--green);
+    }
+
+    .wp-legend {
+      display: flex;
+      gap: 14px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .wp-leg-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .wp-leg-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Collect Timeline
+       ════════════════════════════════════════════ */
+    .timeline-demo {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .timeline-demo h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .tl-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .tl-label {
+      font-size: 11px;
+      color: var(--muted);
+      width: 90px;
+      flex-shrink: 0;
+      text-align: right;
+    }
+
+    .tl-bar-wrap {
+      flex: 1;
+      background: var(--bg-card2);
+      border-radius: 99px;
+      height: 22px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid var(--border);
+    }
+
+    .tl-bar {
+      height: 100%;
+      border-radius: 99px;
+      display: flex;
+      align-items: center;
+      padding-left: 8px;
+      font-size: 10px;
+      font-weight: 600;
+      transition: width 1s ease;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .tl-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 99px;
+      margin-left: 6px;
+    }
+
+    .tl-btn {
+      margin-top: 12px;
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Cache RWMutex visualizer
+       ════════════════════════════════════════════ */
+    .cache-vis {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .cache-vis h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .cv-box {
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-bottom: 10px;
+    }
+
+    .cv-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+
+    .cv-slots {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .cv-slot {
+      border-radius: 7px;
+      padding: 6px 12px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid var(--border);
+      background: var(--bg-card2);
+      color: var(--muted);
+      transition: all .3s;
+    }
+
+    .cv-slot.reading {
+      background: var(--blue-m);
+      border-color: #3b82f650;
+      color: var(--blue);
+    }
+
+    .cv-slot.writing {
+      background: var(--orange-m);
+      border-color: #f9731650;
+      color: var(--orange);
+    }
+
+    .cv-slot.blocked {
+      background: var(--red-m);
+      border-color: #ef444450;
+      color: var(--red);
+      opacity: .5;
+    }
+
+    .cv-lock {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      transition: all .3s;
+    }
+
+    .cv-lock.read {
+      border-color: #3b82f640;
+      color: var(--blue);
+    }
+
+    .cv-lock.write {
+      border-color: #f9731650;
+      color: var(--orange);
+    }
+
+    .cv-lock.free {
+      border-color: #22c55e40;
+      color: var(--green);
+    }
+
+    .cv-ops {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Security Layers
+       ════════════════════════════════════════════ */
+    .sec-layers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .sec-layer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+
+    .sec-layer:hover {
+      border-color: var(--accent);
+      background: var(--bg-card2);
+    }
+
+    .sec-layer-ico {
+      font-size: 20px;
+      width: 32px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .sec-layer-name {
+      font-size: 13px;
+      font-weight: 700;
+      min-width: 170px;
+    }
+
+    .sec-layer-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      flex: 1;
+    }
+
+    .sec-layer-expand {
+      display: none;
+      background: var(--bg-card2);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-top: 10px;
+      font-size: 12.5px;
+      color: var(--muted);
+      border-top: 1px solid var(--border);
+    }
+
+    .sec-layer.open .sec-layer-expand {
+      display: block;
+    }
+
+    /* ════════════════════════════════════════════
+       INTERACTIVE: Arch Accordion
+       ════════════════════════════════════════════ */
+    .arch-acc {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+
+    .acc-item {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .acc-hd {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 13px 18px;
+      cursor: pointer;
+      transition: background .15s;
+    }
+
+    .acc-hd:hover {
+      background: var(--bg-card2);
+    }
+
+    .acc-ico {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .acc-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      flex: 1;
+    }
+
+    .acc-tag {
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 99px;
+      background: var(--accent-m);
+      color: var(--accent2);
+    }
+
+    .acc-chevron {
+      color: var(--dim);
+      transition: transform .2s;
+      font-size: 12px;
+    }
+
+    .acc-item.open .acc-chevron {
+      transform: rotate(180deg);
+    }
+
+    .acc-body {
+      display: none;
+      padding: 0 18px 16px;
+      font-size: 12.5px;
+      color: var(--muted);
+    }
+
+    .acc-item.open .acc-body {
+      display: block;
+    }
+
+    .acc-body ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 8px;
+    }
+
+    .acc-body li {
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .acc-body li::before {
+      content: '›';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .acc-body li strong {
+      color: var(--text);
+    }
+
+    /* ════════════════════════════════════════════
+       IPAM Scan Flow (new detailed section)
+       ════════════════════════════════════════════ */
+    .scan-flow-wrap {
+      margin-bottom: 14px;
+    }
+
+    .scan-flow-steps {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .sf-step {
+      display: flex;
+      gap: 16px;
+      padding: 14px 0;
+      position: relative;
+    }
+
+    .sf-left {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 32px;
+      flex-shrink: 0;
+    }
+
+    .sf-num {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      z-index: 1;
+    }
+
+    .sf-line {
+      flex: 1;
+      width: 2px;
+      background: var(--border);
+      margin: 4px 0;
+    }
+
+    .sf-step:last-child .sf-line {
+      display: none;
+    }
+
+    .sf-body {
+      flex: 1;
+      padding-top: 3px;
+    }
+
+    .sf-title {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+
+    .sf-desc {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      line-height: 1.65;
+    }
+
+    .sf-code {
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 11.5px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .sf-code .kw {
+      color: #c084fc;
+    }
+
+    .sf-code .fn {
+      color: #60a5fa;
+    }
+
+    .sf-code .str {
+      color: #86efac;
+    }
+
+    .sf-code .num {
+      color: #fb923c;
+    }
+
+    .sf-code .cm {
+      color: var(--dim);
+    }
+
+    .sf-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 99px;
+      margin-left: 6px;
+    }
+
+    .sf-badge.go {
+      background: var(--cyan-m);
+      color: var(--cyan);
+    }
+
+    .sf-badge.db {
+      background: var(--purple-m);
+      color: var(--purple);
+    }
+
+    .sf-badge.icmp {
+      background: var(--orange-m);
+      color: var(--orange);
+    }
+
+    /* classifyScanResult visualizer */
+    .classify-vis {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .classify-vis h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .cv-inputs {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .cv-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cv-input-group label {
+      font-size: 10.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+      color: var(--dim);
+    }
+
+    .cv-select {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 6px 10px;
+      color: var(--text);
+      font-size: 12.5px;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .cv-select:focus {
+      border-color: var(--accent);
+    }
+
+    .cv-result {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .cv-res-state {
+      font-size: 28px;
+      font-weight: 800;
+    }
+
+    .cv-res-info {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .cv-result.active-r {
+      border-color: #22c55e50;
+      background: var(--green-m);
+    }
+
+    .cv-result.dead-r {
+      border-color: #ef444450;
+      background: var(--red-m);
+    }
+
+    .cv-result.offline-r {
+      border-color: var(--border2);
+      background: var(--bg-card);
+    }
+
+    /* Scheduler timeline */
+    .sched-vis {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .sched-vis h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .sched-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .sched-label {
+      font-size: 11px;
+      color: var(--muted);
+      width: 120px;
+      flex-shrink: 0;
+    }
+
+    .sched-track {
+      flex: 1;
+      height: 30px;
+      background: #0a0c14;
+      border-radius: 7px;
+      overflow: hidden;
+      position: relative;
+      border: 1px solid var(--border);
+    }
+
+    .sched-block {
+      position: absolute;
+      height: 100%;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      padding: 0 8px;
+      font-size: 10px;
+      font-weight: 600;
+      transition: all .3s;
+    }
+
+    /* footer */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+      margin-top: 16px;
+      color: var(--dim);
+      font-size: 11.5px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+
+    /* ── Imported section compatibility styles ── */
+    :root {
+      --bg-card-hover: var(--bg-card2);
+      --accent-light: var(--accent2);
+      --accent-muted: var(--accent-m);
+      --text-muted: var(--muted);
+      --text-dim: var(--dim);
+      --tag-bg: #232638;
+      --code-bg: #0a0c14;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+      margin-bottom: 28px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .section-icon {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .section-title {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -.3px;
+      color: var(--text);
+    }
+
+    .section-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .arch-layers {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-bottom: 16px;
+    }
+
+    .arch-layer {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      transition: border-color .2s, background .2s;
+    }
+
+    .arch-layer:hover {
+      border-color: var(--accent);
+      background: var(--bg-card2);
+    }
+
+    .arch-layer-icon {
+      font-size: 20px;
+      width: 32px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .arch-layer-name {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text);
+      min-width: 160px;
+    }
+
+    .arch-layer-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .info-block {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 26px;
+      margin-bottom: 16px;
+    }
+
+    .info-block h3 {
+      font-size: 14px;
+      font-weight: 700;
+      margin-bottom: 12px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .info-block ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .info-block ul li {
+      font-size: 13.5px;
+      color: var(--text-muted);
+      padding-left: 16px;
+      position: relative;
+    }
+
+    .info-block ul li::before {
+      content: '—';
+      position: absolute;
+      left: 0;
+      color: var(--text-dim);
+    }
+
+    .info-block ul li strong {
+      color: var(--text);
+    }
+
+    .card-grid {
+      display: grid;
+      gap: 14px;
+    }
+
+    .card-grid.col2 {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .card-grid.col3 {
+      grid-template-columns: repeat(3, 1fr);
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      margin-bottom: 6px;
+    }
+
+    .card-value {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .card-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .callout-icon {
+      font-size: 16px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .status-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+    }
+
+    .status-card-source {
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-muted);
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 5px;
+    }
+
+    .status-dot.green {
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .status-dot.yellow {
+      background: var(--yellow);
+      box-shadow: 0 0 6px var(--yellow);
+    }
+
+    .status-dot.red {
+      background: var(--red);
+      box-shadow: 0 0 6px var(--red);
+    }
+
+    .status-dot.gray {
+      background: var(--text-dim);
+    }
+
+    .status-item {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+      padding-left: 28px;
+      margin-bottom: 16px;
+    }
+
+    .flow::before {
+      content: '';
+      position: absolute;
+      left: 9px;
+      top: 20px;
+      bottom: 20px;
+      width: 2px;
+      background: var(--border);
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 0;
+      position: relative;
+    }
+
+    .flow-step-num {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      position: absolute;
+      left: -28px;
+    }
+
+    .flow-step-content {
+      flex: 1;
+    }
+
+    .flow-step-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 3px;
+    }
+
+    .flow-step-desc {
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    @media(max-width:700px) {
+
+      .card-grid.col2,
+      .card-grid.col3 {
+        grid-template-columns: 1fr;
+      }
+
+      .arch-layer {
+        align-items: flex-start
+      }
+
+      .arch-layer-name {
+        min-width: 110px
+      }
+    }
+
+    /* ── Architecture Map ── */
+    .arch-tier {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+    }
+
+    .arch-tier-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--dim);
+      margin-bottom: 10px;
+    }
+
+    .arch-tier-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .arch-node {
+      background: var(--bg-card2);
+      border: 1.5px solid var(--border2);
+      border-radius: 9px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all .2s;
+      flex: 1;
+      min-width: 88px;
+      text-align: center;
+    }
+
+    .arch-node.wide {
+      flex: 2;
+    }
+
+    .arch-node.sm {
+      flex: 0 0 auto;
+      min-width: 66px;
+    }
+
+    .arch-node:hover {
+      border-color: var(--accent);
+      background: var(--accent-m);
+    }
+
+    .arch-node.p-read {
+      border-color: var(--blue) !important;
+      background: var(--blue-m) !important;
+    }
+
+    .arch-node.p-collect {
+      border-color: var(--green) !important;
+      background: var(--green-m) !important;
+    }
+
+    .arch-node.p-ipam {
+      border-color: var(--orange) !important;
+      background: var(--orange-m) !important;
+    }
+
+    .arch-node.dimmed {
+      opacity: .18;
+      pointer-events: none;
+    }
+
+    .an-icon {
+      font-size: 16px;
+      margin-bottom: 3px;
+    }
+
+    .an-name {
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .an-desc {
+      font-size: 9.5px;
+      color: var(--muted);
+      margin-top: 2px;
+      line-height: 1.4;
+    }
+
+    .arch-conn {
+      display: grid;
+      padding: 0;
+    }
+
+    .arch-conn-seg {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2px 0;
+    }
+
+    .arch-conn-line {
+      width: 2px;
+      height: 18px;
+      background: var(--border);
+      transition: background .25s;
+      border-radius: 2px;
+    }
+
+    .arch-conn-line.p-read {
+      background: var(--blue);
+    }
+
+    .arch-conn-line.p-collect {
+      background: var(--green);
+    }
+
+    .arch-conn-line.p-ipam {
+      background: var(--orange);
+    }
+
+    .arch-conn-lbl {
+      font-size: 9px;
+      color: var(--dim);
+      text-align: center;
+      margin-top: 2px;
+    }
+
+    .path-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 12px;
+      border-radius: 7px;
+      font-size: 11.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-card2);
+      color: var(--muted);
+      transition: all .2s;
+    }
+
+    .path-btn:hover {
+      color: var(--text);
+      border-color: var(--border2);
+    }
+
+    .path-btn.pb-read.active {
+      border-color: var(--blue);
+      background: var(--blue-m);
+      color: var(--blue);
+    }
+
+    .path-btn.pb-collect.active {
+      border-color: var(--green);
+      background: var(--green-m);
+      color: var(--green);
+    }
+
+    .path-btn.pb-ipam.active {
+      border-color: var(--orange);
+      background: var(--orange-m);
+      color: var(--orange);
+    }
+
+    /* ── Goroutine Pool Sim ── */
+    .goroutine-sim {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 22px 24px;
+      margin-bottom: 14px;
+    }
+
+    .goroutine-sim h3 {
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 16px;
+    }
+
+    .chan-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0a0c14;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px;
+      margin-bottom: 8px;
+    }
+
+    .chan-name {
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--dim);
+      width: 90px;
+      flex-shrink: 0;
+    }
+
+    .chan-slots {
+      display: flex;
+      gap: 3px;
+      flex-wrap: wrap;
+      flex: 1;
+    }
+
+    .chan-slot {
+      width: 22px;
+      height: 22px;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+      background: var(--bg-card2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7.5px;
+      font-weight: 700;
+      font-family: monospace;
+      transition: all .2s;
+      color: var(--dim);
+    }
+
+    .chan-slot.cs-job {
+      background: var(--blue-m);
+      border-color: #3b82f650;
+      color: var(--blue);
+    }
+
+    .chan-slot.cs-ok {
+      background: var(--green-m);
+      border-color: #22c55e50;
+      color: var(--green);
+    }
+
+    .chan-slot.cs-fail {
+      background: var(--red-m);
+      border-color: #ef444450;
+      color: var(--red);
+    }
+
+    .chan-slot.cs-off {
+      background: var(--bg-card2);
+      border-color: var(--dim);
+      color: var(--dim);
+    }
+
+    .goroutine-grid {
+      display: grid;
+      grid-template-columns: repeat(16, 1fr);
+      gap: 3px;
+      margin: 10px 0;
+    }
+
+    .gc {
+      height: 26px;
+      border-radius: 4px;
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      transition: all .15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 7.5px;
+      font-weight: 700;
+      color: var(--dim);
+    }
+
+    .gc.busy {
+      background: var(--blue-m);
+      border-color: #3b82f650;
+      color: var(--blue);
+      animation: gcPulse .5s infinite;
+    }
+
+    .gc.gc-done {
+      background: var(--green-m);
+      border-color: #22c55e40;
+      color: var(--green);
+    }
+
+    .gc.gc-fail {
+      background: var(--red-m);
+      border-color: #ef444440;
+      color: var(--red);
+    }
+
+    @keyframes gcPulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .5
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="layout">
+
+    <!-- ══════════ SIDEBAR ══════════ -->
+    <nav class="sidebar">
+      <div class="sb-logo">
+        <div><span class="sb-name">Omni</span><span class="sb-tag">v1</span></div>
+        <div class="sb-sub">인프라 통합 포털 · 스펙 문서</div>
+      </div>
+
+      <div class="nav-label">개요</div>
+      <a class="nav-a" href="#overview"><span class="nav-icon">🏠</span>프로젝트 개요</a>
+      <a class="nav-a" href="#tech"><span class="nav-icon">🔧</span>기술 스택</a>
+      <a class="nav-a" href="#arch"><span class="nav-icon">🏗️</span>아키텍처</a>
+
+      <div class="nav-label">기능</div>
+      <a class="nav-a" href="#dashboard"><span class="nav-icon">📊</span>대시보드</a>
+      <a class="nav-a" href="#collect"><span class="nav-icon">🔄</span>데이터 수집</a>
+      <a class="nav-a" href="#status"><span class="nav-icon">💡</span>리소스 상태</a>
+      <a class="nav-a" href="#ipam"><span class="nav-icon">🌐</span>IPAM</a>
+      <a class="nav-a" href="#ipam-scan"><span class="nav-icon">📡</span>IPAM 스캔 설계</a>
+      <a class="nav-a" href="#manage"><span class="nav-icon">⚙️</span>관리(Manage)</a>
+      <a class="nav-a" href="#auth"><span class="nav-icon">🔐</span>인증/Auth</a>
+
+      <div class="nav-label">인터페이스</div>
+      <a class="nav-a" href="#data-model"><span class="nav-icon">🗄️</span>데이터 모델</a>
+      <a class="nav-a" href="#api"><span class="nav-icon">📡</span>API 목록</a>
+      <a class="nav-a" href="#security"><span class="nav-icon">🛡️</span>보안</a>
+      <a class="nav-a" href="#deploy"><span class="nav-icon">🚀</span>배포</a>
+      <a class="nav-a" href="#oos"><span class="nav-icon">🚫</span>범위 외</a>
+    </nav>
+
+    <!-- ══════════ MAIN ══════════ -->
+    <main class="main">
+
+      <!-- ─── HERO ─── -->
+      <div class="hero" id="overview">
+        <div class="hero-eye">SPEC DOCUMENT · v2.0</div>
+        <div class="hero-title">Omni Portal</div>
+        <div class="hero-desc">
+          VM, Kubernetes 클러스터, 개발 도구(ArgoCD, GitLab, Nexus)의 상태를 단일 화면에서 통합 모니터링하는 내부 인프라 포털.
+          외부 API 지연을 사용자 경로에서 격리하고, 최소 리소스로 높은 응답성을 유지.
+        </div>
+        <div class="tags">
+          <span class="tag g">● Go 1.25 Backend</span>
+          <span class="tag b">● Next.js 16 Frontend</span>
+          <span class="tag p">● PostgreSQL</span>
+          <span class="tag c">● In-Memory Cache</span>
+          <span class="tag o">● Docker Compose</span>
+        </div>
+      </div>
+
+      <!-- ─── 핵심 원칙 ─── -->
+      <div class="section">
+        <div class="grid g4">
+          <div class="card">
+            <div class="c-label">Principle 1</div>
+            <div class="c-val">30초 백그라운드 폴링</div>
+            <div class="c-sub">외부 API 지연 격리. 사용자는 캐시에서 즉시 응답.</div>
+          </div>
+          <div class="card">
+            <div class="c-label">Principle 2</div>
+            <div class="c-val">AES-256-GCM 암호화</div>
+            <div class="c-sub">DB에 평문 없음. 수집 직전 메모리에서만 복호화.</div>
+          </div>
+          <div class="card">
+            <div class="c-label">Principle 3</div>
+            <div class="c-val">Collector ↔ API 분리</div>
+            <div class="c-sub">수집 엔진과 API 서버는 독립. 인메모리 캐시로만 공유.</div>
+          </div>
+          <div class="card">
+            <div class="c-label">Principle 4</div>
+            <div class="c-val">표준 상태 모델</div>
+            <div class="c-sub">K8s/ArgoCD/GitLab 상태값을 정규화. 일관된 UI.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 기술 스택 ─── -->
+      <div class="section" id="tech">
+        <div class="section-header">
+          <div class="section-icon" style="background:#3b82f618;">🔧</div>
+          <div>
+            <div class="section-title">기술 스택</div>
+            <div class="section-desc">각 레이어별 기술 선택과 선택 이유</div>
+          </div>
+        </div>
+
+        <div class="arch-layers">
+          <div class="arch-layer">
+            <div class="arch-layer-icon">🌐</div>
+            <div class="arch-layer-name">Frontend</div>
+            <div class="arch-layer-desc">
+              <strong>Next.js 16.2.6</strong> (App Router) · React 19 · Tailwind CSS 4 · shadcn/ui<br />
+              <span style="font-size:12px;color:var(--text-dim)">App Router 최적화 라우팅 + shadcn/ui 일관된 디자인 시스템</span>
+            </div>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">⚙️</div>
+            <div class="arch-layer-name">Backend</div>
+            <div class="arch-layer-desc">
+              <strong>Go 1.25.0</strong> · Gin Framework<br />
+              <span style="font-size:12px;color:var(--text-dim)">정적 타입 + Goroutine 병렬 수집. Gin 최소 오버헤드.</span>
+            </div>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">🗄️</div>
+            <div class="arch-layer-name">Database</div>
+            <div class="arch-layer-desc">
+              <strong>PostgreSQL</strong> (pgx/v5)<br />
+              <span style="font-size:12px;color:var(--text-dim)">사용자, 권한, 연동 설정, 암호화 자격 증명 관리. 관계형 데이터 강점 활용.</span>
+            </div>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">⚡</div>
+            <div class="arch-layer-name">Cache</div>
+            <div class="arch-layer-desc">
+              <strong>Go In-Memory Cache</strong> (RWMutex)<br />
+              <span style="font-size:12px;color:var(--text-dim)">Redis 없이 충분한 성능 확보. 아키텍처 단순화 및 배포 편의성 극대화.</span>
+            </div>
+          </div>
+          <div class="arch-layer">
+            <div class="arch-layer-icon">📦</div>
+            <div class="arch-layer-name">Deployment</div>
+            <div class="arch-layer-desc">
+              <strong>Docker Compose</strong> · GHCR (GitHub Container Registry)<br />
+              <span style="font-size:12px;color:var(--text-dim)">외부 VM 배포. 클러스터 장애와 독립적으로 운영 가능.</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 아키텍처 ── -->
+
+      <div class="section" id="arch">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#a855f718;">🏗️</div>
+          <div>
+            <div class="sec-title">아키텍처</div>
+            <div class="sec-sub">전체 시스템 구조 — 컴포넌트, 레이어, 데이터 경로</div>
+          </div>
+        </div>
+
+        <!-- System Architecture Map -->
+        <div class="flow-diagram" style="padding:24px 24px 20px;">
+          <h3 style="margin-bottom:14px;">🗺️ 시스템 아키텍처 맵 — 경로 선택 또는 노드 클릭</h3>
+
+          <!-- Path selector -->
+          <div style="display:flex;gap:7px;margin-bottom:18px;flex-wrap:wrap;">
+            <button class="path-btn pb-read" id="pbtn-read" onclick="setArchPath('read')">📖 읽기 경로</button>
+            <button class="path-btn pb-collect" id="pbtn-collect" onclick="setArchPath('collect')">🔄 수집 경로</button>
+            <button class="path-btn pb-ipam" id="pbtn-ipam" onclick="setArchPath('ipam')">📡 IPAM 스캔</button>
+            <button class="path-btn" onclick="setArchPath(null)" style="padding:5px 9px;font-size:11px;">✕</button>
+          </div>
+
+          <!-- Tier 1: Client -->
+          <div class="arch-tier">
+            <div class="arch-tier-label">Client</div>
+            <div class="arch-tier-row">
+              <div class="arch-node wide" id="an-browser" onclick="archDetail('browser')">
+                <div class="an-icon">🖥️</div>
+                <div class="an-name">Browser</div>
+                <div class="an-desc">Next.js :3000 · 30초 폴링 · Cookie 인증</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="arch-conn" style="grid-template-columns:1fr;">
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-1"></div>
+              <div class="arch-conn-lbl">HTTP / Cookie</div>
+            </div>
+          </div>
+
+          <!-- Tier 2: Frontend -->
+          <div class="arch-tier">
+            <div class="arch-tier-label">Frontend · Next.js 16</div>
+            <div class="arch-tier-row">
+              <div class="arch-node wide" id="an-nextjs" onclick="archDetail('nextjs')">
+                <div class="an-icon">⚡</div>
+                <div class="an-name">Next.js App Router</div>
+                <div class="an-desc">API Routes → <code>backend:8080</code> 서버사이드 프록시 · React 19 · shadcn/ui</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="arch-conn" style="grid-template-columns:1fr;">
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-2"></div>
+              <div class="arch-conn-lbl">HTTP :8080 (Compose 내부망)</div>
+            </div>
+          </div>
+
+          <!-- Tier 3: Backend API -->
+          <div class="arch-tier">
+            <div class="arch-tier-label">Backend API · Go 1.25 / Gin</div>
+            <div class="arch-tier-row">
+              <div class="arch-node" id="an-auth-mw" onclick="archDetail('auth-mw')">
+                <div class="an-icon">🔐</div>
+                <div class="an-name">Auth MW</div>
+                <div class="an-desc">Opaque 세션<br>DB 해시 검증</div>
+              </div>
+              <div class="arch-node" id="an-rbac-mw" onclick="archDetail('rbac-mw')">
+                <div class="an-icon">🛡️</div>
+                <div class="an-name">RBAC MW</div>
+                <div class="an-desc">admin / viewer<br>역할 분기</div>
+              </div>
+              <div class="arch-node wide" id="an-gin" onclick="archDetail('gin')">
+                <div class="an-icon">🔷</div>
+                <div class="an-name">Gin Handlers</div>
+                <div class="an-desc">/collect · /ipam · /manage · /auth<br>캐시에서만 읽기 · 200 / 207 / 502</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tier 3 → 4 connectors: 4 columns -->
+          <div class="arch-conn" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;">
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-3a"></div>
+              <div class="arch-conn-lbl">RLock (읽기)</div>
+            </div>
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-3b"></div>
+              <div class="arch-conn-lbl">Lock (쓰기)</div>
+            </div>
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-3c"></div>
+              <div class="arch-conn-lbl">SQL (pgx/v5)</div>
+            </div>
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-3d"></div>
+              <div class="arch-conn-lbl">SQL (pgx/v5)</div>
+            </div>
+          </div>
+
+          <!-- Tier 4: Engine + Storage -->
+          <div class="arch-tier">
+            <div class="arch-tier-label">Engine / Storage</div>
+            <div class="arch-tier-row">
+              <div class="arch-node" id="an-cache" onclick="archDetail('cache')">
+                <div class="an-icon">💾</div>
+                <div class="an-name">In-Memory Cache</div>
+                <div class="an-desc">sync.RWMutex<br>6개 스냅샷 필드</div>
+              </div>
+              <div class="arch-node" id="an-collector" onclick="archDetail('collector')">
+                <div class="an-icon">🔄</div>
+                <div class="an-name">Collector Runner</div>
+                <div class="an-desc">5× Goroutine<br>30초 ticker</div>
+              </div>
+              <div class="arch-node" id="an-ipam-eng" onclick="archDetail('ipam-eng')">
+                <div class="an-icon">📡</div>
+                <div class="an-name">IPAM Engine</div>
+                <div class="an-desc">Scheduler (1min)<br>64 Worker Pool</div>
+              </div>
+              <div class="arch-node" id="an-postgres" onclick="archDetail('postgres')">
+                <div class="an-icon">🗄️</div>
+                <div class="an-name">PostgreSQL</div>
+                <div class="an-desc">Users · Sessions<br>Integrations · IPAM</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tier 4 → 5 connectors -->
+          <div class="arch-conn" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:4px;">
+            <div class="arch-conn-seg"></div>
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-4a"></div>
+              <div class="arch-conn-lbl">HTTPS + 복호화</div>
+            </div>
+            <div class="arch-conn-seg">
+              <div class="arch-conn-line" id="cl-4b"></div>
+              <div class="arch-conn-lbl">ICMP ping</div>
+            </div>
+            <div class="arch-conn-seg"></div>
+          </div>
+
+          <!-- Tier 5: External -->
+          <div class="arch-tier">
+            <div class="arch-tier-label">External Systems</div>
+            <div class="arch-tier-row" style="gap:6px;">
+              <div class="arch-node sm" id="an-ext-vm">
+                <div class="an-icon">🖥️</div>
+                <div class="an-name">VMs</div>
+                <div class="an-desc">ICMP</div>
+              </div>
+              <div class="arch-node sm" id="an-ext-k8s">
+                <div class="an-icon">☸️</div>
+                <div class="an-name">K8s</div>
+                <div class="an-desc">API</div>
+              </div>
+              <div class="arch-node sm" id="an-ext-argo">
+                <div class="an-icon">🔵</div>
+                <div class="an-name">ArgoCD</div>
+                <div class="an-desc">API</div>
+              </div>
+              <div class="arch-node sm" id="an-ext-gitlab">
+                <div class="an-icon">🦊</div>
+                <div class="an-name">GitLab</div>
+                <div class="an-desc">API</div>
+              </div>
+              <div class="arch-node sm" id="an-ext-nexus">
+                <div class="an-icon">📦</div>
+                <div class="an-name">Nexus</div>
+                <div class="an-desc">HEAD</div>
+              </div>
+              <div class="arch-node sm" id="an-ext-hosts">
+                <div class="an-icon">🌐</div>
+                <div class="an-name">Hosts</div>
+                <div class="an-desc">ping</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Detail panel -->
+          <div class="fd-detail" id="arch-node-detail" style="margin-top:14px;"></div>
+
+          <!-- Legend -->
+          <div style="display:flex;gap:16px;margin-top:14px;flex-wrap:wrap;font-size:11px;color:var(--muted);">
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div
+                style="width:11px;height:11px;border-radius:3px;background:var(--blue-m);border:1px solid var(--blue);">
+              </div>읽기: Browser→Next.js→API→Cache
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div
+                style="width:11px;height:11px;border-radius:3px;background:var(--green-m);border:1px solid var(--green);">
+              </div>수집: Runner→External→Cache
+            </div>
+            <div style="display:flex;align-items:center;gap:5px;">
+              <div
+                style="width:11px;height:11px;border-radius:3px;background:var(--orange-m);border:1px solid var(--orange);">
+              </div>IPAM: Scheduler→Workers→DB
+            </div>
+          </div>
+        </div>
+
+        <!-- Backend package structure -->
+        <div class="ib">
+          <h3>📐 백엔드 패키지 구조</h3>
+          <ul>
+            <li><strong>internal/api</strong> — Gin 라우터, Auth·RBAC 미들웨어, 핸들러. HTTP 응답 직렬화.</li>
+            <li><strong>internal/collector</strong> — 외부 시스템별 수집 로직. <code>runner.go</code>(5 goroutines) +
+              <code>cache.go</code>(RWMutex).
+            </li>
+            <li><strong>internal/store</strong> — PostgreSQL 접근(pgx/v5), 트랜잭션, AES-256-GCM 암/복호화.</li>
+            <li><strong>internal/ipam</strong> — ICMP scanner, 64 worker pool, Auto Discovery scheduler.</li>
+            <li><strong>internal/models</strong> — 전 계층 공유 도메인 모델 및 타입 정의.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ─── 데이터 수집 ─── -->
+      <div class="section" id="dashboard">
+        <div class="section-header">
+          <div class="section-icon" style="background:#22c55e18;">📊</div>
+          <div>
+            <div class="section-title">대시보드</div>
+            <div class="section-desc">Overview 롤업 + 소스별 섹션 탭 구조</div>
+          </div>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span>화면 구조는 <strong>Overview (롤업 상태)</strong> + <strong>소스별 탭</strong>으로 구성. 접속 경로는
+            <code>http://&lt;VM-IP&gt;:3000</code>.</span>
+        </div>
+
+        <div class="status-grid">
+          <div class="status-card">
+            <div class="status-card-source">VM</div>
+            <div class="status-item"><span class="status-dot green"></span>up / <span class="status-dot red"></span>down
+              / <span class="status-dot gray"></span>unknown</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">ICMP ping 기반 가용성</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card-source">Kubernetes</div>
+            <div class="status-item"><span class="status-dot green"></span>Node Ready</div>
+            <div class="status-item"><span class="status-dot yellow"></span>Not Ready Pod / Pending PVC</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">노드, 워크로드, Pod, PVC, Ingress</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card-source">ArgoCD</div>
+            <div class="status-item">Sync: Synced / OutOfSync</div>
+            <div class="status-item">Health: Healthy / Degraded</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">전체 Application 목록</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card-source">GitLab</div>
+            <div class="status-item"><span class="status-dot green"></span>success / <span
+                class="status-dot red"></span>failed</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">앱 repo 최신 파이프라인</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card-source">Nexus</div>
+            <div class="status-item"><span class="status-dot green"></span>reachable</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">HEAD /service/rest/v1/status</div>
+          </div>
+          <div class="status-card">
+            <div class="status-card-source">Platform Health</div>
+            <div class="status-item">OK / STALE / DOWN 롤업</div>
+            <div class="status-item" style="font-size:11px;color:var(--text-dim);">모든 소스 종합 판단</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 데이터 수집 ── -->
+
+      <div class="section" id="collect">
+        <div class="section-header">
+          <div class="section-icon" style="background:#06b6d418;">🔄</div>
+          <div>
+            <div class="section-title">데이터 수집 (Collector)</div>
+            <div class="section-desc">30초 주기 백그라운드 수집 엔진</div>
+          </div>
+        </div>
+
+        <div class="info-block">
+          <h3>⚙️ 구현 방식</h3>
+          <ul>
+            <li><strong>Go Concurrency</strong> — Goroutine + Channel로 모든 연동 대상 병렬 수집. 전체 수집 시간 최소화.</li>
+            <li><strong>RWMutex 캐시</strong> — 수집 결과를 읽기/쓰기 락 보호 인메모리 스냅샷으로 관리. DB 미조회.</li>
+            <li><strong>장애 격리</strong> — 특정 소스 실패 시 해당 소스만 <code>down</code>/<code>unknown</code> 처리. 전체 수집 중단 없음.</li>
+            <li><strong>크레덴셜 복호화</strong> — 암호화된 Token은 수집 직전 서버 메모리에서만 복호화하여 HTTPS 헤더에 주입.</li>
+            <li><strong>Timeout 처리</strong> — <code>CollectorTimeoutError</code>로 개별 수집 타임아웃 격리.</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>📦 스냅샷 HTTP 상태 코드</h3>
+          <ul>
+            <li><strong>200 OK</strong> — 모든 source 정상 또는 모두 unknown(error 없음, 초기 상태)</li>
+            <li><strong>207 Multi-Status</strong> — 일부 runtime source 실패</li>
+            <li><strong>502 Bad Gateway</strong> — vm/kubernetes/argocd/gitlab/nexus 전체 실패</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>🔗 Source Envelope 상태 코드</h3>
+          <ul>
+            <li><strong>200 OK</strong> — 정상 또는 미판단 상태</li>
+            <li><strong>403</strong> — 권한 오류</li>
+            <li><strong>422</strong> — 입력성 upstream 오류</li>
+            <li><strong>503</strong> — rate limit</li>
+            <li><strong>504</strong> — timeout</li>
+            <li><strong>502</strong> — 연결 실패 / upstream 5xx / parse 오류</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── 리소스 상태 ── -->
+
+      <div class="section" id="status">
+        <div class="section-header">
+          <div class="section-icon" style="background:#eab30818;">💡</div>
+          <div>
+            <div class="section-title">리소스 상태 판별 기준</div>
+            <div class="section-desc">각 소스별 상태 정의 및 판별 로직</div>
+          </div>
+        </div>
+
+        <div class="card-grid col2">
+          <div class="card">
+            <div class="card-label">Overview Rollup</div>
+            <div class="card-value">전체 종합 상태</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div style="margin-bottom:4px;">● <strong style="color:var(--green)">OK</strong> — 모든 소스 <code>ok</code>
+              </div>
+              <div style="margin-bottom:4px;">● <strong style="color:var(--yellow)">STALE</strong> — stale / timeout /
+                permission_error 1개 이상</div>
+              <div>● <strong style="color:var(--red)">DOWN</strong> — 전체 또는 주요 소스 <code>down</code></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-label">VM</div>
+            <div class="card-value">ICMP Ping 기반</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div>● <code>up</code> — ping 성공</div>
+              <div>● <code>down</code> — ping 실패</div>
+              <div>● <code>unknown</code> — timeout/실행 오류</div>
+              <div style="margin-top:6px;font-size:11px;color:var(--text-dim);">전체 up→ok, 일부 up→stale, 전체 down→down
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-label">Kubernetes</div>
+            <div class="card-value">노드 + 워크로드 종합</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div>● Node Ready: <code>True/False</code></div>
+              <div>● Restarting Pod: <code>restartCount &gt; 0</code></div>
+              <div>● Not Ready Pod &gt; 0 → <code>stale</code></div>
+              <div>● Pending PVC &gt; 0 → <code>stale</code></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-label">ArgoCD</div>
+            <div class="card-value">Sync + Health 상태</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div>Sync: Synced / OutOfSync / Unknown</div>
+              <div>Health: Healthy / Progressing / Degraded</div>
+              <div style="margin-top:6px;">OutOfSync 또는 Degraded 1개 이상 → <code>stale</code></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-label">GitLab</div>
+            <div class="card-value">파이프라인 상태</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div>success / failed / running / pending / canceled</div>
+              <div style="margin-top:6px;">failed 또는 canceled 1개 이상 → <code>stale</code></div>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-label">Nexus</div>
+            <div class="card-value">HTTP 접근성</div>
+            <div class="card-sub" style="margin-top:10px;">
+              <div>HEAD <code>/service/rest/v1/status</code></div>
+              <div>2xx → <code>ok</code>, 그 외 → <code>down</code></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── IPAM ── -->
+
+      <div class="section" id="ipam">
+        <div class="section-header">
+          <div class="section-icon" style="background:#06b6d418;">🌐</div>
+          <div>
+            <div class="section-title">IPAM</div>
+            <div class="section-desc">IPv4 주소 자원 관리 + ICMP 스캔</div>
+          </div>
+        </div>
+
+        <div class="callout info">
+          <span class="callout-icon">ℹ️</span>
+          <span><strong>계층 구조:</strong> Location → Network → Subnet → IP Address. 데이터는 PostgreSQL에 저장.</span>
+        </div>
+
+        <div class="info-block">
+          <h3>🗂️ 데이터 모델</h3>
+          <ul>
+            <li><strong>Location</strong> — 최상위 논리 구역 (e.g., 데이터센터)</li>
+            <li><strong>Network</strong> — Location 내부 논리 그룹 (CIDR 소유자는 Subnet)</li>
+            <li><strong>Subnet</strong> — IPv4 CIDR, <code>/24</code>보다 큰 범위 거부, 같은 Location 내 overlap 불허</li>
+            <li><strong>IP Address</strong> — Subnet 생성 시 사용 가능한 host IP row 자동 생성</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>📡 스캔 동작</h3>
+          <ul>
+            <li><strong>Worker Pool</strong> — 크기 고정 64</li>
+            <li><strong>active</strong> — ping 성공, <code>consecutiveFailures = 0</code></li>
+            <li><strong>dead</strong> — 과거 성공 이력 있는 IP에서 연속 3회 실패</li>
+            <li><strong>offline</strong> — 성공 이력 없는 IP는 실패해도 유지</li>
+            <li><strong>Auto Discovery</strong> — interval: 1800/3600/14400/43200/86400초, 기본 3600초</li>
+            <li><strong>Scheduler</strong> — dashboard collect runner와 별도로 독립 실행</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>🖥️ 프론트엔드 UX</h3>
+          <ul>
+            <li>사이드바 Collapsible IPAM 섹션 + Home 메뉴</li>
+            <li>좌측: 통계 + <code>Top IPv4 subnets by hosts</code> (Recharts 차트)</li>
+            <li>우측: Collapsible 트리 (Location → Network → Subnet → IP count)</li>
+            <li>Subnet 선택 → IP 상세 테이블 (active/dead/offline 요약 + 색상 Button Grid)</li>
+            <li>IP 버튼 클릭 → Sheet detail (admin: hostname/description 편집)</li>
+            <li>Admin 전용: 생성/수정/삭제/rescan 버튼, Sheet form, AlertDialog (cascade 수 표시)</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── IPAM 스캔 설계 ── -->
+
+      <div class="section" id="ipam-scan">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#f9731618;">📡</div>
+          <div>
+            <div class="sec-title">IPAM 스캔 설계</div>
+            <div class="sec-sub">스캔 실행 플로우 · Goroutine 채널 시뮬레이션 · 상태 전이</div>
+          </div>
+        </div>
+
+        <div class="callout success">
+          <span class="ci">✅</span>
+          <span><code>internal/ipam/scanner.go</code>, <code>scheduler.go</code> 실제 구현 기반. WorkerCount=64, ping
+            timeout=2s.</span>
+        </div>
+
+        <!-- Part 1: 스캔 실행 플로우 -->
+        <div class="ib" style="margin-bottom:6px;">
+          <h3>🔄 ScanSubnet() 실행 플로우 <span class="sf-badge go">goroutine</span> <span
+              class="sf-badge db">postgres</span> <span class="sf-badge icmp">icmp</span></h3>
+        </div>
+        <div class="scan-flow-steps" style="padding:0 8px;margin-bottom:14px;">
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">1</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">MarkIPAMScanStarted <span class="sf-badge db">DB write</span></div>
+              <div class="sf-desc">스캔 시작 시각(<code>startedAt</code>)을 DB에 기록. 이미 스캔 중이면 <code>ErrConflict</code> 반환 —
+                Scheduler가 이를 무시하여 동일 Subnet 중복 실행 방지.</div>
+            </div>
+          </div>
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">2</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">ListIPAMScanAddresses <span class="sf-badge db">DB read</span></div>
+              <div class="sf-desc">Subnet의 모든 IP 레코드 로드. 각 레코드: <code>status</code>, <code>consecutiveFailures</code>,
+                <code>lastSeenAt</code> 포함. 실패 시 <code>markFailed</code> 후 종료.
+              </div>
+            </div>
+          </div>
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">3</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">scanAddresses() — 64 Worker Goroutine 병렬 ICMP <span class="sf-badge go">64
+                  goroutines</span> <span class="sf-badge icmp">ICMP</span></div>
+              <div class="sf-desc">Producer goroutine이 <code>jobs chan</code>에 IP 주소 순차 전송. 64개 Worker가 receive하여 ICMP
+                ping 수행. 결과는 버퍼드 <code>results chan</code>으로 전송. WaitGroup으로 전체 완료 후 results 채널 close.</div>
+            </div>
+          </div>
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">4</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">classifyScanResult() — 상태 분류</div>
+              <div class="sf-desc">메인 goroutine이 <code>results</code>를 receive하며 분류. ping 결과 +
+                <code>hadSuccess</code>(과거 이력) 조합으로 <code>active / dead / offline</code> 결정. 아래 시뮬레이터에서 직접 확인 가능.
+              </div>
+            </div>
+          </div>
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">5</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">BulkApplyIPAMScanResults <span class="sf-badge db">DB bulk write</span></div>
+              <div class="sf-desc">전체 IP 결과를 <strong>단일 트랜잭션</strong>으로 반영. <code>status</code>,
+                <code>consecutiveFailures</code>, <code>lastSeenAt</code>, <code>lastScanStatus</code>,
+                <code>lastScanCompletedAt</code> 업데이트.
+              </div>
+            </div>
+          </div>
+          <div class="sf-step">
+            <div class="sf-left">
+              <div class="sf-num">6</div>
+              <div class="sf-line"></div>
+            </div>
+            <div class="sf-body">
+              <div class="sf-title">IPAMScanSummary 반환</div>
+              <div class="sf-desc"><code>{ Total, Active, Dead, Offline }</code> 집계 반환. API 응답 및 스케줄러 로그에 활용.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Part 2: Worker Pool Goroutine 채널 시뮬레이션 -->
+        <div class="goroutine-sim">
+          <h3>⚙️ Worker Pool Goroutine 채널 시뮬레이션 — /24 서브넷 254 IPs</h3>
+
+          <div class="chan-row">
+            <div class="chan-name">jobs chan</div>
+            <div class="chan-slots" id="chan-jobs"></div>
+            <div style="font-size:9.5px;color:var(--dim);margin-left:8px;white-space:nowrap;">← producer</div>
+          </div>
+          <div class="chan-row">
+            <div class="chan-name">results chan</div>
+            <div class="chan-slots" id="chan-results"></div>
+            <div style="font-size:9.5px;color:var(--dim);margin-left:8px;white-space:nowrap;">→ main goroutine</div>
+          </div>
+
+          <div style="display:flex;align-items:center;justify-content:space-between;margin:12px 0 6px;">
+            <div style="font-size:11px;font-weight:700;color:var(--muted);">64 Worker Goroutines</div>
+            <div style="display:flex;gap:12px;font-size:10px;color:var(--muted);">
+              <div style="display:flex;align-items:center;gap:4px;">
+                <div
+                  style="width:9px;height:9px;border-radius:2px;background:var(--bg-card2);border:1px solid var(--border);">
+                </div>대기
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <div
+                  style="width:9px;height:9px;border-radius:2px;background:var(--blue-m);border:1px solid var(--blue);">
+                </div>ping 중
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <div
+                  style="width:9px;height:9px;border-radius:2px;background:var(--green-m);border:1px solid var(--green);">
+                </div>성공
+              </div>
+              <div style="display:flex;align-items:center;gap:4px;">
+                <div
+                  style="width:9px;height:9px;border-radius:2px;background:var(--red-m);border:1px solid var(--red);">
+                </div>실패
+              </div>
+            </div>
+          </div>
+          <div class="goroutine-grid" id="goroutine-grid"></div>
+
+          <div class="scan-stats" style="margin-bottom:10px;">
+            <div class="scan-stat">
+              <div class="scan-stat-val prog" id="gp-scanned">0</div>
+              <div class="scan-stat-lbl">처리됨</div>
+            </div>
+            <div class="scan-stat">
+              <div class="scan-stat-val act" id="gp-active">0</div>
+              <div class="scan-stat-lbl">Active</div>
+            </div>
+            <div class="scan-stat">
+              <div class="scan-stat-val dead" id="gp-dead">0</div>
+              <div class="scan-stat-lbl">Dead</div>
+            </div>
+            <div class="scan-stat">
+              <div class="scan-stat-val off" id="gp-offline">0</div>
+              <div class="scan-stat-lbl">Offline</div>
+            </div>
+            <div class="scan-stat">
+              <div class="scan-stat-val" id="gp-workers" style="color:var(--blue);">0</div>
+              <div class="scan-stat-lbl">Active Workers</div>
+            </div>
+          </div>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+            <button class="btn btn-primary" id="gp-btn" onclick="runGoroutinePool()">▶ 시뮬레이션</button>
+            <button class="btn btn-ghost" onclick="resetGoroutinePool()">↩ 리셋</button>
+            <div style="font-size:11px;color:var(--dim);">254 IPs · 64 workers · ~4 라운드 · ping 2s timeout</div>
+          </div>
+          <div class="scan-log" id="gp-log" style="height:68px;"></div>
+        </div>
+
+        <!-- State Transition Diagram -->
+        <div class="state-diagram">
+          <h3>🔀 IP 주소 상태 전이 — 클릭하여 확인</h3>
+          <div class="sd-states">
+            <div class="sd-state offline-s" onclick="selectState('offline')" id="sd-offline">
+              <div class="sd-icon">⚫</div>
+              <div class="sd-name" style="color:var(--muted);">Offline</div>
+              <div class="sd-desc">성공 이력 없음</div>
+            </div>
+            <div style="color:var(--dim);font-size:20px;align-self:center;">⇄</div>
+            <div class="sd-state active-s" onclick="selectState('active')" id="sd-active">
+              <div class="sd-icon">🟢</div>
+              <div class="sd-name" style="color:var(--green);">Active</div>
+              <div class="sd-desc">ping 응답 성공</div>
+            </div>
+            <div style="color:var(--dim);font-size:20px;align-self:center;">→</div>
+            <div class="sd-state dead-s" onclick="selectState('dead')" id="sd-dead">
+              <div class="sd-icon">🔴</div>
+              <div class="sd-name" style="color:var(--red);">Dead</div>
+              <div class="sd-desc">3회 연속 실패</div>
+            </div>
+          </div>
+          <div class="sd-arrows">
+            <div class="sd-arrow-row">
+              <div class="from">Offline</div>
+              <div class="arr">→</div>
+              <div class="cond">ping 성공</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--green);">Active</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Active</div>
+              <div class="arr">→</div>
+              <div class="cond">ping 실패 1~2회 (성공이력 있음)</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--green);">Active 유지 (grace)</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Active</div>
+              <div class="arr">→</div>
+              <div class="cond">ping 실패 ≥3회 연속</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--red);">Dead</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Dead</div>
+              <div class="arr">→</div>
+              <div class="cond">ping 성공</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--green);">Active</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Offline</div>
+              <div class="arr">→</div>
+              <div class="cond">ping 실패 (성공이력 없음)</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--muted);">Offline 유지</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from" style="color:var(--yellow);">핵심 판단</div>
+              <div class="arr">→</div>
+              <div class="cond"><code>hadSuccess = lastSeenAt != nil || status ∈ {active, dead}</code></div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--yellow);">offline 여부</div>
+            </div>
+          </div>
+          <div class="sd-detail" id="sd-detail">← 위 상태 박스를 클릭하면 상세 설명이 표시됩니다.</div>
+        </div>
+
+        <!-- Scheduler -->
+        <div class="sched-vis">
+          <h3>⏰ IPAM Scheduler — Dashboard Runner와 독립 실행</h3>
+          <div class="callout warn" style="margin-bottom:12px;">
+            <span class="ci">⚠️</span>
+            <span>Scheduler는 Dashboard Collector Runner와 <strong>완전히 별개의 Goroutine</strong>에서 실행. 서로 간섭 없음.</span>
+          </div>
+          <div class="ib" style="margin-bottom:10px;">
+            <h3>📋 스케줄러 로직</h3>
+            <ul>
+              <li><strong>시작 즉시 1회 실행</strong> — <code>Start(ctx)</code> 호출 시 <code>scanDue(ctx)</code> 즉시 실행</li>
+              <li><strong>1분 ticker</strong> — 이후 1분마다 due subnet 조회 및 스캔</li>
+              <li><strong>ListDueIPAMSubnets(limit=10)</strong> — Auto Discovery interval 만료 subnet 최대 10개 조회</li>
+              <li><strong>ErrConflict 무시</strong> — 이미 스캔 중인 subnet 건너뜀</li>
+              <li><strong>Context 취소 감지</strong> — <code>ctx.Err()</code>로 graceful shutdown</li>
+            </ul>
+          </div>
+          <div class="grid g2" style="margin-top:12px;">
+            <div class="card">
+              <div class="c-label">Auto Discovery Interval</div>
+              <div class="c-sub" style="font-size:13px;line-height:2;">
+                <div>30분 (<code>1800s</code>)</div>
+                <div>1시간 (<code>3600s</code>) ← 기본값</div>
+                <div>4시간 (<code>14400s</code>)</div>
+                <div>12시간 (<code>43200s</code>)</div>
+                <div>24시간 (<code>86400s</code>)</div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="c-label">CommandPingExecutor (실제 ICMP)</div>
+              <div class="c-sub" style="font-size:13px;line-height:1.9;">
+                <div><strong>Linux</strong>: <code>ping -c 1 -W 1 &lt;addr&gt;</code></div>
+                <div><strong>macOS</strong>: <code>ping -c 1 -W 1000 &lt;addr&gt;</code></div>
+                <div><strong>Windows</strong>: <code>ping -n 1 -w 1000 &lt;addr&gt;</code></div>
+                <div>timeout: 2초. <code>NET_RAW</code> capability 필요.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── MANAGE ─── -->
+      <div class="section" id="manage">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#f9731618;">⚙️</div>
+          <div>
+            <div class="sec-title">관리 (Manage)</div>
+            <div class="sec-sub">Admin 전용 VM · Integration · User CRUD</div>
+          </div>
+        </div>
+        <div class="callout warn"><span class="ci">⚠️</span><span>Manage 메뉴 및 모든 <code>/api/manage/*</code>는
+            <strong>admin 역할만</strong> 접근. Gin 미들웨어 단에서 viewer 차단.</span></div>
+
+        <!-- Manage flow interactive -->
+        <div class="flow-diagram">
+          <h3>🔄 Manage CRUD 플로우 — 노드를 클릭하세요</h3>
+          <div class="fd-nodes">
+            <div class="fd-node" onclick="showFD('mg1')" id="fd-mg1">
+              <div class="nd-icon">📝</div>
+              <div class="nd-label">UI Form</div>
+              <div class="nd-sub">설정 입력</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('mg2')" id="fd-mg2">
+              <div class="nd-icon">🔒</div>
+              <div class="nd-label">AES-GCM</div>
+              <div class="nd-sub">즉시 암호화</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('mg3')" id="fd-mg3">
+              <div class="nd-icon">🗄️</div>
+              <div class="nd-label">PostgreSQL</div>
+              <div class="nd-sub">영구 저장</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('mg4')" id="fd-mg4">
+              <div class="nd-icon">🧪</div>
+              <div class="nd-label">Test Conn</div>
+              <div class="nd-sub">선택적 검증</div>
+            </div>
+          </div>
+          <div class="fd-detail" id="fd-detail-mg1"><strong>UI Form</strong> — 인라인 수정 폼 UX. 항목 아래에 독립 폼이 나타남. Granular
+            API Reload: 변경된 리소스 전용 로딩만 호출하여 전체 재조회 없음.</div>
+          <div class="fd-detail" id="fd-detail-mg2"><strong>AES-256-GCM 암호화</strong> — Kubernetes Token, GitLab Token
+            등 민감 정보를 OMNI_SECRET_KEY로 즉시 암호화. AD(Additional Data)로 <code>integration_type:id:secret_name</code>을 사용하여
+            데이터 변조 탐지.</div>
+          <div class="fd-detail" id="fd-detail-mg3"><strong>PostgreSQL Single Source of Truth</strong> — 타입별 정적 스키마
+            테이블 (VM/K8s/GitLab 각각 전용). 단일 JSON 컬럼 지양. UI 조회 시 민감 필드 마스킹.</div>
+          <div class="fd-detail" id="fd-detail-mg4"><strong>Test Connection (저장과 분리)</strong> — 외부 인프라 장애가 설정 저장을 막지
+            않도록 CRUD와 검증 분리. 검증 실패 시 upstreamStatus 포함한 에러 상세를 클라이언트에 전달.</div>
+        </div>
+      </div>
+
+      <!-- ─── AUTH ─── -->
+      <div class="section" id="auth">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#ef444418;">🔐</div>
+          <div>
+            <div class="sec-title">인증 / Auth</div>
+            <div class="sec-sub">ID/Password 기반 세션 인증 + RBAC</div>
+          </div>
+        </div>
+
+        <div class="flow-diagram">
+          <h3>🔑 인증 플로우 — 노드를 클릭하세요</h3>
+          <div class="fd-nodes">
+            <div class="fd-node" onclick="showFD('au1')" id="fd-au1">
+              <div class="nd-icon">👤</div>
+              <div class="nd-label">Login</div>
+              <div class="nd-sub">ID/PW 입력</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('au2')" id="fd-au2">
+              <div class="nd-icon">🔑</div>
+              <div class="nd-label">bcrypt</div>
+              <div class="nd-sub">PW 검증</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('au3')" id="fd-au3">
+              <div class="nd-icon">🎫</div>
+              <div class="nd-label">Session Token</div>
+              <div class="nd-sub">Opaque + DB</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('au4')" id="fd-au4">
+              <div class="nd-icon">🍪</div>
+              <div class="nd-label">Cookie</div>
+              <div class="nd-sub">HttpOnly+Lax</div>
+            </div>
+            <div class="fd-arrow"><svg viewBox="0 0 60 20" fill="none">
+                <line x1="2" y1="10" x2="52" y2="10" stroke="#4a4d65" stroke-width="1.5" />
+                <polygon points="52,6 60,10 52,14" fill="#4a4d65" />
+              </svg></div>
+            <div class="fd-node" onclick="showFD('au5')" id="fd-au5">
+              <div class="nd-icon">🛡️</div>
+              <div class="nd-label">RBAC</div>
+              <div class="nd-sub">admin/viewer</div>
+            </div>
+          </div>
+          <div class="fd-detail" id="fd-detail-au1"><strong>Login / Setup</strong> — DB에 사용자 없을 때만 Setup 화면 허용. 이후 공개
+            회원가입 차단. 로그인 성공/실패 동일 포맷 응답(계정 존재 유무 비노출). 과도한 실패 시 일시 차단.</div>
+          <div class="fd-detail" id="fd-detail-au2"><strong>bcrypt 검증</strong> — 비밀번호는 bcrypt 단방향 해시로 저장. 무차별 대입 완화.
+            신규 사용자 첫 로그인 후 즉시 비밀번호 변경 강제.</div>
+          <div class="fd-detail" id="fd-detail-au3"><strong>Opaque Session Token</strong> — 난수 기반 토큰을 생성. DB에
+            <strong>토큰 해시</strong> + 만료 시각 저장. JWT와 달리 서버 측에서 수명과 권한을 완전 제어. Logout 시 즉시 revoke 가능.
+          </div>
+          <div class="fd-detail" id="fd-detail-au4"><strong>쿠키 보안</strong> — <code>HttpOnly</code>: JS에서 쿠키 접근 불가(XSS
+            방어). <code>SameSite=Lax</code>: 외부 사이트 요청 시 쿠키 미전송(CSRF 방어).</div>
+          <div class="fd-detail" id="fd-detail-au5"><strong>RBAC (admin/viewer)</strong> — Gin 미들웨어에서 역할 검증. Admin: 모든
+            API. Viewer: 대시보드+IPAM 조회만. Dev 환경에서만 <code>NEXT_PUBLIC_OMNI_MOCK=true</code>로 인증 우회 가능.</div>
+        </div>
+
+        <div class="grid g2">
+          <div class="card">
+            <div class="c-label">Admin</div>
+            <div class="c-val">전체 접근</div>
+            <div class="c-sub">대시보드 + IPAM + Manage(VM/Integration/User CRUD) + 모든 API</div>
+          </div>
+          <div class="card">
+            <div class="c-label">Viewer</div>
+            <div class="c-val">조회 전용</div>
+            <div class="c-sub">대시보드 + IPAM 조회만. Manage 및 mutation API 완전 차단.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── 데이터 모델 ── -->
+      <div class="section" id="data-model">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#10b98118;">🗄️</div>
+          <div>
+            <div class="sec-title">데이터 모델</div>
+            <div class="sec-sub">PostgreSQL 영구 저장 · In-Memory 수집 스냅샷 · 스캔 내부 모델</div>
+          </div>
+        </div>
+
+        <div class="callout info" style="margin-bottom:16px;">
+          <span class="callout-icon">ℹ️</span>
+          <span>IPAM·사용자 데이터는 PostgreSQL에 영구 저장. 대시보드 수집 데이터는 In-Memory Cache에만 존재하며 재시작 시 초기화됨.</span>
+        </div>
+
+        <!-- IPAM 도메인 -->
+        <div class="ib">
+          <h3>🌐 IPAM 도메인 (PostgreSQL)</h3>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">계층 구조:
+            <code>Location → Network → Subnet → Address</code>. 모두 PostgreSQL에 영구 저장. ID는 각 계층 접두사(loc_, net_, subnet_,
+            ip_) + UUID.
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMLocation</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td><code>loc_</code> 접두사 UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>name</code></td>
+                    <td>string</td>
+                    <td>구역명 (e.g. 서울 IDC)</td>
+                  </tr>
+                  <tr>
+                    <td><code>description</code></td>
+                    <td>string?</td>
+                    <td>선택 설명</td>
+                  </tr>
+                  <tr>
+                    <td><code>createdAt</code> / <code>updatedAt</code></td>
+                    <td>string (RFC3339)</td>
+                    <td>생성·수정 시각</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMNetwork</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td><code>net_</code> 접두사 UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>locationId</code></td>
+                    <td>string</td>
+                    <td>상위 Location FK — 불변</td>
+                  </tr>
+                  <tr>
+                    <td><code>name</code></td>
+                    <td>string</td>
+                    <td>네트워크 그룹명</td>
+                  </tr>
+                  <tr>
+                    <td><code>description</code></td>
+                    <td>string?</td>
+                    <td>선택 설명</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMSubnet</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td><code>subnet_</code> 접두사 UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>networkId</code></td>
+                    <td>string</td>
+                    <td>상위 Network FK — 불변</td>
+                  </tr>
+                  <tr>
+                    <td><code>cidr</code></td>
+                    <td>string</td>
+                    <td>IPv4 CIDR · /24 이상만 허용 · 불변 · 동일 Location 내 overlap 불허</td>
+                  </tr>
+                  <tr>
+                    <td><code>autoDiscovery</code></td>
+                    <td>bool</td>
+                    <td>자동 스캔 활성화 여부</td>
+                  </tr>
+                  <tr>
+                    <td><code>scanIntervalSeconds</code></td>
+                    <td>int</td>
+                    <td>스캔 주기 (1800 / 3600 / 14400 / 43200 / 86400) · 기본 3600</td>
+                  </tr>
+                  <tr>
+                    <td><code>lastScanStartedAt</code></td>
+                    <td>string?</td>
+                    <td>마지막 스캔 시작 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>lastScanCompletedAt</code></td>
+                    <td>string?</td>
+                    <td>마지막 스캔 완료 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>lastScanStatus</code></td>
+                    <td>string?</td>
+                    <td><code>running</code> / <code>completed</code> / <code>failed</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>lastScanError</code></td>
+                    <td>string?</td>
+                    <td>실패 사유 메시지 (최대 500자)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMAddress</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td><code>ip_</code> 접두사 UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>subnetId</code></td>
+                    <td>string</td>
+                    <td>상위 Subnet FK</td>
+                  </tr>
+                  <tr>
+                    <td><code>address</code></td>
+                    <td>string</td>
+                    <td>IPv4 주소 — Subnet 생성 시 host IP 전체 자동 생성</td>
+                  </tr>
+                  <tr>
+                    <td><code>status</code></td>
+                    <td>enum</td>
+                    <td><code>active</code> / <code>dead</code> / <code>offline</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>hostname</code></td>
+                    <td>string?</td>
+                    <td>admin이 수동 입력</td>
+                  </tr>
+                  <tr>
+                    <td><code>description</code></td>
+                    <td>string?</td>
+                    <td>admin이 수동 입력</td>
+                  </tr>
+                  <tr>
+                    <td><code>lastScannedAt</code></td>
+                    <td>string?</td>
+                    <td>마지막 ping 시도 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>lastSeenAt</code></td>
+                    <td>string?</td>
+                    <td>마지막 ping 성공 시각 · null이면 성공 이력 없음</td>
+                  </tr>
+                  <tr>
+                    <td><code>consecutiveFailures</code></td>
+                    <td>int</td>
+                    <td>연속 ping 실패 횟수 · ≥3 이면 dead 전이 조건 충족</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Dashboard 수집 도메인 -->
+        <div class="ib">
+          <h3>📊 대시보드 수집 도메인 (In-Memory)</h3>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:16px;">Collector Runner가 주기적으로 수집하여 In-Memory
+            Cache에 기록. 프로세스 재시작 시 초기화되고 첫 수집 사이클에서 재생성됨.</div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:4px;color:var(--fg);">CollectEnvelope&lt;T&gt;
+            </div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px;">각 소스 수집 결과를 감싸는 제네릭 래퍼.
+              <code>DashboardSnapshot</code>의 모든 필드가 이 타입.
+            </div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>source</code></td>
+                    <td>string</td>
+                    <td>overview / vms / kubernetes / argocd / gitlab / nexus</td>
+                  </tr>
+                  <tr>
+                    <td><code>status</code></td>
+                    <td>enum</td>
+                    <td>ok / progressing / down / timeout / permission_error / stale / unknown</td>
+                  </tr>
+                  <tr>
+                    <td><code>attemptedAt</code></td>
+                    <td>string</td>
+                    <td>수집 시도 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>collectedAt</code></td>
+                    <td>string?</td>
+                    <td>마지막 성공 수집 시각 — 실패 시 null</td>
+                  </tr>
+                  <tr>
+                    <td><code>stale</code></td>
+                    <td>bool</td>
+                    <td>마지막 성공 후 5분 경과 시 true</td>
+                  </tr>
+                  <tr>
+                    <td><code>error</code></td>
+                    <td>CollectError?</td>
+                    <td>code (TIMEOUT / PERMISSION_DENIED / CONNECTION_FAILED / UNKNOWN_ERROR) · message ·
+                      upstreamStatus</td>
+                  </tr>
+                  <tr>
+                    <td><code>data</code></td>
+                    <td>T</td>
+                    <td>소스별 실제 수집 데이터</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div>
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">DashboardSnapshot — 소스별
+              데이터(T) 요약</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드 (source)</th>
+                    <th>데이터 타입 T</th>
+                    <th>주요 내용</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>overview</code></td>
+                    <td>OverviewData</td>
+                    <td>health (ok / degraded / unknown) + 소스별 SourceSummary 목록</td>
+                  </tr>
+                  <tr>
+                    <td><code>vms</code></td>
+                    <td>VmsData</td>
+                    <td>VmStatus 목록 — id, name, address, state (up / down / unknown), lastCheckedAt</td>
+                  </tr>
+                  <tr>
+                    <td><code>kubernetes</code></td>
+                    <td>KubernetesData</td>
+                    <td>Nodes (CPU·Memory %), Workloads (deploy/sts/ds), Pods, Services, Ingresses, PVCs</td>
+                  </tr>
+                  <tr>
+                    <td><code>argocd</code></td>
+                    <td>ArgoCdData</td>
+                    <td>Application 목록 — syncStatus (Synced/OutOfSync), healthStatus (Healthy/Degraded/…), revision</td>
+                  </tr>
+                  <tr>
+                    <td><code>gitlab</code></td>
+                    <td>GitLabData</td>
+                    <td>Project 목록 — latestCommit (sha, title, author), latestPipeline (status, ref, link)</td>
+                  </tr>
+                  <tr>
+                    <td><code>nexus</code></td>
+                    <td>NexusData</td>
+                    <td>reachable, httpStatus, checkedAt</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- 사용자 도메인 -->
+        <div class="ib">
+          <h3>🔐 사용자 도메인 (PostgreSQL)</h3>
+          <div class="ib" style="padding:0;overflow:hidden;">
+            <table class="api-t">
+              <thead>
+                <tr>
+                  <th>필드</th>
+                  <th>타입</th>
+                  <th>설명</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>id</code></td>
+                  <td>string</td>
+                  <td>UUID</td>
+                </tr>
+                <tr>
+                  <td><code>username</code></td>
+                  <td>string</td>
+                  <td>로그인 ID (unique)</td>
+                </tr>
+                <tr>
+                  <td><code>role</code></td>
+                  <td>enum</td>
+                  <td><code>admin</code> — 전체 접근 / <code>viewer</code> — 조회 전용</td>
+                </tr>
+                <tr>
+                  <td><code>mustChangePassword</code></td>
+                  <td>bool</td>
+                  <td>true이면 로그인 후 비밀번호 변경 강제</td>
+                </tr>
+                <tr>
+                  <td><code>createdAt</code> / <code>updatedAt</code></td>
+                  <td>string (RFC3339)</td>
+                  <td>생성·수정 시각</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 스캔 내부 모델 -->
+        <div class="ib">
+          <h3>⚙️ 스캔 내부 모델 (In-Process)</h3>
+          <div style="font-size:13px;color:var(--muted);margin-bottom:12px;">DB 왕복 최소화를 위한 경량 타입. API 응답으로 노출되지 않음.
+          </div>
+          <div class="grid g2">
+            <div class="card">
+              <div class="c-label">IPAMScanAddress</div>
+              <div class="c-sub" style="font-size:12px;line-height:1.8;">
+                스캔 시작 시 DB에서 일괄 조회하는 경량 뷰<br>
+                <code>id, subnetId, address</code><br>
+                <code>status, lastSeenAt, consecutiveFailures</code>
+              </div>
+            </div>
+            <div class="card">
+              <div class="c-label">IPAMScanResult</div>
+              <div class="c-sub" style="font-size:12px;line-height:1.8;">
+                Worker 결과 채널에서 취합한 중간 타입<br>
+                <code>addressId, status</code><br>
+                <code>lastScannedAt, lastSeenAt, consecutiveFailures</code><br>
+                → <code>BulkApplyIPAMScanResults()</code>로 단일 트랜잭션 반영
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── API ─── -->
+      <div class="section" id="api">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#6c63ff18;">📡</div>
+          <div>
+            <div class="sec-title">API 목록</div>
+            <div class="sec-sub">Next.js → Go 백엔드 프록시 경로 기준</div>
+          </div>
+        </div>
+        <div class="ib" style="padding:0;overflow:hidden;">
+          <table class="api-t">
+            <thead>
+              <tr>
+                <th style="width:110px;">Method</th>
+                <th>Endpoint</th>
+                <th style="width:75px;">Role</th>
+                <th>설명</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr class="sec-row">
+                <td colspan="4">Auth</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/auth/setup</span></td>
+                <td><span class="rb pub">Public</span></td>
+                <td>최초 admin 생성 (DB 사용자 없을 때)</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/auth/login</span></td>
+                <td><span class="rb pub">Public</span></td>
+                <td>로그인 + 세션 쿠키 발급</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/auth/logout</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>세션 revoke + 쿠키 만료</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/auth/password</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>비밀번호 변경</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/auth/me</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>현재 세션 사용자 정보</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">Collect</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/collect/snapshot</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>전체 rollup + 모든 source envelope 반환 (200/207/502)</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/collect/snapshot?force=true</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>병렬 수집 즉시 실행 후 snapshot 반환</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/collect/{vms|kubernetes|argocd|gitlab|nexus}</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>소스별 개별 확인</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/health/ready</span></td>
+                <td><span class="rb pub">Public</span></td>
+                <td>앱 ready health check</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">Manage — VMs</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span> <span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/resources/vms</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>VM 목록 / 등록</td>
+              </tr>
+              <tr>
+                <td><span class="m put">PUT</span> <span class="m del">DEL</span></td>
+                <td><span class="ep">/api/manage/resources/vms/:id</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>VM 수정 / 삭제</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">Manage — Integrations</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span> <span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/integrations/kubernetes</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>K8s 연동 조회/등록</td>
+              </tr>
+              <tr>
+                <td><span class="m put">PUT</span> <span class="m del">DEL</span></td>
+                <td><span class="ep">/api/manage/integrations/kubernetes/:id</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>K8s 연동 수정/삭제</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span> <span class="m post">POST</span> <span class="m put">PUT</span>
+                  <span class="m del">DEL</span>
+                </td>
+                <td><span class="ep">/api/manage/integrations/{gitlab|argocd|nexus}[/:id]</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>GitLab / ArgoCD / Nexus 연동 CRUD</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">Manage — Users</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span> <span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/users</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>사용자 목록 / 신규 계정 생성</td>
+              </tr>
+              <tr>
+                <td><span class="m put">PUT</span> <span class="m del">DEL</span></td>
+                <td><span class="ep">/api/manage/users/:id</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>사용자 수정 / 삭제</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">IPAM — 조회 (Viewer 이상)</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/summary</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>IPAM 전체 통계 요약</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/locations</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>Location 목록</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/networks?locationId=...</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>Network 목록</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/subnets?locationId=...&networkId=...</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>Subnet 목록</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/subnets/:id/addresses</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>Subnet IP 주소 목록</td>
+              </tr>
+              <tr class="sec-row">
+                <td colspan="4">IPAM — 관리 (Admin)</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span> <span class="m put">PUT</span> <span class="m del">DEL</span>
+                </td>
+                <td><span class="ep">/api/manage/ipam/locations[/:id]</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>Location CRUD</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span> <span class="m put">PUT</span> <span class="m del">DEL</span>
+                </td>
+                <td><span class="ep">/api/manage/ipam/networks[/:id]</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>Network CRUD</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span> <span class="m put">PUT</span> <span class="m del">DEL</span>
+                </td>
+                <td><span class="ep">/api/manage/ipam/subnets[/:id]</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>Subnet CRUD (CIDR 수정 불가)</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/ipam/subnets/:id/rescan</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>Subnet 수동 재스캔</td>
+              </tr>
+              <tr>
+                <td><span class="m put">PUT</span></td>
+                <td><span class="ep">/api/manage/ipam/addresses/:id</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>IP 메타데이터 수정 (hostname, description)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ─── 보안 ─── -->
+      <div class="section" id="security">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#ef444418;">🛡️</div>
+          <div>
+            <div class="sec-title">보안 아키텍처</div>
+            <div class="sec-sub">클릭하여 상세 확인</div>
+          </div>
+        </div>
+        <div class="sec-layers">
+          <div class="sec-layer" onclick="this.classList.toggle('open')">
+            <div class="sec-layer-ico">🔐</div>
+            <div class="sec-layer-name">AES-256-GCM 자격 증명</div>
+            <div class="sec-layer-desc">DB에 평문 없음 · 수집 직전 복호화</div>
+            <div class="sec-layer-expand">
+              <strong>알고리즘:</strong> AES-256-GCM (인증 암호화)<br />
+              <strong>키:</strong> <code>OMNI_SECRET_KEY</code> (32바이트)<br />
+              <strong>AD(Additional Data):</strong> <code>integration_type:integration_id:secret_name</code> — 데이터 변조
+              탐지<br />
+              <strong>복호화 시점:</strong> 수집 실행 직전 서버 메모리에서만. UI 조회 시 마스킹.<br />
+              <strong>저장 형식:</strong> 암호화된 바이너리 blob을 PostgreSQL에 저장.
+            </div>
+          </div>
+          <div class="sec-layer" onclick="this.classList.toggle('open')">
+            <div class="sec-layer-ico">🎫</div>
+            <div class="sec-layer-name">Opaque Session Token</div>
+            <div class="sec-layer-desc">JWT 없음 · 서버 측 완전 제어</div>
+            <div class="sec-layer-expand">
+              <strong>생성:</strong> 서버에서 난수 기반 opaque 토큰 생성<br />
+              <strong>저장:</strong> DB에 <strong>토큰 해시</strong> + 만료 시각 저장 (평문 토큰 미저장)<br />
+              <strong>전달:</strong> <code>HttpOnly; SameSite=Lax</code> 쿠키로 브라우저에 전달<br />
+              <strong>검증:</strong> 매 요청마다 DB에서 해시 비교 + 만료 확인<br />
+              <strong>Revoke:</strong> Logout 시 DB 레코드 즉시 비활성화 (JWT의 stateless 단점 없음)
+            </div>
+          </div>
+          <div class="sec-layer" onclick="this.classList.toggle('open')">
+            <div class="sec-layer-ico">🔑</div>
+            <div class="sec-layer-name">bcrypt 비밀번호</div>
+            <div class="sec-layer-desc">단방향 해시 · 무차별 대입 완화</div>
+            <div class="sec-layer-expand">
+              비밀번호는 bcrypt로 단방향 해시 저장. 복호화 불가.<br />
+              신규 사용자는 첫 로그인 후 즉시 비밀번호 변경 강제.<br />
+              로그인 실패 횟수 추적 → 과도한 접근 시 일시 차단.<br />
+              성공/실패 동일 오류 포맷 → 계정 존재 유무 비노출.
+            </div>
+          </div>
+          <div class="sec-layer" onclick="this.classList.toggle('open')">
+            <div class="sec-layer-ico">🌐</div>
+            <div class="sec-layer-name">Kubernetes 접근 제어</div>
+            <div class="sec-layer-desc">read-only ServiceAccount · HTTPS + CA</div>
+            <div class="sec-layer-expand">
+              <strong>Namespace:</strong> <code>omni</code><br />
+              <strong>ServiceAccount:</strong> <code>omni-reader</code><br />
+              <strong>ClusterRole/ClusterRoleBinding:</strong> read-only 권한만<br />
+              <strong>Secret type:</strong> <code>kubernetes.io/service-account-token</code>
+              (<code>omni-reader-token</code>)<br />
+              <strong>API 접근:</strong> HTTPS + CA 신뢰 필수. private CA → <code>certs/kubernetes-ca.crt</code> 마운트<br />
+              <strong>Docker Compose:</strong> <code>NET_RAW</code> capability (ICMP ping용)
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── 배포 ─── -->
+      <div class="section" id="deploy">
+        <div class="section-header">
+          <div class="section-icon" style="background:#22c55e18;">🚀</div>
+          <div>
+            <div class="section-title">배포</div>
+            <div class="section-desc">Docker Compose + GHCR · 외부 VM 운영</div>
+          </div>
+        </div>
+
+        <div class="callout warn">
+          <span class="callout-icon">⚠️</span>
+          <span>Omni는 <strong>Kubernetes 클러스터 외부 VM</strong>에 배포. 클러스터 장애 시에도 Omni가 살아있어야 관측이 가능하기 때문.</span>
+        </div>
+
+        <div class="info-block">
+          <h3>📁 배포 번들 구조</h3>
+          <pre><code>/opt/omni-portal/deploy/
+  docker-compose.yml
+  .env                        # OMNI_VERSION, DB 설정, OMNI_SECRET_KEY
+  certs/kubernetes-ca.crt     # K8s private CA 사용 시만</code></pre>
+        </div>
+
+        <div class="info-block">
+          <h3>⚙️ 환경 변수</h3>
+          <ul>
+            <li><code>OMNI_VERSION</code> — 릴리스 이미지 태그 (e.g., <code>v1.0.1</code>). latest 사용 금지.</li>
+            <li><code>DATABASE_URL</code> — PostgreSQL 연결 문자열</li>
+            <li><code>POSTGRES_DB / USER / PASSWORD</code> — Compose DB 설정</li>
+            <li><code>OMNI_SECRET_KEY</code> — 32바이트 자격 증명 암호화 키</li>
+            <li><code>API_URL</code> — <code>http://backend:8080</code> (Compose 내부 통신)</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>🔄 배포 절차</h3>
+          <div class="flow">
+            <div class="flow-step">
+              <div class="flow-step-num">1</div>
+              <div class="flow-step-content">
+                <div class="flow-step-title">이미지 업데이트</div>
+                <div class="flow-step-desc"><code>.env</code>의 <code>OMNI_VERSION</code>을 새 태그로 변경</div>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-step-num">2</div>
+              <div class="flow-step-content">
+                <div class="flow-step-title">Pull & Up</div>
+                <div class="flow-step-desc"><code>docker compose pull && docker compose up -d</code></div>
+              </div>
+            </div>
+            <div class="flow-step">
+              <div class="flow-step-num">3</div>
+              <div class="flow-step-content">
+                <div class="flow-step-title">검증</div>
+                <div class="flow-step-desc"><code>docker compose ps</code> + <code>http://&lt;VM-IP&gt;:3000</code> 접근
+                  확인</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-block">
+          <h3>🏷️ CI/CD</h3>
+          <ul>
+            <li>PR / main push: 검증만 수행 (build, test, lint)</li>
+            <li><code>v*</code> Git tag push: 검증 통과 후 frontend + backend 이미지 GHCR publish</li>
+            <li>이미지: <code>ghcr.io/squatboy/omni-frontend:&lt;tag&gt;</code>,
+              <code>ghcr.io/squatboy/omni-backend:&lt;tag&gt;</code>
+            </li>
+            <li>latest 태그 배포 기준 제외</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ── Out of Scope ── -->
+
+      <div class="section" id="oos">
+        <div class="sec-hd">
+          <div class="sec-ico" style="background:#5c5f7518;">🚫</div>
+          <div>
+            <div class="sec-title">v1 범위 외</div>
+            <div class="sec-sub">의도적으로 제외한 기능</div>
+          </div>
+        </div>
+        <div class="ib">
+          <h3></h3>
+          <ul>
+            <li>Slack / 메일 / webhook 알림</li>
+            <li>Grafana 수준 시계열 그래프 및 쿼리 탐색</li>
+            <li>Nexus artifact/image 목록 조회</li>
+            <li>GitLab job 로그 상세 분석</li>
+            <li>VM CPU/메모리/디스크 agent 설치</li>
+            <li>장기 이력 저장용 DB</li>
+            <li>Kubernetes 클러스터 내부 Omni 앱 배포</li>
+            <li>ArgoCD Application 기반 Omni 앱 배포</li>
+            <li>K8s 장애 중 K8s 세부 리소스 수집 지속 보장</li>
+            <li>IPAM — MAC address / hostname 자동 탐지</li>
+            <li>다중 replica 배포 (v1 단일 replica)</li>
+            <li>별도 reverse proxy (v1 제외)</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>Omni Portal · Spec v2.0</span>
+        <span>Updated 2026-05-24</span>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    /* ── Sidebar active tracking ── */
+    const navAs = document.querySelectorAll('.nav-a');
+    const allSections = [...document.querySelectorAll('.section, .hero')];
+    const io = new IntersectionObserver(entries => {
+      entries.forEach(e => {
+        if (e.isIntersecting) {
+          const id = e.target.id;
+          navAs.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + id));
+        }
+      });
+    }, { threshold: 0.2 });
+    allSections.forEach(s => io.observe(s));
+    navAs.forEach(a => a.addEventListener('click', e => {
+      e.preventDefault();
+      document.querySelector(a.getAttribute('href'))?.scrollIntoView({ behavior: 'smooth' });
+    }));
+
+    /* ── Accordion ── */
+    function toggleAcc(hd) {
+      hd.closest('.acc-item').classList.toggle('open');
+    }
+
+    /* ── Flow Diagram ── */
+    let activeFD = null;
+    function showFD(id) {
+      document.querySelectorAll('.fd-detail').forEach(d => d.classList.remove('show'));
+      document.querySelectorAll('.fd-node').forEach(n => n.classList.remove('hi'));
+      const detail = document.getElementById('fd-detail-' + id);
+      const node = document.getElementById('fd-' + id);
+      if (detail && node) {
+        detail.classList.add('show');
+        node.classList.add('hi');
+      }
+    }
+
+    /* ── Tech accordion auto-open first ── */
+    document.querySelectorAll('.acc-hd').forEach(hd => hd.addEventListener('click', () => toggleAcc(hd)));
+
+    /* ── Collect Timeline ── */
+    function runTimeline() {
+      const bars = [
+        { id: 'tl-vms', w: 18, dur: 400, badge: 'tl-vms-badge', label: '~400ms', color: 'var(--green)' },
+        { id: 'tl-nexus', w: 12, dur: 250, badge: 'tl-nexus-badge', label: '~250ms', color: 'var(--orange)' },
+        { id: 'tl-argo', w: 28, dur: 600, badge: 'tl-argo-badge', label: '~600ms', color: 'var(--yellow)' },
+        { id: 'tl-gitlab', w: 35, dur: 800, badge: 'tl-gitlab-badge', label: '~800ms', color: 'var(--orange)' },
+        { id: 'tl-k8s', w: 55, dur: 1400, badge: 'tl-k8s-badge', label: '~1400ms', color: 'var(--blue)' },
+      ];
+      const prog = document.getElementById('collect-progress');
+      prog.style.width = '0%';
+      bars.forEach(b => {
+        const el = document.getElementById(b.id);
+        const badge = document.getElementById(b.badge);
+        el.style.width = '0%';
+        el.style.transition = 'none';
+        badge.textContent = '';
+      });
+      setTimeout(() => {
+        prog.style.transition = 'width 1.5s ease';
+        prog.style.width = '100%';
+        bars.forEach(b => {
+          const el = document.getElementById(b.id);
+          const badge = document.getElementById(b.badge);
+          el.style.transition = `width ${b.dur}ms ease`;
+          requestAnimationFrame(() => { el.style.width = b.w + '%'; });
+          setTimeout(() => { badge.textContent = b.label; badge.style.color = b.color; }, b.dur);
+        });
+      }, 50);
+    }
+
+    /* ── Cache RWMutex demo ── */
+    function cacheLog(msg, cls = '') {
+      const log = document.getElementById('cache-log');
+      log.innerHTML += `<div class="log-line ${cls}">${msg}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+    function demoRead() {
+      const lock = document.getElementById('cache-lock');
+      const desc = document.getElementById('cache-lock-desc');
+      lock.className = 'cv-lock read';
+      lock.textContent = '🔵 RLock (읽기 락)';
+      desc.textContent = '여러 API Thread 동시 읽기 허용';
+      ['cs-api1', 'cs-api2'].forEach(id => {
+        document.getElementById(id).className = 'cv-slot reading';
+      });
+      cacheLog('[RLock] API Thread 1 — 스냅샷 읽기 시작', 'info');
+      cacheLog('[RLock] API Thread 2 — 동시 읽기 허용 ✓', 'info');
+      setTimeout(() => {
+        ['cs-api1', 'cs-api2'].forEach(id => document.getElementById(id).className = 'cv-slot');
+        lock.className = 'cv-lock free'; lock.textContent = '🔓 Free';
+        desc.textContent = '잠금 해제';
+        cacheLog('[RUnlock] 읽기 완료', 'ok');
+      }, 1800);
+    }
+    function demoWrite() {
+      const lock = document.getElementById('cache-lock');
+      const desc = document.getElementById('cache-lock-desc');
+      lock.className = 'cv-lock write';
+      lock.textContent = '🟠 Lock (쓰기 락)';
+      desc.textContent = 'VMs Collector 쓰기 중 — 다른 접근 블로킹';
+      document.getElementById('cs-vms').className = 'cv-slot writing';
+      ['cs-api1', 'cs-api2'].forEach(id => document.getElementById(id).className = 'cv-slot blocked');
+      cacheLog('[Lock] VMs Collector — 캐시 업데이트 시작', 'warn');
+      cacheLog('[blocked] API Thread 1, 2 — 쓰기 완료까지 대기', 'fail');
+      setTimeout(() => {
+        document.getElementById('cs-vms').className = 'cv-slot';
+        ['cs-api1', 'cs-api2'].forEach(id => document.getElementById(id).className = 'cv-slot');
+        lock.className = 'cv-lock free'; lock.textContent = '🔓 Free';
+        desc.textContent = '쓰기 완료 — 대기 중 읽기 허용';
+        cacheLog('[Unlock] 캐시 업데이트 완료 → 대기 API 허용 ✓', 'ok');
+      }, 2000);
+    }
+    function demoReset() {
+      document.getElementById('cache-log').innerHTML = '';
+      document.getElementById('cache-lock').className = 'cv-lock free';
+      document.getElementById('cache-lock').textContent = '🔓 Free';
+      document.getElementById('cache-lock-desc').textContent = '잠금 없음 — 동시 읽기 가능';
+      ['cs-api1', 'cs-api2', 'cs-vms', 'cs-k8s', 'cs-argo'].forEach(id => document.getElementById(id).className = 'cv-slot');
+    }
+
+    /* ── Architecture Map ── */
+    const archDetails = {
+      'browser': '<strong>Browser</strong> — 진입점. 30초마다 <code>/api/collect/snapshot</code> 폴링으로 대시보드 자동 갱신. Go 백엔드 포트(:8080)는 브라우저에 직접 노출되지 않음.',
+      'nextjs': '<strong>Next.js App Router</strong> — <code>/api/*</code>를 <code>http://backend:8080</code>으로 서버사이드 프록시. Docker Compose 내부망 활용. <code>API_URL=http://backend:8080</code> 환경변수.',
+      'auth-mw': '<strong>Auth Middleware</strong> — 쿠키의 opaque 토큰을 매 요청마다 DB에서 해시 조회 + 만료 확인. 검증 실패 시 401. 세션 기반이므로 logout 시 즉시 revoke 가능.',
+      'rbac-mw': '<strong>RBAC Middleware</strong> — admin/viewer 역할 분기. Admin: 모든 API. Viewer: 대시보드·IPAM 조회만. Manage·mutation API는 admin만. Gin 미들웨어 체인에서 처리.',
+      'gin': '<strong>Gin Handlers</strong> — HTTP 핸들링 + JSON 직렬화. Snapshot 엔드포인트는 DB 미조회, 인메모리 캐시에서만 읽음. 소스 상태에 따라 200/207/502 반환.',
+      'cache': '<strong>In-Memory Cache (sync.RWMutex)</strong> — <code>vms, kubernetes, argocd, gitlab, nexus, overview</code> 6개 필드. RLock으로 동시 다중 읽기, Lock으로 배타 쓰기. Set* 호출마다 <code>updateOverview()</code>가 롤업 즉시 재계산.',
+      'collector': '<strong>Collector Runner</strong> — 앱 시작 시 5개 독립 Goroutine 실행(VM/Nexus/ArgoCD/GitLab/K8s). 초기 수집 후 30초 ticker. 한 소스 실패해도 나머지 계속 실행(장애 격리).',
+      'ipam-eng': '<strong>IPAM Engine</strong> — Dashboard Runner와 완전히 독립된 Goroutine. Scheduler(1min ticker)가 만료 Subnet 감지 → Scanner가 64 worker goroutine pool + jobs/results 채널로 ICMP 병렬 수행 → 단일 트랜잭션으로 DB 반영.',
+      'postgres': '<strong>PostgreSQL (pgx/v5)</strong> — 영구 저장소. Users·Sessions·Integrations(AES-256-GCM 암호화 자격증명)·IPAM 계층 저장. Collector 캐시는 DB를 거치지 않는 read path.',
+    };
+    const archPaths = {
+      read: { nodes: ['an-browser', 'an-nextjs', 'an-auth-mw', 'an-rbac-mw', 'an-gin', 'an-cache'], lines: ['cl-1', 'cl-2', 'cl-3a'], cls: 'p-read' },
+      collect: { nodes: ['an-collector', 'an-cache', 'an-ext-vm', 'an-ext-k8s', 'an-ext-argo', 'an-ext-gitlab', 'an-ext-nexus'], lines: ['cl-3b', 'cl-4a'], cls: 'p-collect' },
+      ipam: { nodes: ['an-ipam-eng', 'an-postgres', 'an-ext-hosts'], lines: ['cl-3d', 'cl-4b'], cls: 'p-ipam' },
+    };
+    const ALL_NODES = ['an-browser', 'an-nextjs', 'an-auth-mw', 'an-rbac-mw', 'an-gin', 'an-cache', 'an-collector', 'an-ipam-eng', 'an-postgres', 'an-ext-vm', 'an-ext-k8s', 'an-ext-argo', 'an-ext-gitlab', 'an-ext-nexus', 'an-ext-hosts'];
+    const ALL_LINES = ['cl-1', 'cl-2', 'cl-3a', 'cl-3b', 'cl-3c', 'cl-3d', 'cl-4a', 'cl-4b'];
+    function setArchPath(path) {
+      ALL_NODES.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('p-read', 'p-collect', 'p-ipam', 'dimmed'); });
+      ALL_LINES.forEach(id => { const el = document.getElementById(id); if (el) el.classList.remove('p-read', 'p-collect', 'p-ipam'); });
+      document.querySelectorAll('.path-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById('arch-node-detail').classList.remove('show');
+      if (!path || !archPaths[path]) return;
+      const p = archPaths[path];
+      ALL_NODES.forEach(id => {
+        const el = document.getElementById(id); if (!el) return;
+        if (p.nodes.includes(id)) el.classList.add(p.cls); else el.classList.add('dimmed');
+      });
+      p.lines.forEach(id => { const el = document.getElementById(id); if (el) el.classList.add(p.cls); });
+      const btn = document.getElementById('pbtn-' + path); if (btn) btn.classList.add('active');
+    }
+    function archDetail(id) {
+      const panel = document.getElementById('arch-node-detail');
+      if (!archDetails[id]) return;
+      panel.innerHTML = archDetails[id];
+      panel.classList.add('show');
+    }
+
+    /* ── Goroutine Pool Simulation ── */
+    (function initGP() {
+      const grid = document.getElementById('goroutine-grid');
+      if (!grid) return;
+      for (let i = 0; i < 64; i++) {
+        const c = document.createElement('div');
+        c.className = 'gc'; c.id = 'gc-' + i; c.textContent = i + 1;
+        grid.appendChild(c);
+      }
+      const jobs = document.getElementById('chan-jobs');
+      const res = document.getElementById('chan-results');
+      if (!jobs || !res) return;
+      for (let i = 0; i < 18; i++) {
+        const s = document.createElement('div'); s.className = 'chan-slot'; s.id = 'cj-' + i; jobs.appendChild(s);
+        const r = document.createElement('div'); r.className = 'chan-slot'; r.id = 'cr-' + i; res.appendChild(r);
+      }
+    })();
+
+    let gpRunning = false;
+    function gpLog(msg, cls = '') {
+      const log = document.getElementById('gp-log');
+      if (!log) return;
+      log.innerHTML += `<div class="log-line ${cls}">${msg}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+    function resetGoroutinePool() {
+      gpRunning = false;
+      const btn = document.getElementById('gp-btn'); if (btn) btn.disabled = false;
+      for (let i = 0; i < 64; i++) { const c = document.getElementById('gc-' + i); if (c) { c.className = 'gc'; c.textContent = i + 1; } }
+      for (let i = 0; i < 18; i++) {
+        const cj = document.getElementById('cj-' + i); if (cj) { cj.className = 'chan-slot'; cj.textContent = ''; }
+        const cr = document.getElementById('cr-' + i); if (cr) { cr.className = 'chan-slot'; cr.textContent = ''; }
+      }
+      ['gp-scanned', 'gp-active', 'gp-dead', 'gp-offline', 'gp-workers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+      const log = document.getElementById('gp-log'); if (log) log.innerHTML = '';
+    }
+    async function runGoroutinePool() {
+      if (gpRunning) return;
+      gpRunning = true;
+      resetGoroutinePool();
+      gpRunning = true;
+      const btn = document.getElementById('gp-btn'); if (btn) btn.disabled = true;
+      const TOTAL = 254, WORKERS = 64;
+      const outcomes = Array.from({ length: TOTAL }, () => { const r = Math.random(); return r < 0.58 ? 'ok' : r < 0.73 ? 'fail' : 'off'; });
+
+      // Workers are persistent goroutines — always 64, never goes to 0
+      document.getElementById('gp-workers').textContent = WORKERS;
+      gpLog(`[init] 64 worker goroutine 생성 — jobs chan(buf=64), results chan(buf=254)`, 'info');
+
+      // Fill jobs channel (first 18 slots visible)
+      for (let i = 0; i < 18; i++) { const s = document.getElementById('cj-' + i); if (s) { s.className = 'chan-slot cs-job'; s.textContent = (i + 1).toString(); } }
+      gpLog(`[producer] ${TOTAL}개 IP → jobs chan 전송 시작`, 'warn');
+      await sleep(400);
+      if (!gpRunning) return;
+
+      // Shared state — JS is single-threaded, no race between await boundaries
+      let nextJob = 0;     // next job index for workers to pick up
+      let resultSlot = 0;  // rolling results channel slot index
+      const resultBuf = new Array(TOTAL); // collect all results in memory — no DB update until done
+
+      // Refresh jobs channel display to reflect current drain state
+      function refreshJobsChan() {
+        for (let i = 0; i < 18; i++) {
+          const s = document.getElementById('cj-' + i); if (!s) continue;
+          const idx = nextJob + i;
+          if (idx < TOTAL) { s.className = 'chan-slot cs-job'; s.textContent = (idx + 1).toString(); }
+          else { s.className = 'chan-slot'; s.textContent = ''; }
+        }
+      }
+
+      // Launch all 64 workers concurrently — each independently picks up jobs from chan
+      // JS single-thread: nextJob++ between awaits is safe (no interleaving within a sync block)
+      const workerTasks = Array.from({ length: WORKERS }, (_, w) => (async () => {
+        const el = document.getElementById('gc-' + w);
+        while (true) {
+          if (!gpRunning) return;
+          const jobIdx = nextJob++;
+          if (jobIdx >= TOTAL) return; // jobs chan exhausted, goroutine exits
+
+          // Receive from jobs chan — go busy
+          if (el) { el.className = 'gc busy'; el.textContent = '▶'; }
+
+          // ICMP ping (each worker runs independently, not synchronized)
+          await sleep(150 + Math.random() * 550);
+          if (!gpRunning) return;
+
+          // Push result to results chan
+          const out = outcomes[jobIdx];
+          resultBuf[jobIdx] = out;
+          const rIdx = (resultSlot++) % 18;
+          const rEl = document.getElementById('cr-' + rIdx);
+          if (out === 'ok') {
+            if (el) { el.className = 'gc gc-done'; el.textContent = '✓'; }
+            if (rEl) { rEl.className = 'chan-slot cs-ok'; rEl.textContent = '✓'; }
+          } else if (out === 'fail') {
+            if (el) { el.className = 'gc gc-fail'; el.textContent = '✗'; }
+            if (rEl) { rEl.className = 'chan-slot cs-fail'; rEl.textContent = '✗'; }
+          } else {
+            if (el) { el.className = 'gc'; el.textContent = '—'; }
+            if (rEl) { rEl.className = 'chan-slot cs-off'; rEl.textContent = '—'; }
+          }
+          // Stats stay at 0 — no DB update until BulkApplyIPAMScanResults at the end
+        }
+      })());
+
+      // Periodically refresh jobs channel display and log milestones
+      let lastMilestone = 0;
+      const ticker = setInterval(() => {
+        if (!gpRunning) { clearInterval(ticker); return; }
+        refreshJobsChan();
+        const done = resultSlot;
+        if (done >= lastMilestone + 64 && done < TOTAL) {
+          lastMilestone = done;
+          gpLog(`[ping] ${done}/${TOTAL} 완료 — workers continue...`, 'warn');
+        }
+      }, 100);
+
+      await Promise.all(workerTasks);
+      clearInterval(ticker);
+      if (!gpRunning) return;
+
+      // Workers exit after close(jobs) — goroutine count drops to 0
+      document.getElementById('gp-workers').textContent = 0;
+
+      // Clear channels
+      for (let i = 0; i < 18; i++) {
+        const s = document.getElementById('cj-' + i); if (s) { s.className = 'chan-slot'; s.textContent = ''; }
+        const r = document.getElementById('cr-' + i); if (r) { r.className = 'chan-slot'; r.textContent = ''; }
+      }
+
+      gpLog(`[done] results chan closed — main goroutine ${TOTAL}개 수신 완료`, 'info');
+      await sleep(300);
+
+      // Single bulk DB transaction — count stats only NOW (not during scan)
+      let active = 0, dead = 0, offline = 0;
+      resultBuf.forEach(out => { if (out === 'ok') active++; else if (out === 'fail') dead++; else offline++; });
+
+      gpLog(`[bulk] BulkApplyIPAMScanResults — ${TOTAL}개 단일 트랜잭션 반영 ✓`, 'info');
+      await sleep(400);
+
+      // Flash all stats at once — this is the single write to DB
+      document.getElementById('gp-scanned').textContent = TOTAL;
+      document.getElementById('gp-active').textContent = active;
+      document.getElementById('gp-dead').textContent = dead;
+      document.getElementById('gp-offline').textContent = offline;
+
+      gpLog(`[summary] Total=${TOTAL} Active=${active} Dead=${dead} Offline=${offline}`, 'ok');
+      if (btn) btn.disabled = false;
+      gpRunning = false;
+    }
+
+    /* ── Worker Pool Visualizer (legacy, no-op if element missing) ── */
+    (function initWP() {
+      const grid = document.getElementById('wp-grid');
+      if (!grid) return;
+      for (let i = 0; i < 64; i++) {
+        const w = document.createElement('div');
+        w.className = 'wp-worker';
+        w.id = 'wp-' + i;
+        w.textContent = i + 1;
+        grid.appendChild(w);
+      }
+    })();
+
+    function runWorkerPool() {
+      const btn = document.getElementById('wp-btn'); if (!btn) return;
+      btn.disabled = true;
+      const log = document.getElementById('wp-log');
+      log.innerHTML = '';
+      for (let i = 0; i < 64; i++) { const w = document.getElementById('wp-' + i); if (w) w.className = 'wp-worker'; }
+
+      const totalIPs = 128;
+      log.innerHTML += `<div class="log-line info">[scheduler] ${totalIPs}개 IP 스캔 시작 — 64 worker goroutine 상시 대기</div>`;
+      log.scrollTop = log.scrollHeight;
+
+      // True worker pool: workers pick up jobs independently, no round synchronization
+      let nextJob = 0;
+      let completedCount = 0;
+
+      function workerLoop(w) {
+        if (nextJob >= totalIPs) return; // jobs exhausted
+        const jobIdx = nextJob++;
+        const el = document.getElementById('wp-' + w); if (el) el.className = 'wp-worker busy';
+        setTimeout(() => {
+          if (el) el.className = 'wp-worker done';
+          completedCount++;
+          if (completedCount === totalIPs) {
+            log.innerHTML += `<div class="log-line ok">[done] ${totalIPs} IPs 전체 완료 ✓</div>`;
+            log.innerHTML += `<div class="log-line info">[bulk] BulkApplyIPAMScanResults 호출 (단일 트랜잭션)</div>`;
+            log.scrollTop = log.scrollHeight;
+            btn.disabled = false;
+          }
+          workerLoop(w); // worker immediately picks up next job
+          log.scrollTop = log.scrollHeight;
+        }, 80 + Math.random() * 500);
+      }
+
+      for (let w = 0; w < 64; w++) workerLoop(w);
+    }
+
+    /* ── State Diagram ── */
+    const stateDetails = {
+      offline: '<strong>Offline</strong> — ping 성공 이력이 <strong>한 번도 없는</strong> IP. lastSeenAt = nil. ping에 실패해도 offline을 유지. 오직 ping 성공 시에만 active로 전이. 새로 생성된 모든 IP의 초기 상태.',
+      active: '<strong>Active</strong> — 마지막 ping이 성공했거나, 성공 이력이 있으며 consecutiveFailures < 3인 IP. lastSeenAt이 갱신됨. 1~2회 실패해도 grace period로 active 유지. 3회 연속 실패 시 dead로 전이.',
+      dead: '<strong>Dead</strong> — 성공 이력이 있었지만(lastSeenAt != nil 또는 이전 status가 active/dead) consecutiveFailures ≥ 3인 IP. 다시 ping 성공 시 즉시 active로 복귀. offline과 달리 "과거에 살아있었다"는 기록이 있음.'
+    };
+    function selectState(name) {
+      ['offline', 'active', 'dead'].forEach(s => {
+        document.getElementById('sd-' + s).classList.remove('sel');
+      });
+      document.getElementById('sd-' + name).classList.add('sel');
+      document.getElementById('sd-detail').innerHTML = stateDetails[name];
+    }
+
+    /* ── IPAM Scan Demo ── */
+    const SCAN_IPS = Array.from({ length: 20 }, (_, i) => `10.0.0.${i + 1}`);
+    // pre-determine outcomes for demo
+    const OUTCOMES = [
+      'active', 'active', 'active', 'offline', 'dead',
+      'active', 'offline', 'active', 'dead', 'active',
+      'offline', 'active', 'active', 'dead', 'active',
+      'active', 'offline', 'active', 'active', 'dead'
+    ];
+    let scanRunning = false;
+
+    function initGrid() {
+      const grid = document.getElementById('ip-grid');
+      grid.innerHTML = '';
+      SCAN_IPS.forEach((ip, i) => {
+        const cell = document.createElement('div');
+        cell.className = 'ip-cell offline';
+        cell.id = 'ipc-' + i;
+        cell.textContent = ip.split('.').pop().padStart(3, ' ');
+        cell.title = ip;
+        grid.appendChild(cell);
+      });
+    }
+
+    function scanLog(msg, cls = '') {
+      const log = document.getElementById('scan-log');
+      log.innerHTML += `<div class="log-line ${cls}">${msg}</div>`;
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function resetScan() {
+      scanRunning = false;
+      document.getElementById('scan-btn').disabled = false;
+      document.getElementById('scan-progress').style.width = '0%';
+      ['ss-total', 'ss-active', 'ss-dead', 'ss-offline'].forEach(id => document.getElementById(id).textContent = '0');
+      document.getElementById('scan-log').innerHTML = '';
+      initGrid();
+    }
+
+    async function runScan() {
+      if (scanRunning) return;
+      scanRunning = true;
+      resetScan();
+      scanRunning = true;
+      document.getElementById('scan-btn').disabled = true;
+
+      scanLog('[scanner] MarkIPAMScanStarted — scan_id=subnet-demo', 'info');
+      scanLog('[store] ListIPAMScanAddresses — 20개 IP 로드', 'info');
+      await sleep(300);
+      // 20 IPs < 64 workers — all dispatched at once, no batching
+      scanLog('[producer] 20개 IP → jobs chan. 20개 worker 즉시 수신 (동시 dispatch)', 'info');
+      await sleep(200);
+
+      const prog = document.getElementById('scan-progress');
+      const resultBuf = []; // collect results in memory — no stats update until BulkApply
+      let completedCount = 0;
+
+      // All IPs start scanning simultaneously — 64 workers > 20 IPs
+      SCAN_IPS.forEach((_, i) => { document.getElementById('ipc-' + i).className = 'ip-cell scanning'; });
+      scanLog(`[workers] 20개 IP ping 동시 실행 중 (각 worker 독립 타이머)...`, 'warn');
+
+      // Each IP resolves independently — no synchronization between workers
+      const ipPromises = SCAN_IPS.map((ip, i) => sleep(350 + Math.random() * 1300).then(() => {
+        if (!scanRunning) return;
+        const outcome = OUTCOMES[i];
+        document.getElementById('ipc-' + i).className = 'ip-cell ' + outcome;
+        resultBuf.push(outcome);
+        completedCount++;
+        prog.style.width = (completedCount / SCAN_IPS.length * 100) + '%';
+        // Log individual ping result as it arrives (results chan receive)
+        if (outcome === 'active') scanLog(`[ping] ${ip} → success ✓`, 'ok');
+        else if (outcome === 'dead') scanLog(`[ping] ${ip} → fail ×3 → dead`, 'fail');
+        else scanLog(`[ping] ${ip} → fail (no history) → offline`);
+      }));
+
+      await Promise.all(ipPromises);
+      if (!scanRunning) return;
+
+      await sleep(200);
+      scanLog(`[results] results chan closed — 20개 결과 메모리 수집 완료`, 'info');
+      await sleep(300);
+
+      // Single bulk DB transaction — compute and write stats only NOW
+      let active = 0, dead = 0, offline = 0;
+      resultBuf.forEach(o => { if (o === 'active') active++; else if (o === 'dead') dead++; else offline++; });
+
+      scanLog(`[store] BulkApplyIPAMScanResults — ${resultBuf.length}개 결과 트랜잭션 반영`, 'info');
+      await sleep(400);
+
+      // Flash all stats at once — single DB write
+      document.getElementById('ss-total').textContent = resultBuf.length;
+      document.getElementById('ss-active').textContent = active;
+      document.getElementById('ss-dead').textContent = dead;
+      document.getElementById('ss-offline').textContent = offline;
+
+      scanLog(`[done] 스캔 완료: active=${active}, dead=${dead}, offline=${offline}`, 'ok');
+      document.getElementById('scan-btn').disabled = false;
+      scanRunning = false;
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    initGrid();
+
+    /* ── Security layer expand ── */
+    document.querySelectorAll('.sec-layer').forEach(layer => {
+      // click on child expands toggle already bound via onclick
+    });
+  </script>
+</body>
+
+</html>
