@@ -30,6 +30,7 @@ frontend/build/
 .gemini/
 .codex/
 .copilot/
+.claude/
 
 # debug
 npm-debug.log*
