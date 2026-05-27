@@ -730,14 +730,16 @@ export function IPAMScanHistoryPanel() {
                       <TableCell colSpan={6}>
                         <Collapsible open={expanded}>
                           <CollapsibleContent className="flex flex-col gap-3 py-2">
-                            <div className="grid gap-2 text-sm md:grid-cols-4">
+                            <div className="grid gap-2 text-sm md:grid-cols-6">
                               <ReadOnlyRow
                                 label="Started"
                                 value={formatNullableTime(item.startedAt)}
+                                className="md:col-span-2"
                               />
                               <ReadOnlyRow
                                 label="Completed"
                                 value={formatNullableTime(item.completedAt)}
+                                className="md:col-span-2"
                               />
                               <ReadOnlyRow
                                 label="Total"
@@ -747,12 +749,14 @@ export function IPAMScanHistoryPanel() {
                                     ? "-"
                                     : String(item.total)
                                 }
+                                className="md:col-span-1"
                               />
                               <ReadOnlyRow
                                 label="Changes"
                                 value={
                                   detail ? String(detail.changes.length) : "--"
                                 }
+                                className="md:col-span-1"
                               />
                             </div>
                             {item.error ? (
@@ -1706,11 +1710,24 @@ function Field({
   )
 }
 
-function ReadOnlyRow({ label, value }: { label: string; value: string }) {
+function ReadOnlyRow({
+  label,
+  value,
+  className,
+}: {
+  label: string
+  value: string
+  className?: string
+}) {
   return (
-    <div className="flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2">
+    <div
+      className={cn(
+        "flex items-center justify-between gap-3 rounded-md bg-muted px-3 py-2 text-xs",
+        className
+      )}
+    >
       <span className="text-muted-foreground">{label}</span>
-      <span className="font-mono">{value}</span>
+      <span className="font-mono text-right">{value}</span>
     </div>
   )
 }
