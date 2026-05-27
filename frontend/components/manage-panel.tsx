@@ -165,6 +165,9 @@ export function ManagePanel({ section }: { section: ManageSection }) {
   const [editingNexusId, setEditingNexusId] = React.useState<string | null>(null)
   const [editNexusForm, setEditNexusForm] = React.useState<NexusIntegration>(emptyNexus)
 
+  const [editingVMId, setEditingVMId] = React.useState<string | null>(null)
+  const [editVMForm, setEditVMForm] = React.useState<VMResource>(emptyVM)
+
   const loadVMs = React.useCallback(async () => {
     const nextVMs = await api.listVMs()
     setVMs(nextVMs ?? [])
@@ -214,9 +217,11 @@ export function ManagePanel({ section }: { section: ManageSection }) {
     return () => window.clearTimeout(id)
   }, [load])
 
-  async function saveVM() {
-    await api.saveVM(vmForm)
-    setVMForm(emptyVM)
+  async function saveVM(form: VMResource, isEdit = false) {
+    await api.saveVM(form)
+    if (!isEdit) {
+      setVMForm(emptyVM)
+    }
     setMessage("VM saved.")
     await loadVMs()
   }
@@ -287,18 +292,79 @@ export function ManagePanel({ section }: { section: ManageSection }) {
               value={vmForm}
               onChange={setVMForm}
               onSave={() =>
-                void saveVM().catch((error) => setMessage(error.message))
+                void saveVM(vmForm, false).catch((error) => setMessage(error.message))
               }
             />
             <ResourceTable
               items={vms}
-              onEdit={setVMForm}
+              editingId={editingVMId}
+              onEdit={(item) => {
+                if (editingVMId === item.id) {
+                  setEditingVMId(null)
+                  setEditVMForm(emptyVM)
+                } else {
+                  setEditingVMId(item.id)
+                  setEditVMForm({ ...item })
+                }
+              }}
               onDelete={(id) =>
                 void api
                   .deleteVM(id)
                   .then(loadVMs)
                   .catch((error) => setMessage(error.message))
               }
+              renderEditForm={(item) => (
+                <form
+                  className="grid gap-3 md:grid-cols-6"
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    void saveVM(editVMForm, true)
+                      .then(() => {
+                        setEditingVMId(null)
+                      })
+                      .catch((error) => setMessage(error.message))
+                  }}
+                >
+                  <TextInput
+                    label="Name"
+                    value={editVMForm.name}
+                    onChange={(name) =>
+                      setEditVMForm((prev) => ({ ...prev, name }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Address"
+                    value={editVMForm.address}
+                    onChange={(address) =>
+                      setEditVMForm((prev) => ({ ...prev, address }))
+                    }
+                    required
+                  />
+                  <TextInput
+                    label="Description"
+                    value={editVMForm.description ?? ""}
+                    onChange={(description) =>
+                      setEditVMForm((prev) => ({ ...prev, description }))
+                    }
+                  />
+                  <div className="flex items-end">
+                    <Button className="w-full" type="submit">
+                      <Check data-icon="inline-start" />
+                      Save
+                    </Button>
+                  </div>
+                  <div className="flex items-end">
+                    <ActiveToggle
+                      id={`vm-active-${item.id}`}
+                      checked={editVMForm.active}
+                      onChange={(active) =>
+                        setEditVMForm((prev) => ({ ...prev, active }))
+                      }
+                    />
+                  </div>
+                </form>
+              )}
             />
           </CardContent>
         </Card>
@@ -924,34 +990,49 @@ function ResourceTable({
   items,
   onEdit,
   onDelete,
+  editingId,
+  renderEditForm,
 }: {
   items: VMResource[]
   onEdit: (item: VMResource) => void
   onDelete: (id: string) => void
+  editingId?: string | null
+  renderEditForm?: (item: VMResource) => React.ReactNode
 }) {
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Address</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead className="w-28" />
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <TableRow key={item.id}>
-            <TableCell>{item.name}</TableCell>
-            <TableCell className="font-mono">{item.address}</TableCell>
-            <TableCell>
-              <Badge variant={item.active ? "secondary" : "outline"}>
-                {item.active ? "active" : "inactive"}
-              </Badge>
-            </TableCell>
-            <TableCell className="flex justify-end gap-2">
+  const columns = React.useMemo<ColumnDef<VMResource>[]>(
+    () => [
+      {
+        accessorKey: "name",
+        header: "Name",
+        cell: ({ row }) => <div className="font-medium">{row.original.name}</div>,
+      },
+      {
+        accessorKey: "address",
+        header: "Address",
+        cell: ({ row }) => (
+          <div className="font-mono text-xs text-muted-foreground">
+            {row.original.address}
+          </div>
+        ),
+      },
+      {
+        accessorKey: "active",
+        header: "Status",
+        cell: ({ row }) => (
+          <Badge variant={row.original.active ? "secondary" : "outline"}>
+            {row.original.active ? "active" : "inactive"}
+          </Badge>
+        ),
+      },
+      {
+        id: "actions",
+        header: () => <div className="text-right">Actions</div>,
+        cell: ({ row }) => {
+          const item = row.original
+          return (
+            <div className="flex justify-end gap-2">
               <Button variant="outline" size="sm" onClick={() => onEdit(item)}>
-                Edit
+                {editingId === item.id ? "Cancel" : "Edit"}
               </Button>
               <Button
                 variant="outline"
@@ -961,11 +1042,26 @@ function ResourceTable({
               >
                 <Trash2 data-icon="inline-start" />
               </Button>
-            </TableCell>
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+            </div>
+          )
+        },
+      },
+    ],
+    [editingId, onEdit, onDelete]
+  )
+
+  return (
+    <DataTable
+      columns={columns}
+      data={items}
+      getRowId={(row) => row.id}
+      expandedId={editingId}
+      renderSubComponent={(item) => (
+        <div className="animate-slide-down">
+          {renderEditForm?.(item)}
+        </div>
+      )}
+    />
   )
 }
 
