@@ -1,10 +1,20 @@
 "use client"
 
 import * as React from "react"
-import { Check, Eye, EyeOff, Loader2, TestTube2 } from "lucide-react"
+import { Check, Edit, Eye, EyeOff, Loader2, TestTube2, Trash2 } from "lucide-react"
 import { toast } from "sonner"
 
 import { type TestResult } from "@/lib/api"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -216,6 +226,79 @@ export function FormActions({ onTest }: { onTest: () => Promise<TestResult> }) {
         </Badge>
       )}
     </div>
+  )
+}
+
+export function RowActions({
+  onEdit,
+  onDelete,
+  deleteConfirmTitle,
+  deleteConfirmDescription = "This action cannot be undone.",
+}: {
+  onEdit: () => void
+  onDelete: () => void
+  deleteConfirmTitle: string
+  deleteConfirmDescription?: string
+}) {
+  const [confirmOpen, setConfirmOpen] = React.useState(false)
+
+  return (
+    <>
+      <div className="flex items-center gap-1">
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon-sm"
+                aria-label="Edit"
+                onClick={onEdit}
+              >
+                <Edit data-icon="inline-start" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Edit</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="destructive"
+                size="icon-sm"
+                aria-label="Delete"
+                onClick={() => setConfirmOpen(true)}
+              >
+                <Trash2 data-icon="inline-start" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">Delete</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      </div>
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{deleteConfirmTitle}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfirmDescription}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                onDelete()
+                setConfirmOpen(false)
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
 

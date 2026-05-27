@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { type ColumnDef } from "@tanstack/react-table"
-import { Check, Trash2 } from "lucide-react"
+import { Check } from "lucide-react"
 
 import { api } from "@/lib/api"
 import type { VMResource } from "@/lib/types"
@@ -16,7 +16,7 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { DataTable } from "@/components/ui/data-table"
-import { ActiveToggle, showMessage, TextInput } from "./shared"
+import { ActiveToggle, RowActions, showMessage, TextInput } from "./shared"
 
 const emptyVM: VMResource = {
   id: "",
@@ -238,21 +238,11 @@ function ResourceTable({
           const item = row.original
           return (
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(item)}
-              >
-                {editingId === item.id ? "Cancel" : "Edit"}
-              </Button>
-              <Button
-                variant="outline"
-                size="icon-sm"
-                aria-label="Delete VM"
-                onClick={() => onDelete(item.id)}
-              >
-                <Trash2 data-icon="inline-start" />
-              </Button>
+              <RowActions
+                onEdit={() => onEdit(item)}
+                onDelete={() => onDelete(item.id)}
+                deleteConfirmTitle={`Delete ${item.name}`}
+              />
             </div>
           )
         },

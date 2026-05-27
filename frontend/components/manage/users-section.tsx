@@ -1,21 +1,11 @@
 "use client"
 
 import * as React from "react"
-import { Check, Edit, Trash2 } from "lucide-react"
+import { Check } from "lucide-react"
 import { toast } from "sonner"
 
 import { api } from "@/lib/api"
 import type { User } from "@/lib/types"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import {
@@ -49,13 +39,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { PasswordInput, showMessage, TextInput } from "./shared"
+import { PasswordInput, RowActions, showMessage, TextInput } from "./shared"
 
 export function UsersSection() {
   const [users, setUsers] = React.useState<User[]>([])
@@ -67,7 +51,6 @@ export function UsersSection() {
   })
   const [editingUser, setEditingUser] = React.useState<User | null>(null)
   const [editUserPassword, setEditUserPassword] = React.useState("")
-  const [deletingUser, setDeletingUser] = React.useState<User | null>(null)
 
   const loadUsers = React.useCallback(async () => {
     const nextUsers = await api.listUsers()
@@ -98,13 +81,6 @@ export function UsersSection() {
     setEditingUser(null)
     setEditUserPassword("")
     toast.success("Password updated.")
-  }
-
-  async function handleDeleteUser() {
-    await api.deleteUser(deletingUser!.id)
-    setDeletingUser(null)
-    await loadUsers()
-    toast.success("User deleted.")
   }
 
   return (
@@ -180,41 +156,19 @@ export function UsersSection() {
                   <Badge variant="secondary">{user.role}</Badge>
                 </TableCell>
                 <TableCell>
-                  <div className="flex items-center gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="icon-sm"
-                            aria-label="Edit"
-                            onClick={() => {
-                              setEditingUser(user)
-                              setEditUserPassword("")
-                            }}
-                          >
-                            <Edit data-icon="inline-start" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Edit</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="destructive"
-                            size="icon-sm"
-                            aria-label="Delete"
-                            onClick={() => setDeletingUser(user)}
-                          >
-                            <Trash2 data-icon="inline-start" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">Delete</TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
+                  <RowActions
+                    onEdit={() => {
+                      setEditingUser(user)
+                      setEditUserPassword("")
+                    }}
+                    onDelete={() =>
+                      void api
+                        .deleteUser(user.id)
+                        .then(loadUsers)
+                        .then(() => toast.success("User deleted."))
+                    }
+                    deleteConfirmTitle={`Delete ${user.username}`}
+                  />
                 </TableCell>
               </TableRow>
             ))}
@@ -254,32 +208,6 @@ export function UsersSection() {
             </SheetContent>
           </Sheet>
         ) : null}
-        <AlertDialog
-          open={Boolean(deletingUser)}
-          onOpenChange={(open) => {
-            if (!open) setDeletingUser(null)
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                Delete {deletingUser?.username}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                variant="destructive"
-                onClick={() => void handleDeleteUser()}
-              >
-                Delete
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </CardContent>
     </Card>
   )

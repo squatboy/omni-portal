@@ -2,7 +2,6 @@
 
 import * as React from "react"
 import { type ColumnDef } from "@tanstack/react-table"
-import { Trash2 } from "lucide-react"
 
 import { api, type TestResult } from "@/lib/api"
 import type {
@@ -12,7 +11,6 @@ import type {
   NexusIntegration,
 } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
 import {
   Card,
   CardContent,
@@ -24,6 +22,7 @@ import {
   ActiveToggle,
   FormActions,
   parseProjects,
+  RowActions,
   SecretInput,
   showMessage,
   splitList,
@@ -361,23 +360,11 @@ function IntegrationList<
           const item = row.original
           return (
             <div className="flex justify-end gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(item)}
-              >
-                {editingId === item.id ? "Cancel" : "Edit"}
-              </Button>
-              {onDelete ? (
-                <Button
-                  variant="outline"
-                  size="icon-sm"
-                  aria-label="Delete integration"
-                  onClick={() => onDelete(item.id)}
-                >
-                  <Trash2 data-icon="inline-start" />
-                </Button>
-              ) : null}
+              <RowActions
+                onEdit={() => onEdit(item)}
+                onDelete={() => onDelete?.(item.id)}
+                deleteConfirmTitle={`Delete ${item.name}`}
+              />
             </div>
           )
         },
