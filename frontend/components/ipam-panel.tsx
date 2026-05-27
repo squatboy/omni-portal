@@ -200,9 +200,8 @@ export function scanHistoryCountLabel(history: IPAMScanHistory) {
   if (history.status === "failed") {
     return "Failed"
   }
-  return `${history.used ?? 0} used / ${history.offline ?? 0} offline / ${
-    history.free ?? 0
-  } free`
+  return `${history.used ?? 0} used / ${history.offline ?? 0} offline / ${history.free ?? 0
+    } free`
 }
 
 export function statusTransitionLabel(change: IPAMScanHistoryChange) {
@@ -745,7 +744,7 @@ export function IPAMScanHistoryPanel() {
                                 label="Total"
                                 value={
                                   item.total === null ||
-                                  item.total === undefined
+                                    item.total === undefined
                                     ? "-"
                                     : String(item.total)
                                 }
@@ -821,17 +820,23 @@ function ScanHistoryChangesTable({
             <TableCell>
               <span className="flex items-center gap-2">
                 <StatusBadge status={change.previousStatus} count={null} />
-                <span className="text-muted-foreground">{"->"}</span>
+                <span className="text-muted-foreground mx-2">{"->"}</span>
                 <StatusBadge status={change.currentStatus} count={null} />
               </span>
             </TableCell>
             <TableCell className="font-mono text-xs">
-              {formatNullableTime(change.previousLastSeenAt)} {"->"}{" "}
-              {formatNullableTime(change.currentLastSeenAt)}
+              <span className="flex items-center gap-2">
+                <Badge variant="outline">{formatNullableTime(change.previousLastSeenAt)}</Badge>
+                <span className="text-muted-foreground mx-2">{"->"}</span>
+                <Badge variant="outline">{formatNullableTime(change.currentLastSeenAt)}</Badge>
+              </span>
             </TableCell>
             <TableCell className="font-mono">
-              {change.previousConsecutiveFailures} {"->"}{" "}
-              {change.currentConsecutiveFailures}
+              <span className="flex items-center gap-2">
+                <Badge variant="outline">{change.previousConsecutiveFailures}</Badge>
+                <span className="text-muted-foreground mx-2">{"->"}</span>
+                <Badge variant="outline">{change.currentConsecutiveFailures}</Badge>
+              </span>
             </TableCell>
           </TableRow>
         ))}
@@ -1347,9 +1352,9 @@ function SubnetAddressDetails({
               className={cn(
                 "w-full justify-center font-mono",
                 address.status === "used" &&
-                  "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)] hover:bg-[color:color-mix(in_oklch,var(--status-ok)_20%,transparent)]",
+                "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)] hover:bg-[color:color-mix(in_oklch,var(--status-ok)_20%,transparent)]",
                 address.status === "offline" &&
-                  "border-destructive/30 bg-destructive/10 text-destructive",
+                "border-destructive/30 bg-destructive/10 text-destructive",
                 address.status === "free" && "bg-muted"
               )}
               onClick={() => onOpenAddress(address)}
@@ -1750,7 +1755,7 @@ function StatusBadge({
       }
       className={cn(
         status === "used" &&
-          "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]"
+        "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]"
       )}
     >
       {status}
