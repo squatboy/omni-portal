@@ -216,6 +216,26 @@ func (s *Store) ChangePassword(ctx context.Context, userID, currentPassword, new
 	return err
 }
 
+func (s *Store) AdminResetPassword(ctx context.Context, actorID, targetUserID, newPassword string) error {
+	if newPassword == "" {
+		return fmt.Errorf("password is required")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = s.db.ExecContext(ctx, `UPDATE users SET password_hash=$1, must_change_password=false, updated_at=now(), updated_by=$2 WHERE id=$3`, string(hash), actorID, targetUserID)
+	return err
+}
+
+func (s *Store) DeleteUser(ctx context.Context, actorID, targetUserID string) error {
+	if actorID == targetUserID {
+		return fmt.Errorf("cannot delete your own account")
+	}
+	_, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id=$1`, targetUserID)
+	return err
+}
+
 func (s *Store) ListVMResources(ctx context.Context) ([]models.VMResource, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, name, address, description, active FROM vm_resources ORDER BY name`)
 	if err != nil {

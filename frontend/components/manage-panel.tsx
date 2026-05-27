@@ -4,6 +4,7 @@ import * as React from "react"
 import { ColumnDef } from "@tanstack/react-table"
 import {
   Check,
+  Edit,
   Eye,
   EyeOff,
   Loader2,
@@ -54,7 +55,25 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { DataTable } from "@/components/ui/data-table"
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetFooter,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet"
 
 const emptyVM: VMResource = {
   id: "",
@@ -144,8 +163,11 @@ export function ManagePanel({ section }: { section: ManageSection }) {
     username: "",
     role: "viewer" as "admin" | "viewer",
     password: "",
-    mustChangePassword: true,
+    mustChangePassword: false,
   })
+  const [editingUser, setEditingUser] = React.useState<User | null>(null)
+  const [editUserPassword, setEditUserPassword] = React.useState("")
+  const [deletingUser, setDeletingUser] = React.useState<User | null>(null)
 
   const [editingKubernetesId, setEditingKubernetesId] = React.useState<string | null>(null)
   const [editKubernetesForm, setEditKubernetesForm] = React.useState<
@@ -271,10 +293,24 @@ export function ManagePanel({ section }: { section: ManageSection }) {
       username: "",
       role: "viewer",
       password: "",
-      mustChangePassword: true,
+      mustChangePassword: false,
     })
     setMessage("User created.")
     await loadUsers()
+  }
+
+  async function handleResetPassword() {
+    await api.updateUser(editingUser!.id, { password: editUserPassword })
+    setEditingUser(null)
+    setEditUserPassword("")
+    toast.success("Password updated.")
+  }
+
+  async function handleDeleteUser() {
+    await api.deleteUser(deletingUser!.id)
+    setDeletingUser(null)
+    await loadUsers()
+    toast.success("User deleted.")
   }
 
   return (
@@ -912,7 +948,7 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                 <TableRow>
                   <TableHead>Username</TableHead>
                   <TableHead>Role</TableHead>
-                  <TableHead>Password</TableHead>
+                  <TableHead className="w-20">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -923,12 +959,106 @@ export function ManagePanel({ section }: { section: ManageSection }) {
                       <Badge variant="secondary">{user.role}</Badge>
                     </TableCell>
                     <TableCell>
-                      {user.mustChangePassword ? "Change required" : "Set"}
+                      <div className="flex items-center gap-1">
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="icon-sm"
+                                aria-label="Edit"
+                                onClick={() => {
+                                  setEditingUser(user)
+                                  setEditUserPassword("")
+                                }}
+                              >
+                                <Edit data-icon="inline-start" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">Edit</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="destructive"
+                                size="icon-sm"
+                                aria-label="Delete"
+                                onClick={() => setDeletingUser(user)}
+                              >
+                                <Trash2 data-icon="inline-start" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">Delete</TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
+            {editingUser ? (
+              <Sheet
+                open
+                onOpenChange={(open) => {
+                  if (!open) setEditingUser(null)
+                }}
+              >
+                <SheetContent>
+                  <SheetHeader>
+                    <SheetTitle>Edit {editingUser.username}</SheetTitle>
+                    <SheetDescription>
+                      Set a new password for this user.
+                    </SheetDescription>
+                  </SheetHeader>
+                  <form
+                    className="flex flex-col gap-4 px-6"
+                    onSubmit={(e) => {
+                      e.preventDefault()
+                      void handleResetPassword()
+                    }}
+                  >
+                    <PasswordInput
+                      label="New Password"
+                      value={editUserPassword}
+                      onChange={setEditUserPassword}
+                      required
+                    />
+                    <SheetFooter className="px-0">
+                      <Button type="submit">Save</Button>
+                    </SheetFooter>
+                  </form>
+                </SheetContent>
+              </Sheet>
+            ) : null}
+            <AlertDialog
+              open={Boolean(deletingUser)}
+              onOpenChange={(open) => {
+                if (!open) setDeletingUser(null)
+              }}
+            >
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Delete {deletingUser?.username}
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    onClick={() => void handleDeleteUser()}
+                  >
+                    Delete
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </CardContent>
         </Card>
       ) : null}

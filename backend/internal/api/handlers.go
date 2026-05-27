@@ -124,6 +124,8 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 
 		manage.GET("/users", api.handleListUsers)
 		manage.POST("/users", api.handleCreateUser)
+		manage.PUT("/users/:id", api.handleUpdateUser)
+		manage.DELETE("/users/:id", api.handleDeleteUser)
 
 		manage.POST("/ipam/locations", api.handleCreateIPAMLocation)
 		manage.PUT("/ipam/locations/:id", api.handleUpdateIPAMLocation)
@@ -384,6 +386,26 @@ func (api *API) handleCreateUser(c *gin.Context) {
 	}
 	created, err := api.store.CreateUser(c.Request.Context(), &user.ID, req.Username, req.Role, req.Password, req.MustChangePassword)
 	writeJSON(c, created, err)
+}
+
+func (api *API) handleUpdateUser(c *gin.Context) {
+	actor, _ := api.currentUser(c)
+	targetID := c.Param("id")
+	var req struct {
+		Password string `json:"password"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	err := api.store.AdminResetPassword(c.Request.Context(), actor.ID, targetID, req.Password)
+	writeJSON(c, gin.H{"ok": true}, err)
+}
+
+func (api *API) handleDeleteUser(c *gin.Context) {
+	actor, _ := api.currentUser(c)
+	targetID := c.Param("id")
+	err := api.store.DeleteUser(c.Request.Context(), actor.ID, targetID)
+	writeJSON(c, gin.H{"ok": true}, err)
 }
 
 func (api *API) handleIPAMSummary(c *gin.Context) {

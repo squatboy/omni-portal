@@ -402,6 +402,28 @@ export const api = {
           method: "POST",
           body: JSON.stringify(payload),
         }),
+  updateUser: (id: string, payload: { password: string }) =>
+    isMockMode()
+      ? (() => {
+          const store = getMockStore()
+          const user = store.users.find((u) => u.id === id)
+          if (user) user.updatedAt = new Date().toISOString()
+          return mockResponse({ ok: true })
+        })()
+      : request<{ ok: true }>(`/api/manage/users/${id}`, {
+          method: "PUT",
+          body: JSON.stringify(payload),
+        }),
+  deleteUser: (id: string) =>
+    isMockMode()
+      ? (() => {
+          const store = getMockStore()
+          store.users = store.users.filter((u) => u.id !== id)
+          return mockResponse({ ok: true })
+        })()
+      : request<{ ok: true }>(`/api/manage/users/${id}`, {
+          method: "DELETE",
+        }),
   ipamSummary: () =>
     isMockMode()
       ? mockResponse(buildIPAMSummary())
