@@ -329,7 +329,7 @@ func (s *Store) ListIPAMAddresses(ctx context.Context, subnetID string) ([]model
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, subnet_id, address::text, status, hostname, description,
-			last_scanned_at, last_seen_at, consecutive_failures, created_at, updated_at
+			last_scanned_at, last_seen_at, consecutive_failures, created_at, updated_at, is_override
 		FROM ipam_addresses
 		WHERE subnet_id = $1
 		ORDER BY address
@@ -354,13 +354,40 @@ func (s *Store) UpdateIPAMAddress(ctx context.Context, actorID string, item mode
 	if strings.TrimSpace(item.ID) == "" {
 		return models.IPAMAddress{}, validationError("address id is required")
 	}
+
+	var isOverride bool
+	var updateStatus bool
+	if item.Status != "" {
+		if item.Status != models.IPAMAddressUsed && item.Status != models.IPAMAddressReserved && item.Status != models.IPAMAddressFree {
+			return models.IPAMAddress{}, validationError("invalid status value, allowed: used, reserved, free")
+		}
+		updateStatus = true
+		if item.Status == models.IPAMAddressUsed || item.Status == models.IPAMAddressReserved {
+			isOverride = true
+		} else if item.Status == models.IPAMAddressFree {
+			isOverride = false
+		}
+	}
+
 	hostname := normalizeOptionalString(item.Hostname)
 	description := normalizeOptionalString(item.Description)
-	result, err := s.db.ExecContext(ctx, `
-		UPDATE ipam_addresses
-		SET hostname=$2, description=$3, updated_at=now(), updated_by=$4
-		WHERE id=$1
-	`, item.ID, hostname, description, actorID)
+
+	var result sql.Result
+	var err error
+	if updateStatus {
+		result, err = s.db.ExecContext(ctx, `
+			UPDATE ipam_addresses
+			SET hostname=$2, description=$3, status=$4, is_override=$5, updated_at=now(), updated_by=$6
+			WHERE id=$1
+		`, item.ID, hostname, description, string(item.Status), isOverride, actorID)
+	} else {
+		result, err = s.db.ExecContext(ctx, `
+			UPDATE ipam_addresses
+			SET hostname=$2, description=$3, updated_at=now(), updated_by=$4
+			WHERE id=$1
+		`, item.ID, hostname, description, actorID)
+	}
+
 	if err != nil {
 		return models.IPAMAddress{}, classifyIPAMWriteError(err)
 	}
@@ -380,7 +407,8 @@ func (s *Store) IPAMSummary(ctx context.Context) (models.IPAMSummary, error) {
 			(SELECT count(*) FROM ipam_addresses),
 			(SELECT count(*) FROM ipam_addresses WHERE status='used'),
 			(SELECT count(*) FROM ipam_addresses WHERE status='offline'),
-			(SELECT count(*) FROM ipam_addresses WHERE status='free')
+			(SELECT count(*) FROM ipam_addresses WHERE status='free'),
+			(SELECT count(*) FROM ipam_addresses WHERE status='reserved')
 	`).Scan(
 		&summary.Locations,
 		&summary.Networks,
@@ -389,6 +417,7 @@ func (s *Store) IPAMSummary(ctx context.Context) (models.IPAMSummary, error) {
 		&summary.Addresses.Used,
 		&summary.Addresses.Offline,
 		&summary.Addresses.Free,
+		&summary.Addresses.Reserved,
 	)
 	return summary, err
 }
@@ -611,12 +640,27 @@ func (s *Store) CompleteIPAMScan(ctx context.Context, subnetID string, startedAt
 		if !ok {
 			return models.IPAMSubnet{}, ErrNotFound
 		}
+
+		statusToUpdate := result.Status
+		failuresToUpdate := result.ConsecutiveFailures
+		lastSeenToUpdate := result.LastSeenAt
+
+		if before.isOverride {
+			statusToUpdate = before.status
+			failuresToUpdate = before.consecutiveFailures
+			if result.Status == models.IPAMAddressUsed {
+				lastSeenToUpdate = result.LastSeenAt
+			} else {
+				lastSeenToUpdate = before.lastSeenAt
+			}
+		}
+
 		updateResult, err := stmt.ExecContext(ctx,
 			result.AddressID,
-			string(result.Status),
+			string(statusToUpdate),
 			result.LastScannedAt.UTC(),
-			result.LastSeenAt,
-			result.ConsecutiveFailures,
+			lastSeenToUpdate,
+			failuresToUpdate,
 			appliedAt,
 			subnetID,
 		)
@@ -627,23 +671,25 @@ func (s *Store) CompleteIPAMScan(ctx context.Context, subnetID string, startedAt
 			return models.IPAMSubnet{}, ErrNotFound
 		}
 		counts.Total++
-		switch result.Status {
+		switch statusToUpdate {
 		case models.IPAMAddressUsed:
 			counts.Used++
 		case models.IPAMAddressOffline:
 			counts.Offline++
+		case models.IPAMAddressReserved:
+			counts.Reserved++
 		default:
 			counts.Free++
 		}
-		if before.status != result.Status || (before.consecutiveFailures != result.ConsecutiveFailures && result.Status != models.IPAMAddressFree) {
+		if before.status != statusToUpdate || (before.consecutiveFailures != failuresToUpdate && statusToUpdate != models.IPAMAddressFree) {
 			changes = append(changes, models.IPAMScanHistoryChange{
 				Address:                     before.address,
 				PreviousStatus:              before.status,
-				CurrentStatus:               result.Status,
+				CurrentStatus:               statusToUpdate,
 				PreviousLastSeenAt:          timeStringPtr(before.lastSeenAt),
-				CurrentLastSeenAt:           timeStringPtr(result.LastSeenAt),
+				CurrentLastSeenAt:           timeStringPtr(lastSeenToUpdate),
 				PreviousConsecutiveFailures: before.consecutiveFailures,
-				CurrentConsecutiveFailures:  result.ConsecutiveFailures,
+				CurrentConsecutiveFailures:  failuresToUpdate,
 			})
 		}
 	}
@@ -670,6 +716,7 @@ func (s *Store) CompleteIPAMScan(ctx context.Context, subnetID string, startedAt
 		Used:        &counts.Used,
 		Offline:     &counts.Offline,
 		Free:        &counts.Free,
+		Reserved:    &counts.Reserved,
 	})
 	if err != nil {
 		return models.IPAMSubnet{}, err
@@ -695,7 +742,7 @@ func (s *Store) ListIPAMScanHistory(ctx context.Context, limit int) ([]models.IP
 	}
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, subnet_id, subnet_name, subnet_cidr::text, started_at, completed_at,
-			status, total_count, used_count, offline_count, free_count, error
+			status, total_count, used_count, offline_count, free_count, reserved_count, error
 		FROM ipam_scan_history
 		ORDER BY completed_at DESC, created_at DESC
 		LIMIT $1
@@ -722,7 +769,7 @@ func (s *Store) IPAMScanHistoryDetail(ctx context.Context, id string) (models.IP
 	}
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, subnet_id, subnet_name, subnet_cidr::text, started_at, completed_at,
-			status, total_count, used_count, offline_count, free_count, error
+			status, total_count, used_count, offline_count, free_count, reserved_count, error
 		FROM ipam_scan_history
 		WHERE id=$1
 	`, id)
@@ -818,7 +865,7 @@ func (s *Store) ipamSubnetByID(ctx context.Context, id string) (models.IPAMSubne
 func (s *Store) ipamAddressByID(ctx context.Context, id string) (models.IPAMAddress, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, subnet_id, address::text, status, hostname, description,
-			last_scanned_at, last_seen_at, consecutive_failures, created_at, updated_at
+			last_scanned_at, last_seen_at, consecutive_failures, created_at, updated_at, is_override
 		FROM ipam_addresses
 		WHERE id=$1
 	`, id)
@@ -881,11 +928,12 @@ type ipamScanAddressSnapshotRow struct {
 	status              models.IPAMAddressStatus
 	lastSeenAt          *time.Time
 	consecutiveFailures int
+	isOverride          bool
 }
 
 func ipamScanAddressSnapshots(ctx context.Context, tx *sql.Tx, subnetID string) (map[string]ipamScanAddressSnapshotRow, error) {
 	rows, err := tx.QueryContext(ctx, `
-		SELECT id, address::text, status, last_seen_at, consecutive_failures
+		SELECT id, address::text, status, last_seen_at, consecutive_failures, is_override
 		FROM ipam_addresses
 		WHERE subnet_id=$1
 		FOR UPDATE
@@ -901,7 +949,7 @@ func ipamScanAddressSnapshots(ctx context.Context, tx *sql.Tx, subnetID string) 
 		var item ipamScanAddressSnapshotRow
 		var status string
 		var lastSeenAt sql.NullTime
-		if err := rows.Scan(&id, &item.address, &status, &lastSeenAt, &item.consecutiveFailures); err != nil {
+		if err := rows.Scan(&id, &item.address, &status, &lastSeenAt, &item.consecutiveFailures, &item.isOverride); err != nil {
 			return nil, err
 		}
 		item.status = models.IPAMAddressStatus(status)
@@ -925,6 +973,7 @@ type ipamScanHistoryInsert struct {
 	Used        *int
 	Offline     *int
 	Free        *int
+	Reserved    *int
 	Error       *string
 }
 
@@ -933,9 +982,9 @@ func insertIPAMScanHistory(ctx context.Context, tx *sql.Tx, item ipamScanHistory
 	_, err := tx.ExecContext(ctx, `
 		INSERT INTO ipam_scan_history (
 			id, subnet_id, subnet_name, subnet_cidr, started_at, completed_at,
-			status, total_count, used_count, offline_count, free_count, error
+			status, total_count, used_count, offline_count, free_count, reserved_count, error
 		)
-		VALUES ($1,$2,$3,$4::cidr,$5,$6,$7,$8,$9,$10,$11,$12)
+		VALUES ($1,$2,$3,$4::cidr,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 	`,
 		id,
 		item.SubnetID,
@@ -948,6 +997,7 @@ func insertIPAMScanHistory(ctx context.Context, tx *sql.Tx, item ipamScanHistory
 		item.Used,
 		item.Offline,
 		item.Free,
+		item.Reserved,
 		item.Error,
 	)
 	if err != nil {
@@ -1233,7 +1283,7 @@ func scanIPAMScanHistory(row ipamSubnetScanner) (models.IPAMScanHistory, error) 
 	var startedAt sql.NullTime
 	var completedAt time.Time
 	var status string
-	var total, used, offline, free sql.NullInt64
+	var total, used, offline, free, reserved sql.NullInt64
 	var errorText sql.NullString
 	err := row.Scan(
 		&item.ID,
@@ -1247,6 +1297,7 @@ func scanIPAMScanHistory(row ipamSubnetScanner) (models.IPAMScanHistory, error) 
 		&used,
 		&offline,
 		&free,
+		&reserved,
 		&errorText,
 	)
 	if err != nil {
@@ -1259,6 +1310,7 @@ func scanIPAMScanHistory(row ipamSubnetScanner) (models.IPAMScanHistory, error) 
 	item.Used = nullIntPtr(used)
 	item.Offline = nullIntPtr(offline)
 	item.Free = nullIntPtr(free)
+	item.Reserved = nullIntPtr(reserved)
 	item.Error = stringFromNull(errorText)
 	return item, nil
 }
@@ -1305,6 +1357,7 @@ func scanIPAMAddress(row ipamAddressScanner) (models.IPAMAddress, error) {
 		&item.ConsecutiveFailures,
 		&createdAt,
 		&updatedAt,
+		&item.IsOverride,
 	)
 	if err != nil {
 		return models.IPAMAddress{}, err
@@ -1329,4 +1382,54 @@ func (s *Store) deleteIPAMRow(ctx context.Context, query, id string) error {
 		return ErrNotFound
 	}
 	return nil
+}
+
+func (s *Store) GetNextAvailableIPs(ctx context.Context, subnetID string, limit int) ([]string, error) {
+	if strings.TrimSpace(subnetID) == "" {
+		return nil, validationError("subnet id is required")
+	}
+	if limit <= 0 {
+		limit = 5
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	var exists bool
+	err := s.db.QueryRowContext(ctx, `SELECT exists(SELECT 1 FROM ipam_subnets WHERE id = $1)`, subnetID).Scan(&exists)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, ErrNotFound
+	}
+
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT address::text
+		FROM ipam_addresses
+		WHERE subnet_id = $1 AND status = 'free'
+		ORDER BY address
+		LIMIT $2
+	`, subnetID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ipList []string
+	for rows.Next() {
+		var ip string
+		if err := rows.Scan(&ip); err != nil {
+			return nil, err
+		}
+		if idx := strings.Index(ip, "/"); idx != -1 {
+			ip = ip[:idx]
+		}
+		ipList = append(ipList, ip)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return ipList, nil
 }

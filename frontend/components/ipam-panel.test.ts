@@ -69,6 +69,7 @@ describe("IPAM helpers", () => {
     subnetId,
     address: `10.0.0.${id}`,
     status,
+    isOverride: false,
     consecutiveFailures: status === "used" ? 0 : 3,
   })
 
@@ -79,7 +80,7 @@ describe("IPAM helpers", () => {
         address("2", "subnet-a", "offline"),
         address("3", "subnet-a", "free"),
       ])
-    ).toEqual({ total: 3, used: 1, offline: 1, free: 1 })
+    ).toEqual({ total: 3, used: 1, offline: 1, free: 1, reserved: 0 })
   })
 
   it("uses the last octet as the IP button label after removing CIDR", () => {

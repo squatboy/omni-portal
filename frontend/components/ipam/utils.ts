@@ -23,7 +23,7 @@ export function countIPAMAddresses(addresses: IPAMAddress[]) {
       acc[address.status] += 1
       return acc
     },
-    { total: 0, used: 0, offline: 0, free: 0 }
+    { total: 0, used: 0, offline: 0, free: 0, reserved: 0 }
   )
 }
 

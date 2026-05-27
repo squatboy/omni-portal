@@ -335,7 +335,14 @@ function createMockIPAMAddresses(
   return Array.from({ length: count }, (_, index) => {
     const host = start + index
     const status =
-      index % 7 === 0 ? "offline" : index % 5 === 0 ? "free" : "used"
+      index % 9 === 0
+        ? "reserved"
+        : index % 7 === 0
+        ? "offline"
+        : index % 5 === 0
+        ? "free"
+        : "used"
+    const isOverride = status === "reserved"
 
     return {
       id: `${subnetId}-${host}`,
@@ -344,6 +351,7 @@ function createMockIPAMAddresses(
       status,
       hostname: status === "used" ? `host-${host}` : null,
       description: null,
+      isOverride,
       lastScannedAt: now,
       lastSeenAt: status === "used" ? now : null,
       consecutiveFailures: status === "used" ? 0 : status === "offline" ? 3 : 1,

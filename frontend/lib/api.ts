@@ -75,7 +75,7 @@ function buildIPAMSummary(): IPAMSummary {
       acc[address.status] += 1
       return acc
     },
-    { total: 0, used: 0, offline: 0, free: 0 }
+    { total: 0, used: 0, offline: 0, free: 0, reserved: 0 }
   )
 
   return {
@@ -631,7 +631,25 @@ export const api = {
           )
         )
       : request<IPAMAddress[]>(`/api/ipam/subnets/${subnetId}/addresses`),
+  getNextAvailableIPs: (subnetId: string, limit: number = 5) =>
+    isMockMode()
+      ? mockResponse({
+          addresses: getMockStore()
+            .ipamAddresses.filter(
+              (item) => item.subnetId === subnetId && item.status === "free"
+            )
+            .map((item) => item.address)
+            .slice(0, limit),
+        })
+      : request<{ addresses: string[] }>(`/api/ipam/subnets/${subnetId}/next-available?limit=${limit}`),
   saveIPAMAddress: (payload: IPAMAddress) => {
+    if (payload.status) {
+      if (payload.status === "used" || payload.status === "reserved") {
+        payload.isOverride = true
+      } else if (payload.status === "free") {
+        payload.isOverride = false
+      }
+    }
     if (!isMockMode()) {
       return request<IPAMAddress>(`/api/manage/ipam/addresses/${payload.id}`, {
         method: "PUT",

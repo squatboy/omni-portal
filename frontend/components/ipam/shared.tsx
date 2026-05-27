@@ -21,11 +21,15 @@ export function StatusBadge({
           ? "destructive"
           : status === "used"
             ? "secondary"
-            : "outline"
+            : status === "reserved"
+              ? "secondary"
+              : "outline"
       }
       className={cn(
         status === "used" &&
-          "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]"
+          "border-[color:color-mix(in_oklch,var(--status-ok)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-ok)_14%,transparent)] text-[color:var(--status-ok)]",
+        status === "reserved" &&
+          "border-[color:color-mix(in_oklch,var(--status-warn)_45%,transparent)] bg-[color:color-mix(in_oklch,var(--status-warn)_14%,transparent)] text-[color:var(--status-warn)]"
       )}
     >
       {status}

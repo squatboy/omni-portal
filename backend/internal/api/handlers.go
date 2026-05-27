@@ -94,6 +94,7 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 		ipam.GET("/networks", api.handleListIPAMNetworks)
 		ipam.GET("/subnets", api.handleListIPAMSubnets)
 		ipam.GET("/subnets/:id/addresses", api.handleListIPAMAddresses)
+		ipam.GET("/subnets/:id/next-available", api.handleGetNextAvailableIPs)
 	}
 
 	manage := r.Group("/api/manage")
@@ -538,6 +539,23 @@ func (api *API) handleRescanIPAMSubnet(c *gin.Context) {
 func (api *API) handleListIPAMAddresses(c *gin.Context) {
 	items, err := api.store.ListIPAMAddresses(c.Request.Context(), c.Param("id"))
 	writeStoreJSON(c, http.StatusOK, items, err)
+}
+
+func (api *API) handleGetNextAvailableIPs(c *gin.Context) {
+	limitStr := c.DefaultQuery("limit", "5")
+	limit, err := strconv.Atoi(limitStr)
+	if err != nil || limit <= 0 {
+		limit = 5
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	ips, err := api.store.GetNextAvailableIPs(c.Request.Context(), c.Param("id"), limit)
+	if err != nil {
+		writeStoreJSON(c, http.StatusOK, nil, err)
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"addresses": ips})
 }
 
 func (api *API) handleUpdateIPAMAddress(c *gin.Context) {

@@ -232,4 +232,24 @@ var migrations = []string{
 			INSERT INTO schema_migrations (version) VALUES (1);
 		END IF;
 	END $$`,
+	`DO $$
+	BEGIN
+		IF NOT EXISTS (SELECT 1 FROM schema_migrations WHERE version = 2) THEN
+			-- ipam_addresses 수정: is_override 추가 및 status 제약조건에 reserved 추가
+			ALTER TABLE ipam_addresses ADD COLUMN IF NOT EXISTS is_override boolean NOT NULL DEFAULT false;
+			ALTER TABLE ipam_addresses DROP CONSTRAINT IF EXISTS ipam_addresses_status_check;
+			ALTER TABLE ipam_addresses ADD CONSTRAINT ipam_addresses_status_check CHECK (status IN ('used', 'offline', 'free', 'reserved'));
+
+			-- ipam_scan_history_changes 제약조건에 reserved 추가
+			ALTER TABLE ipam_scan_history_changes DROP CONSTRAINT IF EXISTS ipam_scan_history_changes_previous_status_check;
+			ALTER TABLE ipam_scan_history_changes ADD CONSTRAINT ipam_scan_history_changes_previous_status_check CHECK (previous_status IN ('used', 'offline', 'free', 'reserved'));
+			ALTER TABLE ipam_scan_history_changes DROP CONSTRAINT IF EXISTS ipam_scan_history_changes_current_status_check;
+			ALTER TABLE ipam_scan_history_changes ADD CONSTRAINT ipam_scan_history_changes_current_status_check CHECK (current_status IN ('used', 'offline', 'free', 'reserved'));
+
+			-- ipam_scan_history에 reserved_count 컬럼 추가
+			ALTER TABLE ipam_scan_history ADD COLUMN IF NOT EXISTS reserved_count integer DEFAULT 0;
+
+			INSERT INTO schema_migrations (version) VALUES (2);
+		END IF;
+	END $$`,
 }

@@ -111,20 +111,43 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
 - **상태 표시**:
   - `used`: 초록색 상태 표시 (`--status-ok` 변수 활용).
   - `offline`: 빨간색 상태 표시 (destructive 테마).
-- **IP 상세 Sheet**: 버튼 클릭 시 Sheet가 열리며, 관리자 권한을 가진 경우 hostname 및 description을 수정할 수 있음.AM Collapsible 섹션과 Home, Scan History 메뉴를 추가한다.
+  - `reserved`: 주황색 상태 표시 (`--status-warn` 변수 활용).
+- **IP 상세 Sheet**: 
+  - 버튼 클릭 시 detail Sheet가 열리며, admin 권한이 있으면 hostname, description 및 status를 수정할 수 있음.
+  - 수동으로 오버라이드된 IP에는 `Manual Override` 배지가 노출됨.
+
+### Frontend 표현 및 UX 세부 내용
+- Sidebar에 IPAM Collapsible 섹션과 Home, Scan History 메뉴를 제공함.
 - IPAM Home은 모든 로그인 사용자에게 노출한다.
 - Scan History는 모든 로그인 사용자에게 노출한다.
-- Admin 전용 생성, 수정, 삭제, rescan, IP metadata 편집 버튼은 viewer에게 숨긴다.
-- Actions 버튼들(Scan, Edit, Delete)에는 hover 시 직관적인 설명을 제공하는 Tooltip(Scan, Edit, Delete)을 추가한다.
+- Admin 전용 생성, 수정, 삭제, rescan, IP metadata/status 편집 기능은 viewer에게 숨긴다.
+- Actions 버튼들(Scan, Edit, Delete)에는 hover 시 직관적인 설명을 제공하는 Tooltip을 추가한다.
 - Home은 Location, Network, Subnet 탭을 제공한다.
 - 좌측 영역은 기본 통계와 shadcn Chart/Recharts 기반 `Top IPv4 subnets by number of hosts`를 보여준다.
 - 우측 영역은 shadcn Collapsible 기반 Location -> Network -> Subnet -> IP 상태 count 트리를 보여준다.
 - Location, Network, Subnet 생성/수정은 shadcn Sheet form으로 처리한다.
 - 삭제 확인은 shadcn AlertDialog에서 대상 이름과 cascade 하위 개수를 보여준다.
 - Subnet row 선택 시 IP 상세 섹션을 표시한다.
-- IP 상세는 used/offline/free 요약 table과 상태 색상 Button grid를 제공한다.
+- IP 상세는 used/offline/free/reserved 요약 table과 상태 색상 Button grid를 제공한다.
 - IP 상세 Button grid는 IPv4 숫자순으로 정렬하고, 버튼 라벨은 마지막 octet만 `.1` 형식으로 표시한다. 모든 버튼의 가로 길이는 IP 3자릿수 label(예: `.200`)에 맞추어 `4rem` (`w-16`) 고정 너비로 통일하고 가운데 정렬한다.
-- used 상태 badge와 IP 버튼은 `--status-ok` 기반 초록 상태 표시를 사용하고, offline은 destructive/red 표시를 유지한다.
-- IP 버튼 클릭 시 Sheet detail을 열고, admin은 hostname/description을 수정할 수 있다.
+- used 상태 badge와 IP 버튼은 `--status-ok` 기반 초록 상태 표시를 사용하고, offline은 destructive/red 표시를 유지하며, reserved는 `--status-warn` 기반 주황색 표시를 사용한다.
+- IP 버튼 클릭 시 Sheet detail을 열고, admin은 hostname/description/status를 수정할 수 있다.
 - Scan History는 최근 scan summary를 table row로 보여주고 row 확장 시 count, error, status transition 목록을 보여준다.
 - 변경된 IP가 없으면 `No status changes.` 빈 상태를 표시한다.
+
+---
+
+## 6. IP 예약 및 수동 상태 오버라이드 (Manual Override)
+
+### 1) IP 예약
+- **`reserved` 상태**: "미할당이지만 미리 예약된 IP"를 표현하는 상태 값 (주황색 배지 적용).
+- **수동 상태 변경**: Admin은 IP 상세 편집에서 `used`, `reserved`, `free` 상태를 임의로 오버라이드할 수 있음.
+
+### 2) 오버라이드 구조
+- Admin이 `used` 혹은 `reserved`로 상태 변경 시 `is_override = true`가 되며, 자동 ping 스캐너는 해당 주소의 상태(status)와 연속 실패 횟수(consecutive_failures)를 덮어쓰지 않고 고정함. (핑 성공 시 `last_seen_at` 등 타임스탬프 정보는 최신화됨)
+- Admin이 상태를 `free`로 지정 시 `is_override = false`로 리셋되어 다음 스캔 주기부터 자동 ping 스캔 결과를 따르게 됨.
+
+### 3) "다음 사용 가능 IP" 조회 API
+- **Endpoint**: `GET /api/ipam/subnets/:id/next-available?limit=N`
+- **Description**: Subnet 내에서 `free` 상태인 빈 IP 목록을 오름차순 정렬하여 최대 `limit` (기본 5, 최대 100) 개수만큼 반환.
+- **Response**: `{ "addresses": ["10.40.0.3", "10.40.0.4", ...] }`

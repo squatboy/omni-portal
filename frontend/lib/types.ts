@@ -69,13 +69,14 @@ export type NexusIntegration = {
   active: boolean
 }
 
-export type IPAMAddressStatus = "used" | "offline" | "free"
+export type IPAMAddressStatus = "used" | "offline" | "free" | "reserved"
 
 export type IPAMAddressSummary = {
   total: number
   used: number
   offline: number
   free: number
+  reserved: number
 }
 
 export type IPAMSummary = {
@@ -126,6 +127,7 @@ export type IPAMAddress = {
   status: IPAMAddressStatus
   hostname?: string | null
   description?: string | null
+  isOverride: boolean
   lastScannedAt?: string | null
   lastSeenAt?: string | null
   consecutiveFailures: number
@@ -158,6 +160,7 @@ export type IPAMScanHistory = {
   used?: number | null
   offline?: number | null
   free?: number | null
+  reserved?: number | null
   error?: string | null
 }
 

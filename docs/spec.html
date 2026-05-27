@@ -846,15 +846,15 @@
       letter-spacing: .8px;
     }
 
-    .scan-stat-val.act {
+    .scan-stat-val.used {
       color: var(--green);
     }
 
-    .scan-stat-val.dead {
+    .scan-stat-val.offline {
       color: var(--red);
     }
 
-    .scan-stat-val.off {
+    .scan-stat-val.free {
       color: var(--muted);
     }
 
@@ -881,7 +881,7 @@
       border: 1px solid transparent;
     }
 
-    .ip-cell.offline {
+    .ip-cell.free {
       background: #1a1d27;
       color: var(--dim);
       border-color: var(--border);
@@ -894,13 +894,13 @@
       animation: scanPulse .8s infinite;
     }
 
-    .ip-cell.active {
+    .ip-cell.used {
       background: var(--green-m);
       color: var(--green);
       border-color: #22c55e40;
     }
 
-    .ip-cell.dead {
+    .ip-cell.offline {
       background: var(--red-m);
       color: var(--red);
       border-color: #ef444440;
@@ -1009,34 +1009,34 @@
       border: 2px solid transparent;
     }
 
-    .sd-state.offline-s {
+    .sd-state.free-s {
       background: #1a1d27;
       border-color: var(--dim);
     }
 
-    .sd-state.offline-s:hover,
-    .sd-state.offline-s.sel {
+    .sd-state.free-s:hover,
+    .sd-state.free-s.sel {
       border-color: var(--muted);
       background: #23263a;
     }
 
-    .sd-state.active-s {
+    .sd-state.used-s {
       background: var(--green-m);
       border-color: #22c55e40;
     }
 
-    .sd-state.active-s:hover,
-    .sd-state.active-s.sel {
+    .sd-state.used-s:hover,
+    .sd-state.used-s.sel {
       border-color: var(--green);
     }
 
-    .sd-state.dead-s {
+    .sd-state.offline-s {
       background: var(--red-m);
       border-color: #ef444440;
     }
 
-    .sd-state.dead-s:hover,
-    .sd-state.dead-s.sel {
+    .sd-state.offline-s:hover,
+    .sd-state.offline-s.sel {
       border-color: var(--red);
     }
 
@@ -2929,26 +2929,59 @@
         </div>
 
         <div class="info-block">
-          <h3>📡 스캔 동작</h3>
+          <h3>📡 스캔 동작 및 예외 처리</h3>
           <ul>
             <li><strong>Worker Pool</strong> — 크기 고정 64</li>
-            <li><strong>active</strong> — ping 성공, <code>consecutiveFailures = 0</code></li>
-            <li><strong>dead</strong> — 과거 성공 이력 있는 IP에서 연속 3회 실패</li>
-            <li><strong>offline</strong> — 성공 이력 없는 IP는 실패해도 유지</li>
+            <li><strong>used</strong> — ping 성공, <code>consecutiveFailures = 0</code></li>
+            <li><strong>offline</strong> — 과거 성공 이력 있는 IP에서 연속 3회 실패</li>
+            <li><strong>free</strong> — 성공 이력 없는 IP는 실패해도 유지</li>
             <li><strong>Auto Discovery</strong> — interval: 1800/3600/14400/43200/86400초, 기본 3600초</li>
             <li><strong>Scheduler</strong> — dashboard collect runner와 별도로 독립 실행</li>
+            <li><strong>강제 재스캔 우회</strong> — 스캔 비정상 중단 상황에 대비하여, 스캔 시작 후 15분이 경과한 Subnet은 중복 실행 차단(409 Conflict)을 우회하고
+              강제 재스캔 허용</li>
           </ul>
         </div>
 
         <div class="info-block">
-          <h3>🖥️ 프론트엔드 UX</h3>
+          <h3>🔒 데이터 정합성 제약</h3>
           <ul>
-            <li>사이드바 Collapsible IPAM 섹션 + Home 메뉴</li>
-            <li>좌측: 통계 + <code>Top IPv4 subnets by hosts</code> (Recharts 차트)</li>
-            <li>우측: Collapsible 트리 (Location → Network → Subnet → IP count)</li>
-            <li>Subnet 선택 → IP 상세 테이블 (active/dead/offline 요약 + 색상 Button Grid)</li>
-            <li>IP 버튼 클릭 → Sheet detail (admin: hostname/description 편집)</li>
-            <li>Admin 전용: 생성/수정/삭제/rescan 버튼, Sheet form, AlertDialog (cascade 수 표시)</li>
+            <li><strong>CIDR 제약</strong> — IPv4 전용. <code>/24</code>보다 큰 범위(예: <code>/23</code>, <code>/16</code>)는 등록
+              거부</li>
+            <li><strong>중복 방지</strong> — 동일 Location 내에서는 Network가 달라도 Subnet CIDR 겹침 불허</li>
+            <li><strong>CIDR 불변</strong> — Subnet CIDR은 생성 후 수정 불가. 변경 시 삭제 후 재생성 필요</li>
+            <li><strong>자동 IP 생성</strong> — Subnet 생성 시 CIDR 범위 내 모든 host IP row가 자동 삽입됨</li>
+            <li><strong>연쇄 삭제</strong> — Location / Network / Subnet 삭제 시 PostgreSQL FK Cascade로 하위 데이터 함께 물리 삭제</li>
+            <li><strong>주기 제한</strong> — Auto Discovery 주기는 <code>1800 / 3600 / 14400 / 43200 / 86400</code>초 중 하나만 허용.
+              기본값 <code>3600</code>초</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>⚠️ 예외 처리 및 동시성 제어</h3>
+          <ul>
+            <li><strong>Ping 타임아웃</strong> — Go context timeout <strong>2초</strong> + OS ping 옵션으로 응답 대기
+              <strong>1초</strong> 이중 적용. 초과 시 해당 IP를 실패로 처리
+            </li>
+            <li><strong>동시 스캔 차단</strong> — 이미 실행 중인 Subnet에 중복 스캔 요청이 들어오면 <code>409 Conflict</code>를 반환하고 즉시 종료</li>
+            <li><strong>강제 재스캔 (Stale Lease 우회)</strong> — 스캔 시작 후 <strong>15분</strong>이 경과한 Subnet은 비정상 중단으로 간주하여 409
+              차단을 우회하고 재스캔 허용</li>
+            <li><strong>결과 덮어쓰기 방지</strong> — 완료 반영 시 <code>subnetId + startedAt</code> lease를 검증. 지연된 이전 스캔(A)의 결과가 더
+              나중에 도착하더라도 최신 스캔(B) 반영 이후엔 A 결과를 무시하고 스킵하여 상태 꼬임 방지</li>
+          </ul>
+        </div>
+
+        <div class="info-block">
+          <h3>📜 스캔 히스토리 (Scan History)</h3>
+          <ul>
+            <li><strong>이력 기록</strong> — 스캔 완료 시 요약(ipam_scan_history)과 상태 변경 내역(ipam_scan_history_changes)을 단일 트랜잭션으로
+              커밋</li>
+            <li><strong>트랜잭션 바운더리</strong> — 스캔 완료 시 (IP bulk update, Subnet status 갱신, history summary/change row 기록,
+              retention pruning)을 함께 커밋하며, 스캔 실패 시에는 (Subnet failed status 반영, 실패 history 기록, retention pruning)을 함께 커밋
+            </li>
+            <li><strong>실패 이력</strong> — 실패한 스캔의 경우, 에러 메시지(error)와 발생 시각만 기록하며 count 및 변경 내역(diff)은 비워둠</li>
+            <li><strong>보존 정책 (Retention)</strong> — Subnet별로 최근 20개의 히스토리 행만 유지하며, 새로운 이력 추가 시 초과분은 데이터베이스에서 물리 삭제(Hard
+              Delete)</li>
+            <li><strong>효율적 저장</strong> — 데이터 효율성을 위해 전체 IP 주소 스냅샷은 보관하지 않고 변경된 주소(Diff)만 기록</li>
           </ul>
         </div>
       </div>
@@ -2983,8 +3016,8 @@
             </div>
             <div class="sf-body">
               <div class="sf-title">MarkIPAMScanStarted <span class="sf-badge db">DB write</span></div>
-              <div class="sf-desc">스캔 시작 시각(<code>startedAt</code>)을 DB에 기록. 이미 스캔 중이면 <code>ErrConflict</code> 반환 —
-                Scheduler가 이를 무시하여 동일 Subnet 중복 실행 방지.</div>
+              <div class="sf-desc">스캔 시작 시각(<code>startedAt</code>)을 DB에 기록. 이미 스캔 중인 경우 <code>ErrConflict</code>(409)를
+                반환해 동일 Subnet 중복 실행 방지 (시작 15분 경과 시 예외적으로 차단 우회).</div>
             </div>
           </div>
           <div class="sf-step">
@@ -3007,8 +3040,9 @@
             <div class="sf-body">
               <div class="sf-title">scanAddresses() — 64 Worker Goroutine 병렬 ICMP <span class="sf-badge go">64
                   goroutines</span> <span class="sf-badge icmp">ICMP</span></div>
-              <div class="sf-desc">Producer goroutine이 <code>jobs chan</code>에 IP 주소 순차 전송. 64개 Worker가 receive하여 ICMP
-                ping 수행. 결과는 버퍼드 <code>results chan</code>으로 전송. WaitGroup으로 전체 완료 후 results 채널 close.</div>
+              <div class="sf-desc">Producer goroutine이 <code>jobs channel</code>에 IP 주소 순차 전송. 64개 Worker가 receive하여
+                ICMP
+                ping 수행. 결과는 버퍼드 <code>results channel</code>으로 전송. WaitGroup으로 전체 완료 후 results 채널 close.</div>
             </div>
           </div>
           <div class="sf-step">
@@ -3019,7 +3053,7 @@
             <div class="sf-body">
               <div class="sf-title">classifyScanResult() — 상태 분류</div>
               <div class="sf-desc">메인 goroutine이 <code>results</code>를 receive하며 분류. ping 결과 +
-                <code>hadSuccess</code>(과거 이력) 조합으로 <code>active / dead / offline</code> 결정. 아래 시뮬레이터에서 직접 확인 가능.
+                <code>hadSuccess</code>(과거 이력) 조합으로 <code>used / offline / free</code> 결정. 아래 시뮬레이터에서 직접 확인 가능.
               </div>
             </div>
           </div>
@@ -3030,9 +3064,8 @@
             </div>
             <div class="sf-body">
               <div class="sf-title">BulkApplyIPAMScanResults <span class="sf-badge db">DB bulk write</span></div>
-              <div class="sf-desc">전체 IP 결과를 <strong>단일 트랜잭션</strong>으로 반영. <code>status</code>,
-                <code>consecutiveFailures</code>, <code>lastSeenAt</code>, <code>lastScanStatus</code>,
-                <code>lastScanCompletedAt</code> 업데이트.
+              <div class="sf-desc">전체 IP 결과, Subnet 상태, Scan History 등을 <strong>단일 트랜잭션</strong>으로 반영.
+                <code>subnetId + startedAt</code> lease 검증을 거쳐, 지연 완료된 이전 스캔 결과가 최신 결과를 덮어쓰는 상태 꼬임 방지.
               </div>
             </div>
           </div>
@@ -3043,7 +3076,7 @@
             </div>
             <div class="sf-body">
               <div class="sf-title">IPAMScanSummary 반환</div>
-              <div class="sf-desc"><code>{ Total, Active, Dead, Offline }</code> 집계 반환. API 응답 및 스케줄러 로그에 활용.</div>
+              <div class="sf-desc"><code>{ Total, Used, Offline, Free }</code> 집계 반환. API 응답 및 스케줄러 로그에 활용.</div>
             </div>
           </div>
         </div>
@@ -3053,12 +3086,12 @@
           <h3>⚙️ Worker Pool Goroutine 채널 시뮬레이션 — /24 서브넷 254 IPs</h3>
 
           <div class="chan-row">
-            <div class="chan-name">jobs chan</div>
+            <div class="chan-name">jobs channel</div>
             <div class="chan-slots" id="chan-jobs"></div>
             <div style="font-size:9.5px;color:var(--dim);margin-left:8px;white-space:nowrap;">← producer</div>
           </div>
           <div class="chan-row">
-            <div class="chan-name">results chan</div>
+            <div class="chan-name">results channel</div>
             <div class="chan-slots" id="chan-results"></div>
             <div style="font-size:9.5px;color:var(--dim);margin-left:8px;white-space:nowrap;">→ main goroutine</div>
           </div>
@@ -3096,16 +3129,16 @@
               <div class="scan-stat-lbl">처리됨</div>
             </div>
             <div class="scan-stat">
-              <div class="scan-stat-val act" id="gp-active">0</div>
-              <div class="scan-stat-lbl">Active</div>
+              <div class="scan-stat-val used" id="gp-used">0</div>
+              <div class="scan-stat-lbl">Used</div>
             </div>
             <div class="scan-stat">
-              <div class="scan-stat-val dead" id="gp-dead">0</div>
-              <div class="scan-stat-lbl">Dead</div>
-            </div>
-            <div class="scan-stat">
-              <div class="scan-stat-val off" id="gp-offline">0</div>
+              <div class="scan-stat-val offline" id="gp-offline">0</div>
               <div class="scan-stat-lbl">Offline</div>
+            </div>
+            <div class="scan-stat">
+              <div class="scan-stat-val free" id="gp-free">0</div>
+              <div class="scan-stat-lbl">Free</div>
             </div>
             <div class="scan-stat">
               <div class="scan-stat-val" id="gp-workers" style="color:var(--blue);">0</div>
@@ -3125,66 +3158,66 @@
         <div class="state-diagram">
           <h3>🔀 IP 주소 상태 전이 — 클릭하여 확인</h3>
           <div class="sd-states">
-            <div class="sd-state offline-s" onclick="selectState('offline')" id="sd-offline">
+            <div class="sd-state free-s" onclick="selectState('free')" id="sd-free">
               <div class="sd-icon">⚫</div>
-              <div class="sd-name" style="color:var(--muted);">Offline</div>
+              <div class="sd-name" style="color:var(--muted);">Free</div>
               <div class="sd-desc">성공 이력 없음</div>
             </div>
             <div style="color:var(--dim);font-size:20px;align-self:center;">⇄</div>
-            <div class="sd-state active-s" onclick="selectState('active')" id="sd-active">
+            <div class="sd-state used-s" onclick="selectState('used')" id="sd-used">
               <div class="sd-icon">🟢</div>
-              <div class="sd-name" style="color:var(--green);">Active</div>
+              <div class="sd-name" style="color:var(--green);">Used</div>
               <div class="sd-desc">ping 응답 성공</div>
             </div>
             <div style="color:var(--dim);font-size:20px;align-self:center;">→</div>
-            <div class="sd-state dead-s" onclick="selectState('dead')" id="sd-dead">
+            <div class="sd-state offline-s" onclick="selectState('offline')" id="sd-offline">
               <div class="sd-icon">🔴</div>
-              <div class="sd-name" style="color:var(--red);">Dead</div>
+              <div class="sd-name" style="color:var(--red);">Offline</div>
               <div class="sd-desc">3회 연속 실패</div>
             </div>
           </div>
           <div class="sd-arrows">
             <div class="sd-arrow-row">
-              <div class="from">Offline</div>
+              <div class="from">Free</div>
               <div class="arr">→</div>
               <div class="cond">ping 성공</div>
               <div class="arr">→</div>
-              <div class="to" style="color:var(--green);">Active</div>
+              <div class="to" style="color:var(--green);">Used</div>
             </div>
             <div class="sd-arrow-row">
-              <div class="from">Active</div>
+              <div class="from">Used</div>
               <div class="arr">→</div>
               <div class="cond">ping 실패 1~2회 (성공이력 있음)</div>
               <div class="arr">→</div>
-              <div class="to" style="color:var(--green);">Active 유지 (grace)</div>
+              <div class="to" style="color:var(--green);">Used 유지 (grace)</div>
             </div>
             <div class="sd-arrow-row">
-              <div class="from">Active</div>
+              <div class="from">Used</div>
               <div class="arr">→</div>
               <div class="cond">ping 실패 ≥3회 연속</div>
               <div class="arr">→</div>
-              <div class="to" style="color:var(--red);">Dead</div>
-            </div>
-            <div class="sd-arrow-row">
-              <div class="from">Dead</div>
-              <div class="arr">→</div>
-              <div class="cond">ping 성공</div>
-              <div class="arr">→</div>
-              <div class="to" style="color:var(--green);">Active</div>
+              <div class="to" style="color:var(--red);">Offline</div>
             </div>
             <div class="sd-arrow-row">
               <div class="from">Offline</div>
               <div class="arr">→</div>
+              <div class="cond">ping 성공</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--green);">Used</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Free</div>
+              <div class="arr">→</div>
               <div class="cond">ping 실패 (성공이력 없음)</div>
               <div class="arr">→</div>
-              <div class="to" style="color:var(--muted);">Offline 유지</div>
+              <div class="to" style="color:var(--muted);">Free 유지</div>
             </div>
             <div class="sd-arrow-row">
               <div class="from" style="color:var(--yellow);">핵심 판단</div>
               <div class="arr">→</div>
-              <div class="cond"><code>hadSuccess = lastSeenAt != nil || status ∈ {active, dead}</code></div>
+              <div class="cond"><code>hadSuccess = lastSeenAt != nil || status ∈ {used, offline}</code></div>
               <div class="arr">→</div>
-              <div class="to" style="color:var(--yellow);">offline 여부</div>
+              <div class="to" style="color:var(--yellow);">free/offline 구분</div>
             </div>
           </div>
           <div class="sd-detail" id="sd-detail">← 위 상태 박스를 클릭하면 상세 설명이 표시됩니다.</div>
@@ -3201,7 +3234,10 @@
             <h3>📋 스케줄러 로직</h3>
             <ul>
               <li><strong>시작 즉시 1회 실행</strong> — <code>Start(ctx)</code> 호출 시 <code>scanDue(ctx)</code> 즉시 실행</li>
-              <li><strong>1분 ticker</strong> — 이후 1분마다 due subnet 조회 및 스캔</li>
+              <li><strong>1분 ticker</strong> — 이후 1분마다 <code>ScanExecutor.ScanDue</code> 호출</li>
+              <li><strong>ScanDue 캡슐화</strong> — 만료 subnet 조회(ListDueIPAMSubnets), 스캔 락(claim) 및 Skip 처리가
+                <code>ScanDue</code> 내부 계약으로 완전 캡슐화되어 진행
+              </li>
               <li><strong>ListDueIPAMSubnets(limit=10)</strong> — Auto Discovery interval 만료 subnet 최대 10개 조회</li>
               <li><strong>ErrConflict 무시</strong> — 이미 스캔 중인 subnet 건너뜀</li>
               <li><strong>Context 취소 감지</strong> — <code>ctx.Err()</code>로 graceful shutdown</li>
@@ -3563,7 +3599,7 @@
                   <tr>
                     <td><code>status</code></td>
                     <td>enum</td>
-                    <td><code>active</code> / <code>dead</code> / <code>offline</code></td>
+                    <td><code>used</code> / <code>offline</code> / <code>free</code></td>
                   </tr>
                   <tr>
                     <td><code>hostname</code></td>
@@ -3583,12 +3619,153 @@
                   <tr>
                     <td><code>lastSeenAt</code></td>
                     <td>string?</td>
-                    <td>마지막 ping 성공 시각 · null이면 성공 이력 없음</td>
+                    <td>마지막 ping 성공 시각 · null이면 성공 이력 없음(free)</td>
                   </tr>
                   <tr>
                     <td><code>consecutiveFailures</code></td>
                     <td>int</td>
-                    <td>연속 ping 실패 횟수 · ≥3 이면 dead 전이 조건 충족</td>
+                    <td>연속 ping 실패 횟수 · ≥3 이면 offline 전이 조건 충족</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-top:20px;margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMScanSummary</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>subnetId</code></td>
+                    <td>string</td>
+                    <td>대상 Subnet ID</td>
+                  </tr>
+                  <tr>
+                    <td><code>total</code> / <code>used</code> / <code>offline</code> / <code>free</code></td>
+                    <td>int</td>
+                    <td>스캔 직후 상태별 IP 주소 수 집계</td>
+                  </tr>
+                  <tr>
+                    <td><code>startedAt</code> / <code>completedAt</code></td>
+                    <td>string</td>
+                    <td>스캔 시작·완료 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>subnet</code></td>
+                    <td>IPAMSubnet</td>
+                    <td>대상 Subnet의 상세 메타데이터</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMScanHistory</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td>UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>subnetId</code></td>
+                    <td>string</td>
+                    <td>대상 Subnet FK</td>
+                  </tr>
+                  <tr>
+                    <td><code>subnetName</code> / <code>subnetCidr</code></td>
+                    <td>string</td>
+                    <td>스캔 당시 Subnet 명칭 및 CIDR 스냅샷 복사</td>
+                  </tr>
+                  <tr>
+                    <td><code>startedAt</code></td>
+                    <td>string?</td>
+                    <td>스캔 시작 시각 (실패 시 null 가능)</td>
+                  </tr>
+                  <tr>
+                    <td><code>completedAt</code></td>
+                    <td>string</td>
+                    <td>스캔 완료 시각</td>
+                  </tr>
+                  <tr>
+                    <td><code>status</code></td>
+                    <td>enum</td>
+                    <td><code>completed</code> / <code>failed</code></td>
+                  </tr>
+                  <tr>
+                    <td><code>total</code> / <code>used</code> / <code>offline</code> / <code>free</code></td>
+                    <td>int?</td>
+                    <td>완료 상태의 경우 각 IP 수 집계 (실패 시 null)</td>
+                  </tr>
+                  <tr>
+                    <td><code>error</code></td>
+                    <td>string?</td>
+                    <td>스캔 실패 시 에러 메시지 (성공 시 null)</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div style="margin-bottom:20px;">
+            <div style="font-weight:600;font-size:13px;margin-bottom:6px;color:var(--fg);">IPAMScanHistoryChange</div>
+            <div class="ib" style="padding:0;overflow:hidden;">
+              <table class="api-t">
+                <thead>
+                  <tr>
+                    <th>필드</th>
+                    <th>타입</th>
+                    <th>설명</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>id</code></td>
+                    <td>string</td>
+                    <td>UUID</td>
+                  </tr>
+                  <tr>
+                    <td><code>historyId</code></td>
+                    <td>string</td>
+                    <td>상위 IPAMScanHistory FK</td>
+                  </tr>
+                  <tr>
+                    <td><code>address</code></td>
+                    <td>string</td>
+                    <td>상태 변경이 일어난 IP 주소</td>
+                  </tr>
+                  <tr>
+                    <td><code>previousStatus</code> / <code>currentStatus</code></td>
+                    <td>enum</td>
+                    <td>변경 전/후 IP 상태 (<code>used</code> / <code>offline</code> / <code>free</code>)</td>
+                  </tr>
+                  <tr>
+                    <td><code>previousLastSeenAt</code> / <code>currentLastSeenAt</code></td>
+                    <td>string?</td>
+                    <td>변경 전/후 마지막 ping 성공 시각 스냅샷</td>
+                  </tr>
+                  <tr>
+                    <td><code>previousConsecutiveFailures</code> / <code>currentConsecutiveFailures</code></td>
+                    <td>int</td>
+                    <td>변경 전/후 연속 ping 실패 횟수</td>
                   </tr>
                 </tbody>
               </table>
@@ -3828,8 +4005,8 @@
               <tr>
                 <td><span class="m get">GET</span></td>
                 <td><span class="ep">/api/auth/me</span></td>
-                <td><span class="rb auth">Auth</span></td>
-                <td>현재 세션 사용자 정보</td>
+                <td><span class="rb pub">Public</span></td>
+                <td>현재 세션 사용자 정보 (미인증 시 <code>authenticated: false</code> 반환)</td>
               </tr>
               <tr class="sec-row">
                 <td colspan="4">Collect</td>
@@ -3848,7 +4025,7 @@
               </tr>
               <tr>
                 <td><span class="m get">GET</span></td>
-                <td><span class="ep">/api/collect/{vms|kubernetes|argocd|gitlab|nexus}</span></td>
+                <td><span class="ep">/api/collect/{vms|kubernetes|argocd|gitlab|nexus|overview}</span></td>
                 <td><span class="rb auth">Auth</span></td>
                 <td>소스별 개별 확인</td>
               </tr>
@@ -3865,13 +4042,13 @@
                 <td><span class="m get">GET</span> <span class="m post">POST</span></td>
                 <td><span class="ep">/api/manage/resources/vms</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>VM 목록 / 등록</td>
+                <td>VM 목록 / 등록·수정 (upsert — id 유무로 create/update 구분)</td>
               </tr>
               <tr>
-                <td><span class="m put">PUT</span> <span class="m del">DEL</span></td>
+                <td><span class="m del">DEL</span></td>
                 <td><span class="ep">/api/manage/resources/vms/:id</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>VM 수정 / 삭제</td>
+                <td>VM 삭제</td>
               </tr>
               <tr class="sec-row">
                 <td colspan="4">Manage — Integrations</td>
@@ -3880,21 +4057,37 @@
                 <td><span class="m get">GET</span> <span class="m post">POST</span></td>
                 <td><span class="ep">/api/manage/integrations/kubernetes</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>K8s 연동 조회/등록</td>
+                <td>K8s 연동 조회/등록·수정 (upsert)</td>
               </tr>
               <tr>
-                <td><span class="m put">PUT</span> <span class="m del">DEL</span></td>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/integrations/kubernetes/test</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>K8s 연동 연결 테스트 (저장과 분리)</td>
+              </tr>
+              <tr>
+                <td><span class="m del">DEL</span></td>
                 <td><span class="ep">/api/manage/integrations/kubernetes/:id</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>K8s 연동 수정/삭제</td>
+                <td>K8s 연동 삭제</td>
               </tr>
               <tr>
-                <td><span class="m get">GET</span> <span class="m post">POST</span> <span class="m put">PUT</span>
-                  <span class="m del">DEL</span>
-                </td>
-                <td><span class="ep">/api/manage/integrations/{gitlab|argocd|nexus}[/:id]</span></td>
+                <td><span class="m get">GET</span> <span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/integrations/{gitlab|argocd|nexus}</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>GitLab / ArgoCD / Nexus 연동 CRUD</td>
+                <td>GitLab / ArgoCD / Nexus 연동 조회/등록·수정 (upsert)</td>
+              </tr>
+              <tr>
+                <td><span class="m post">POST</span></td>
+                <td><span class="ep">/api/manage/integrations/{gitlab|argocd|nexus}/test</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>연결 테스트 (저장과 분리)</td>
+              </tr>
+              <tr>
+                <td><span class="m del">DEL</span></td>
+                <td><span class="ep">/api/manage/integrations/{gitlab|argocd|nexus}/:id</span></td>
+                <td><span class="rb admin">Admin</span></td>
+                <td>삭제</td>
               </tr>
               <tr class="sec-row">
                 <td colspan="4">Manage — Users</td>
@@ -3919,6 +4112,18 @@
                 <td><span class="ep">/api/ipam/summary</span></td>
                 <td><span class="rb auth">Auth</span></td>
                 <td>IPAM 전체 통계 요약</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/scan-history?limit=...</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>IPAM 스캔 히스토리 목록 조회 (Subnet별 최신 스캔 요약 목록)</td>
+              </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/scan-history/:id</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>특정 스캔 히스토리 세부 정보 조회 (상태 변경 내역/Transitions 및 에러 상세 포함)</td>
               </tr>
               <tr>
                 <td><span class="m get">GET</span></td>
@@ -4154,7 +4359,7 @@
 
       <div class="footer">
         <span>Omni Portal · Spec v2.0</span>
-        <span>Updated 2026-05-24</span>
+        <span>Updated 2026-05-27</span>
       </div>
     </main>
   </div>
@@ -4352,7 +4557,7 @@
         const cj = document.getElementById('cj-' + i); if (cj) { cj.className = 'chan-slot'; cj.textContent = ''; }
         const cr = document.getElementById('cr-' + i); if (cr) { cr.className = 'chan-slot'; cr.textContent = ''; }
       }
-      ['gp-scanned', 'gp-active', 'gp-dead', 'gp-offline', 'gp-workers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+      ['gp-scanned', 'gp-used', 'gp-offline', 'gp-free', 'gp-workers'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
       const log = document.getElementById('gp-log'); if (log) log.innerHTML = '';
     }
     async function runGoroutinePool() {
@@ -4362,7 +4567,7 @@
       gpRunning = true;
       const btn = document.getElementById('gp-btn'); if (btn) btn.disabled = true;
       const TOTAL = 254, WORKERS = 64;
-      const outcomes = Array.from({ length: TOTAL }, () => { const r = Math.random(); return r < 0.58 ? 'ok' : r < 0.73 ? 'fail' : 'off'; });
+      const outcomes = Array.from({ length: TOTAL }, () => { const r = Math.random(); return r < 0.58 ? 'used' : r < 0.73 ? 'offline' : 'free'; });
 
       // Workers are persistent goroutines — always 64, never goes to 0
       document.getElementById('gp-workers').textContent = WORKERS;
@@ -4370,7 +4575,7 @@
 
       // Fill jobs channel (first 18 slots visible)
       for (let i = 0; i < 18; i++) { const s = document.getElementById('cj-' + i); if (s) { s.className = 'chan-slot cs-job'; s.textContent = (i + 1).toString(); } }
-      gpLog(`[producer] ${TOTAL}개 IP → jobs chan 전송 시작`, 'warn');
+      gpLog(`[producer] ${TOTAL}개 IP → jobs channel 전송 시작`, 'warn');
       await sleep(400);
       if (!gpRunning) return;
 
@@ -4410,10 +4615,10 @@
           resultBuf[jobIdx] = out;
           const rIdx = (resultSlot++) % 18;
           const rEl = document.getElementById('cr-' + rIdx);
-          if (out === 'ok') {
+          if (out === 'used') {
             if (el) { el.className = 'gc gc-done'; el.textContent = '✓'; }
             if (rEl) { rEl.className = 'chan-slot cs-ok'; rEl.textContent = '✓'; }
-          } else if (out === 'fail') {
+          } else if (out === 'offline') {
             if (el) { el.className = 'gc gc-fail'; el.textContent = '✗'; }
             if (rEl) { rEl.className = 'chan-slot cs-fail'; rEl.textContent = '✗'; }
           } else {
@@ -4453,19 +4658,19 @@
       await sleep(300);
 
       // Single bulk DB transaction — count stats only NOW (not during scan)
-      let active = 0, dead = 0, offline = 0;
-      resultBuf.forEach(out => { if (out === 'ok') active++; else if (out === 'fail') dead++; else offline++; });
+      let used = 0, offline = 0, free = 0;
+      resultBuf.forEach(out => { if (out === 'used') used++; else if (out === 'offline') offline++; else free++; });
 
       gpLog(`[bulk] BulkApplyIPAMScanResults — ${TOTAL}개 단일 트랜잭션 반영 ✓`, 'info');
       await sleep(400);
 
       // Flash all stats at once — this is the single write to DB
       document.getElementById('gp-scanned').textContent = TOTAL;
-      document.getElementById('gp-active').textContent = active;
-      document.getElementById('gp-dead').textContent = dead;
+      document.getElementById('gp-used').textContent = used;
       document.getElementById('gp-offline').textContent = offline;
+      document.getElementById('gp-free').textContent = free;
 
-      gpLog(`[summary] Total=${TOTAL} Active=${active} Dead=${dead} Offline=${offline}`, 'ok');
+      gpLog(`[summary] Total=${TOTAL} Used=${used} Offline=${offline} Free=${free}`, 'ok');
       if (btn) btn.disabled = false;
       gpRunning = false;
     }
@@ -4521,15 +4726,17 @@
 
     /* ── State Diagram ── */
     const stateDetails = {
-      offline: '<strong>Offline</strong> — ping 성공 이력이 <strong>한 번도 없는</strong> IP. lastSeenAt = nil. ping에 실패해도 offline을 유지. 오직 ping 성공 시에만 active로 전이. 새로 생성된 모든 IP의 초기 상태.',
-      active: '<strong>Active</strong> — 마지막 ping이 성공했거나, 성공 이력이 있으며 consecutiveFailures < 3인 IP. lastSeenAt이 갱신됨. 1~2회 실패해도 grace period로 active 유지. 3회 연속 실패 시 dead로 전이.',
-      dead: '<strong>Dead</strong> — 성공 이력이 있었지만(lastSeenAt != nil 또는 이전 status가 active/dead) consecutiveFailures ≥ 3인 IP. 다시 ping 성공 시 즉시 active로 복귀. offline과 달리 "과거에 살아있었다"는 기록이 있음.'
+      free: '<strong>Free</strong> — ping 성공 이력이 <strong>한 번도 없는</strong> IP. lastSeenAt = nil. ping에 실패해도 free를 유지. 오직 ping 성공 시에만 used로 전이. 새로 생성된 모든 IP의 초기 상태.',
+      used: '<strong>Used</strong> — 마지막 ping이 성공했거나, 성공 이력이 있으며 consecutiveFailures < 3인 IP. lastSeenAt이 갱신됨. 1~2회 실패해도 grace period로 used 유지. 3회 연속 실패 시 offline으로 전이.',
+      offline: '<strong>Offline</strong> — 성공 이력이 있었지만(lastSeenAt != nil 또는 이전 status가 used/offline) consecutiveFailures ≥ 3인 IP. 다시 ping 성공 시 즉시 used로 복귀. free와 달리 "과거에 살아있었다"는 기록이 있음.'
     };
     function selectState(name) {
-      ['offline', 'active', 'dead'].forEach(s => {
-        document.getElementById('sd-' + s).classList.remove('sel');
+      ['free', 'used', 'offline'].forEach(s => {
+        const el = document.getElementById('sd-' + s);
+        if (el) el.classList.remove('sel');
       });
-      document.getElementById('sd-' + name).classList.add('sel');
+      const el = document.getElementById('sd-' + name);
+      if (el) el.classList.add('sel');
       document.getElementById('sd-detail').innerHTML = stateDetails[name];
     }
 
@@ -4537,19 +4744,20 @@
     const SCAN_IPS = Array.from({ length: 20 }, (_, i) => `10.0.0.${i + 1}`);
     // pre-determine outcomes for demo
     const OUTCOMES = [
-      'active', 'active', 'active', 'offline', 'dead',
-      'active', 'offline', 'active', 'dead', 'active',
-      'offline', 'active', 'active', 'dead', 'active',
-      'active', 'offline', 'active', 'active', 'dead'
+      'used', 'used', 'used', 'free', 'offline',
+      'used', 'free', 'used', 'offline', 'used',
+      'free', 'used', 'used', 'offline', 'used',
+      'used', 'free', 'used', 'used', 'offline'
     ];
     let scanRunning = false;
 
     function initGrid() {
       const grid = document.getElementById('ip-grid');
+      if (!grid) return;
       grid.innerHTML = '';
       SCAN_IPS.forEach((ip, i) => {
         const cell = document.createElement('div');
-        cell.className = 'ip-cell offline';
+        cell.className = 'ip-cell free';
         cell.id = 'ipc-' + i;
         cell.textContent = ip.split('.').pop().padStart(3, ' ');
         cell.title = ip;
@@ -4559,16 +4767,17 @@
 
     function scanLog(msg, cls = '') {
       const log = document.getElementById('scan-log');
+      if (!log) return;
       log.innerHTML += `<div class="log-line ${cls}">${msg}</div>`;
       log.scrollTop = log.scrollHeight;
     }
 
     function resetScan() {
       scanRunning = false;
-      document.getElementById('scan-btn').disabled = false;
-      document.getElementById('scan-progress').style.width = '0%';
-      ['ss-total', 'ss-active', 'ss-dead', 'ss-offline'].forEach(id => document.getElementById(id).textContent = '0');
-      document.getElementById('scan-log').innerHTML = '';
+      const btn = document.getElementById('scan-btn'); if (btn) btn.disabled = false;
+      const prog = document.getElementById('scan-progress'); if (prog) prog.style.width = '0%';
+      ['ss-total', 'ss-used', 'ss-offline', 'ss-free'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = '0'; });
+      const log = document.getElementById('scan-log'); if (log) log.innerHTML = '';
       initGrid();
     }
 
@@ -4577,13 +4786,13 @@
       scanRunning = true;
       resetScan();
       scanRunning = true;
-      document.getElementById('scan-btn').disabled = true;
+      const btn = document.getElementById('scan-btn'); if (btn) btn.disabled = true;
 
       scanLog('[scanner] MarkIPAMScanStarted — scan_id=subnet-demo', 'info');
       scanLog('[store] ListIPAMScanAddresses — 20개 IP 로드', 'info');
       await sleep(300);
       // 20 IPs < 64 workers — all dispatched at once, no batching
-      scanLog('[producer] 20개 IP → jobs chan. 20개 worker 즉시 수신 (동시 dispatch)', 'info');
+      scanLog('[producer] 20개 IP → jobs channel. 20개 worker 즉시 수신 (동시 dispatch)', 'info');
       await sleep(200);
 
       const prog = document.getElementById('scan-progress');
@@ -4591,21 +4800,21 @@
       let completedCount = 0;
 
       // All IPs start scanning simultaneously — 64 workers > 20 IPs
-      SCAN_IPS.forEach((_, i) => { document.getElementById('ipc-' + i).className = 'ip-cell scanning'; });
+      SCAN_IPS.forEach((_, i) => { const el = document.getElementById('ipc-' + i); if (el) el.className = 'ip-cell scanning'; });
       scanLog(`[workers] 20개 IP ping 동시 실행 중 (각 worker 독립 타이머)...`, 'warn');
 
       // Each IP resolves independently — no synchronization between workers
       const ipPromises = SCAN_IPS.map((ip, i) => sleep(350 + Math.random() * 1300).then(() => {
         if (!scanRunning) return;
         const outcome = OUTCOMES[i];
-        document.getElementById('ipc-' + i).className = 'ip-cell ' + outcome;
+        const el = document.getElementById('ipc-' + i); if (el) el.className = 'ip-cell ' + outcome;
         resultBuf.push(outcome);
         completedCount++;
-        prog.style.width = (completedCount / SCAN_IPS.length * 100) + '%';
+        if (prog) prog.style.width = (completedCount / SCAN_IPS.length * 100) + '%';
         // Log individual ping result as it arrives (results chan receive)
-        if (outcome === 'active') scanLog(`[ping] ${ip} → success ✓`, 'ok');
-        else if (outcome === 'dead') scanLog(`[ping] ${ip} → fail ×3 → dead`, 'fail');
-        else scanLog(`[ping] ${ip} → fail (no history) → offline`);
+        if (outcome === 'used') scanLog(`[ping] ${ip} → success ✓`, 'ok');
+        else if (outcome === 'offline') scanLog(`[ping] ${ip} → fail ×3 → offline`, 'fail');
+        else scanLog(`[ping] ${ip} → fail (no history) → free`);
       }));
 
       await Promise.all(ipPromises);
@@ -4616,20 +4825,20 @@
       await sleep(300);
 
       // Single bulk DB transaction — compute and write stats only NOW
-      let active = 0, dead = 0, offline = 0;
-      resultBuf.forEach(o => { if (o === 'active') active++; else if (o === 'dead') dead++; else offline++; });
+      let used = 0, offline = 0, free = 0;
+      resultBuf.forEach(o => { if (o === 'used') used++; else if (o === 'offline') offline++; else free++; });
 
       scanLog(`[store] BulkApplyIPAMScanResults — ${resultBuf.length}개 결과 트랜잭션 반영`, 'info');
       await sleep(400);
 
       // Flash all stats at once — single DB write
-      document.getElementById('ss-total').textContent = resultBuf.length;
-      document.getElementById('ss-active').textContent = active;
-      document.getElementById('ss-dead').textContent = dead;
-      document.getElementById('ss-offline').textContent = offline;
+      const elTotal = document.getElementById('ss-total'); if (elTotal) elTotal.textContent = resultBuf.length;
+      const elUsed = document.getElementById('ss-used'); if (elUsed) elUsed.textContent = used;
+      const elOffline = document.getElementById('ss-offline'); if (elOffline) elOffline.textContent = offline;
+      const elFree = document.getElementById('ss-free'); if (elFree) elFree.textContent = free;
 
-      scanLog(`[done] 스캔 완료: active=${active}, dead=${dead}, offline=${offline}`, 'ok');
-      document.getElementById('scan-btn').disabled = false;
+      scanLog(`[done] 스캔 완료: used=${used}, offline=${offline}, free=${free}`, 'ok');
+      if (btn) btn.disabled = false;
       scanRunning = false;
     }
 

@@ -333,9 +333,10 @@ type NexusIntegration struct {
 type IPAMAddressStatus string
 
 const (
-	IPAMAddressUsed    IPAMAddressStatus = "used"
-	IPAMAddressOffline IPAMAddressStatus = "offline"
-	IPAMAddressFree    IPAMAddressStatus = "free"
+	IPAMAddressUsed     IPAMAddressStatus = "used"
+	IPAMAddressOffline  IPAMAddressStatus = "offline"
+	IPAMAddressFree     IPAMAddressStatus = "free"
+	IPAMAddressReserved IPAMAddressStatus = "reserved"
 )
 
 type IPAMLocation struct {
@@ -379,6 +380,7 @@ type IPAMAddress struct {
 	Status              IPAMAddressStatus `json:"status"`
 	Hostname            *string           `json:"hostname,omitempty"`
 	Description         *string           `json:"description,omitempty"`
+	IsOverride          bool              `json:"isOverride"`
 	LastScannedAt       *string           `json:"lastScannedAt,omitempty"`
 	LastSeenAt          *string           `json:"lastSeenAt,omitempty"`
 	ConsecutiveFailures int               `json:"consecutiveFailures"`
@@ -433,6 +435,7 @@ type IPAMScanHistory struct {
 	Used        *int                  `json:"used,omitempty"`
 	Offline     *int                  `json:"offline,omitempty"`
 	Free        *int                  `json:"free,omitempty"`
+	Reserved    *int                  `json:"reserved,omitempty"`
 	Error       *string               `json:"error,omitempty"`
 }
 
@@ -454,10 +457,11 @@ type IPAMScanHistoryDetail struct {
 }
 
 type IPAMAddressSummary struct {
-	Total   int `json:"total"`
-	Used    int `json:"used"`
-	Offline int `json:"offline"`
-	Free    int `json:"free"`
+	Total    int `json:"total"`
+	Used     int `json:"used"`
+	Offline  int `json:"offline"`
+	Free     int `json:"free"`
+	Reserved int `json:"reserved"`
 }
 
 type IPAMSummary struct {
