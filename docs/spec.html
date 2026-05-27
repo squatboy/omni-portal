@@ -1040,6 +1040,16 @@
       border-color: var(--red);
     }
 
+    .sd-state.reserved-s {
+      background: var(--orange-m);
+      border-color: #f9731640;
+    }
+
+    .sd-state.reserved-s:hover,
+    .sd-state.reserved-s.sel {
+      border-color: var(--orange);
+    }
+
     .sd-icon {
       font-size: 24px;
       margin-bottom: 6px;
@@ -3028,7 +3038,7 @@
             <div class="sf-body">
               <div class="sf-title">ListIPAMScanAddresses <span class="sf-badge db">DB read</span></div>
               <div class="sf-desc">Subnet의 모든 IP 레코드 로드. 각 레코드: <code>status</code>, <code>consecutiveFailures</code>,
-                <code>lastSeenAt</code> 포함. 실패 시 <code>markFailed</code> 후 종료.
+                <code>lastSeenAt</code>, <code>is_override</code> 포함. 실패 시 <code>markFailed</code> 후 종료.
               </div>
             </div>
           </div>
@@ -3051,9 +3061,8 @@
               <div class="sf-line"></div>
             </div>
             <div class="sf-body">
-              <div class="sf-title">classifyScanResult() — 상태 분류</div>
-              <div class="sf-desc">메인 goroutine이 <code>results</code>를 receive하며 분류. ping 결과 +
-                <code>hadSuccess</code>(과거 이력) 조합으로 <code>used / offline / free</code> 결정. 아래 시뮬레이터에서 직접 확인 가능.
+              <div class="sf-title">classifyScanResult() — 상태 분류 및 예외 필터링</div>
+              <div class="sf-desc">메인 goroutine이 <code>results</code>를 수신하며 분류. ping 결과 + <code>hadSuccess</code>(과거 이력) 조합으로 <code>used / offline / free</code>를 결정하되, <strong><code>is_override = true</code></strong>인 IP는 ping 결과에 따라 상태(status)와 연속 실패 횟수(consecutiveFailures)가 덮어씌워지지 않고 고정됨 (단, ping 성공 시 <code>lastSeenAt</code> 정보는 최신화됨).
               </div>
             </div>
           </div>
@@ -3076,7 +3085,7 @@
             </div>
             <div class="sf-body">
               <div class="sf-title">IPAMScanSummary 반환</div>
-              <div class="sf-desc"><code>{ Total, Used, Offline, Free }</code> 집계 반환. API 응답 및 스케줄러 로그에 활용.</div>
+              <div class="sf-desc"><code>{ Total, Used, Offline, Free, Reserved }</code> 집계 반환 (JSON API 응답 상에는 Reserved 항목 제외 가능하나 DB 및 내부 스케줄러 스캔 로그에는 수동 예약 상태인 IP 수도 함께 집계).</div>
             </div>
           </div>
         </div>
@@ -3175,6 +3184,12 @@
               <div class="sd-name" style="color:var(--red);">Offline</div>
               <div class="sd-desc">3회 연속 실패</div>
             </div>
+            <div style="color:var(--dim);font-size:20px;align-self:center;">⇄</div>
+            <div class="sd-state reserved-s" onclick="selectState('reserved')" id="sd-reserved">
+              <div class="sd-icon">🟠</div>
+              <div class="sd-name" style="color:var(--orange);">Reserved</div>
+              <div class="sd-desc">관리자 수동 지정</div>
+            </div>
           </div>
           <div class="sd-arrows">
             <div class="sd-arrow-row">
@@ -3213,9 +3228,23 @@
               <div class="to" style="color:var(--muted);">Free 유지</div>
             </div>
             <div class="sd-arrow-row">
+              <div class="from">Any State</div>
+              <div class="arr">→</div>
+              <div class="cond">Admin 수동 강제 설정 (<code>used</code> / <code>reserved</code>)</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--orange);">Status 고정 (isOverride=true)</div>
+            </div>
+            <div class="sd-arrow-row">
+              <div class="from">Reserved / Override</div>
+              <div class="arr">→</div>
+              <div class="cond">Admin 수동 <code>free</code> 지정 (오버라이드 해제)</div>
+              <div class="arr">→</div>
+              <div class="to" style="color:var(--muted);">Free (isOverride=false 리셋)</div>
+            </div>
+            <div class="sd-arrow-row">
               <div class="from" style="color:var(--yellow);">핵심 판단</div>
               <div class="arr">→</div>
-              <div class="cond"><code>hadSuccess = lastSeenAt != nil || status ∈ {used, offline}</code></div>
+              <div class="cond"><code>hadSuccess = lastSeenAt != nil || status ∈ {used, offline, reserved}</code></div>
               <div class="arr">→</div>
               <div class="to" style="color:var(--yellow);">free/offline 구분</div>
             </div>
@@ -3599,7 +3628,7 @@
                   <tr>
                     <td><code>status</code></td>
                     <td>enum</td>
-                    <td><code>used</code> / <code>offline</code> / <code>free</code></td>
+                    <td><code>used</code> / <code>offline</code> / <code>free</code> / <code>reserved</code></td>
                   </tr>
                   <tr>
                     <td><code>hostname</code></td>
@@ -3610,6 +3639,11 @@
                     <td><code>description</code></td>
                     <td>string?</td>
                     <td>admin이 수동 입력</td>
+                  </tr>
+                  <tr>
+                    <td><code>isOverride</code></td>
+                    <td>boolean</td>
+                    <td>수동 오버라이드 여부 · admin이 수동 상태 지정 시 true 고정, free 변경 시 false 리셋</td>
                   </tr>
                   <tr>
                     <td><code>lastScannedAt</code></td>
@@ -3711,9 +3745,9 @@
                     <td><code>completed</code> / <code>failed</code></td>
                   </tr>
                   <tr>
-                    <td><code>total</code> / <code>used</code> / <code>offline</code> / <code>free</code></td>
+                    <td><code>total</code> / <code>used</code> / <code>offline</code> / <code>free</code> / <code>reserved</code></td>
                     <td>int?</td>
-                    <td>완료 상태의 경우 각 IP 수 집계 (실패 시 null)</td>
+                    <td>완료 상태의 경우 각 IP 수 집계 (실패 시 null. DB 컬럼은 <code>reserved_count</code>)</td>
                   </tr>
                   <tr>
                     <td><code>error</code></td>
@@ -3755,7 +3789,7 @@
                   <tr>
                     <td><code>previousStatus</code> / <code>currentStatus</code></td>
                     <td>enum</td>
-                    <td>변경 전/후 IP 상태 (<code>used</code> / <code>offline</code> / <code>free</code>)</td>
+                    <td>변경 전/후 IP 상태 (<code>used</code> / <code>offline</code> / <code>free</code> / <code>reserved</code>)</td>
                   </tr>
                   <tr>
                     <td><code>previousLastSeenAt</code> / <code>currentLastSeenAt</code></td>
@@ -4149,6 +4183,12 @@
                 <td><span class="rb auth">Auth</span></td>
                 <td>Subnet IP 주소 목록</td>
               </tr>
+              <tr>
+                <td><span class="m get">GET</span></td>
+                <td><span class="ep">/api/ipam/subnets/:id/next-available?limit=N</span></td>
+                <td><span class="rb auth">Auth</span></td>
+                <td>사용 가능한(free) IP 주소를 순차적으로 최대 <code>limit</code>개(기본 1) 반환</td>
+              </tr>
               <tr class="sec-row">
                 <td colspan="4">IPAM — 관리 (Admin)</td>
               </tr>
@@ -4183,7 +4223,7 @@
                 <td><span class="m put">PUT</span></td>
                 <td><span class="ep">/api/manage/ipam/addresses/:id</span></td>
                 <td><span class="rb admin">Admin</span></td>
-                <td>IP 메타데이터 수정 (hostname, description)</td>
+                <td>IP 메타데이터 및 상태 수정 (hostname, description, status). <code>used</code>/<code>reserved</code> 변경 시 override 활성화, <code>free</code> 지정 시 해제.</td>
               </tr>
             </tbody>
           </table>
@@ -4727,11 +4767,12 @@
     /* ── State Diagram ── */
     const stateDetails = {
       free: '<strong>Free</strong> — ping 성공 이력이 <strong>한 번도 없는</strong> IP. lastSeenAt = nil. ping에 실패해도 free를 유지. 오직 ping 성공 시에만 used로 전이. 새로 생성된 모든 IP의 초기 상태.',
-      used: '<strong>Used</strong> — 마지막 ping이 성공했거나, 성공 이력이 있으며 consecutiveFailures < 3인 IP. lastSeenAt이 갱신됨. 1~2회 실패해도 grace period로 used 유지. 3회 연속 실패 시 offline으로 전이.',
-      offline: '<strong>Offline</strong> — 성공 이력이 있었지만(lastSeenAt != nil 또는 이전 status가 used/offline) consecutiveFailures ≥ 3인 IP. 다시 ping 성공 시 즉시 used로 복귀. free와 달리 "과거에 살아있었다"는 기록이 있음.'
+      used: '<strong>Used</strong> — 마지막 ping이 성공했거나, 성공 이력이 있으며 consecutiveFailures < 3인 IP. lastSeenAt이 갱신됨. 1~2회 실패해도 grace period로 used 유지. 3회 연속 실패 시 offline으로 전이. (수동 지정 시 isOverride=true로 스캔 결과 보호)',
+      offline: '<strong>Offline</strong> — 성공 이력이 있었지만(lastSeenAt != nil 또는 이전 status가 used/offline) consecutiveFailures ≥ 3인 IP. 다시 ping 성공 시 즉시 used로 복귀. free와 달리 "과거에 살아있었다"는 기록이 있음.',
+      reserved: '<strong>Reserved</strong> — 관리자가 수동으로 할당 보류 또는 예약을 지정한 IP. <code>isOverride = true</code>로 고정되어 ping 스캔에 의해 상태가 변하지 않고 고정됨. Admin이 상태를 free로 명시적 변경해야만 isOverride=false로 리셋되어 자동 스캔 대상으로 복귀.'
     };
     function selectState(name) {
-      ['free', 'used', 'offline'].forEach(s => {
+      ['free', 'used', 'offline', 'reserved'].forEach(s => {
         const el = document.getElementById('sd-' + s);
         if (el) el.classList.remove('sel');
       });
