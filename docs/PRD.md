@@ -1,99 +1,54 @@
-# PRD: Omni 인프라 통합 대시보드
+# PRD: Omni 인프라 및 IPAM 통합 대시보드
 
 ## Problem Statement
-
-현재 프로젝트의 VM, Kubernetes Cluster, Frontend/Backend Pod, Argo CD, GitLab, Nexus 상태가 여러 도구와
-문서에 흩어져 있어 운영/개발자가 전체 상태를 한눈에 보기 어렵다.
-Omni는 프로젝트 기능과 무관한 인프라 및 리소스 통합 dashboard 앱으로, 내부 운영/개발자가
-VM IP와 포트로 현재 상태를 빠르게 확인하고, UI에서 관측 대상과 외부 연동을 관리하는 것을 목표로 한다.
+- VM, Kubernetes, Argo CD, GitLab, Nexus, IPAM 자원 상태가 분산되어 관리 효율이 저하됨.
+- 한눈에 리소스 상태와 IP 할당 현황을 확인하고, UI에서 대상을 유연하게 제어하는 관리 도구가 필요함.
 
 ## Solution
-
-- **구조**: Go 기반의 고성능 백엔드(API/Collector)와 Next.js 기반의 프론트엔드 분리 구조로 만든다.
-- **수집**: 데이터 수집 logic은 Go 백엔드에서 30초마다 백그라운드 폴링으로 수행하며, 결과를 in-memory 캐시에 저장한다.
-- **배포**: 앱은 Kubernetes cluster 외부 VM에 Docker Compose(프론트엔드 + 백엔드)로 배포한다.
-- 같은 Kubernetes cluster 안에 앱을 배포하지 않는다. 클러스터 장애 시 관측 UI/collector도 같이 죽어
-  Omni의 목적과 충돌하기 때문이다.
-- 앱 repo는 GitHub public repo로 관리하고, 프론트엔드/백엔드 Docker image는 같은 version tag로 public GHCR에 push한다.
-- CI는 PR/main push에서 검증만 수행하고, `v*` Git tag push에서 검증 통과 후 frontend/backend release image를 publish한다.
-- VM 반영은 운영자가 `deploy/.env`의 `OMNI_VERSION`을 바꾼 뒤 `docker compose pull && docker compose up -d`로 수행한다.
-- Kubernetes에는 앱을 배포하지 않고 외부 collector용 read-only credential만 만든다.
-- v1은 현재 상태 중심 대시보드다. 시계열 분석, 알림, 상세 로그 분석은 원본 도구로 연결한다.
-- 설정 source of truth는 PostgreSQL이며, 최초 admin 생성 후 `Manage`에서 VM/resource/integration/user를 관리한다.
+- **구조**: Go 백엔드(API/Collector) 및 Next.js 프론트엔드 분리 구조.
+- **수집**: 
+  - 외부 도구: 백엔드에서 30초 주기 백그라운드 폴링 후 In-memory 캐시 저장.
+  - IPAM: ICMP Ping 기반 백그라운드 스캔(Auto Discovery) 및 PostgreSQL 영속화.
+- **배포**: Kubernetes 외부 VM에 Docker Compose로 단일 레플리카 배포 (K8s 장애 시 관측 보장).
+- **보안/설정**: PostgreSQL을 단일 진실 공급원(SoT)으로 사용하며, credential은 AES-256-GCM 암호화 저장.
 
 ## User Stories
-
-1. 운영자는 전체 시스템 health를 첫 화면에서 보고, 장애 여부를 빠르게 판단하고 싶다.
-2. 운영자는 VM 목록과 각 VM의 ping 생존 여부를 보고 싶다.
-3. 운영자는 Kubernetes 노드 Ready 상태와 현재 CPU/메모리 사용량을 보고 싶다.
-4. 운영자는 주요 namespace, workload, Pod Ready, restart, PVC, ingress 상태를 보고 싶다.
-5. 운영자는 frontend/backend Pod 상태를 별도로 빠르게 확인하고 싶다.
-6. 운영자는 Argo CD 전체 Application의 sync/health 상태와 원본 링크를 보고 싶다.
-7. 개발자는 앱 repo의 최신 commit과 default branch 기준 최신 pipeline 상태를 보고 싶다.
-8. 운영자는 GitLab, Nexus 같은 외부 도구가 접속 가능한지 확인하고 싶다.
-9. 운영자는 각 섹션에서 원본 시스템으로 이동할 수 있는 링크를 원한다.
-10. 운영자는 30초마다 자동 갱신되는 상태를 보고, 마지막 수집 시각과 수집 실패 여부를 확인하고 싶다.
-11. 운영자는 파일을 직접 수정하지 않고 UI에서 VM과 외부 시스템 연동을 등록하고 싶다.
-12. 관리자는 admin/viewer 계정을 만들고 viewer의 설정 변경을 막고 싶다.
+1. **대시보드**: 전체 인프라 health 요약 및 외부 링크 이동.
+2. **리소스 수집**: VM 생존(Ping), K8s 노드/Pod 상태, Argo CD 앱 상태, GitLab 파이프라인, Nexus 접속 상태 확인.
+3. **IPAM 관리**: 
+  - `Location -> Network -> Subnet -> IP Address` 계층 구조 기반 IP 자원 시각화.
+  - Subnet 생성 시 사용 가능한 Host IP 행 자동 생성 및 스캔.
+  - IPAM 스캔 이력(Summary 및 IP 상태 변경 로그) 확인.
+4. **설정/권한**: UI를 통한 VM/인프라/IPAM 연동 등록. Admin(변경/재스캔)과 Viewer(조회 전용) 권한 분리.
 
 ## Design Details
-
-- 제품명은 Omni로 한다.
-- 앱 성격은 “dashboard 앱”으로 문서화하되, 제품명 자체에는 Dashboard를 붙이지 않는다.
-- 접속 경로는 `http://<VM-IP>:3000` 직접 접속으로 한다. (프론트엔드가 백엔드 8080으로 요청을 프록시함)
-- 별도 reverse proxy는 v1 배포 기준에서 제외한다.
-- 화면 구조는 Overview + 섹션 탭으로 한다.
-- UX/UI 상세 디자인은 후속 작업 에이전트와 별도로 결정한다.
-- v1 데이터 깊이는 현재 상태 중심으로 제한한다.
-- CPU/메모리는 현재 사용량만 보여준다.
-- VM 상태는 ICMP ping 기반 up/down/unknown만 제공한다.
-- ICMP ping을 위해 Docker Compose에서 `NET_RAW` capability를 허용한다.
-- GitLab 섹션은 앱 repo만 보여준다: sth-approval-system, sth-approval-system-admin, sth-portal-member-backend.
-- GitLab commit/pipeline은 각 repo의 default branch 기준으로 조회한다.
-- Argo CD 섹션은 전체 Argo CD Application을 보여준다.
-- Nexus 섹션은 접속 상태만 보여준다.
-- 알림/통지는 MVP에서 제외하고, 추후 webhook 연동 예정으로만 기록한다.
-- collect API는 Go 백엔드 collector가 만든 in-memory snapshot cache를 `/api/collect/snapshot` 단일 API로 반환한다.
-- 프론트엔드는 30초 폴링으로 Next.js 프록시를 통해 Go 백엔드 API를 호출한다.
-- v1은 단일 replica 전제로 시작한다.
-- 실제 inventory 파일은 사용하지 않는다.
-- resource/integration/user 설정은 PostgreSQL에 저장한다.
-- Kubernetes/GitLab/ArgoCD credential은 UI에서 등록하고 `OMNI_SECRET_KEY`로 암호화 저장한다.
-- Runtime env는 `OMNI_VERSION`, `API_URL=http://backend:8080`, `DATABASE_URL`, `OMNI_SECRET_KEY` 등을 기준으로 한다.
-- Kubernetes 조회는 `omni` namespace의 전용 read-only `ServiceAccount omni-reader`, `ClusterRole/ClusterRoleBinding`, `Secret omni-reader-token(type kubernetes.io/service-account-token)`으로 처리한다.
-- Kubernetes API는 HTTP가 아니라 HTTPS와 CA 신뢰가 필요하다.
-- GHCR image tag는 `v1.0.1` 같은 version tag만 사용하고 latest는 배포 기준에서 제외한다.
+- **IPAM 스캔**:
+  - ICMP ping 기반으로 IP 상태(`up`, `down`, `unknown`) 식별.
+  - IPAM 스케줄러가 주기적으로 자동 스캔을 수행하며, UI를 통한 수동 즉시 재스캔 제공.
+  - 스캔 시 전체 IP 스냅샷을 저장하지 않고, 스캔 이력 요약 및 상태 변경 내역(diff)만 트랜잭션으로 저장.
+- **배포/네트워크**: Docker Compose 상에서 ICMP ping 동작을 위해 `NET_RAW` capability 부여.
 
 ## Public Interfaces
-
-- 앱 API 계약은 Manage/Auth 도입으로 확장된다. (Next.js `/api/*`가 Go 백엔드로 프록시됨)
-- POST /api/auth/setup, /login, /logout, /password 및 GET /api/auth/me
-- /api/manage/resources/vms
-- /api/manage/integrations/kubernetes, /gitlab, /argocd, /nexus
-- /api/manage/users
-- GET /api/collect/snapshot: 전체 health rollup과 VM, Kubernetes, Argo CD, GitLab, Nexus source envelope을 하나로 반환
-- GET /api/collect/snapshot?force=true: 각 resource/tool collector를 병렬 실행한 뒤 최신 snapshot 반환
-- GET /api/collect/overview, `/vms`, `/kubernetes`, `/argocd`, `/gitlab`, `/nexus`: source별 직접 확인용 개별 API
-- GET /api/health/ready: 앱 ready health
+- **인증 및 계정**: POST `/api/auth/setup`, `/api/auth/login`, `/api/auth/logout`, GET `/api/auth/me`
+- **인프라 설정**: `/api/manage/resources/vms`, `/api/manage/integrations/{kubernetes,gitlab,argocd,nexus}`
+- **대시보드 수집**: GET `/api/collect/snapshot` (전체 snapshot), `/api/collect/snapshot?force=true` (즉시 갱신)
+- **IPAM 조회 (Viewer/Admin)**:
+  - GET `/api/ipam/summary` (IPAM 요약)
+  - GET `/api/ipam/scan-history`, `/api/ipam/scan-history/:id` (스캔 이력 및 상세)
+  - GET `/api/ipam/{locations,networks,subnets}` (IPAM 계층 목록 조회)
+  - GET `/api/ipam/subnets/:id/addresses` (특정 Subnet IP 주소 목록 조회)
+- **IPAM 관리 (Admin)**:
+  - POST/PUT/DELETE `/api/manage/ipam/locations`
+  - POST/PUT/DELETE `/api/manage/ipam/networks`
+  - POST/PUT/DELETE `/api/manage/ipam/subnets`
+  - POST `/api/manage/ipam/subnets/:id/rescan` (수동 재스캔 실행)
+  - PUT `/api/manage/ipam/addresses/:id` (IP 세부 정보 수정)
 
 ## Testing Decisions
-
-- collect API는 Go 백엔드의 외부 시스템별 adapter 단위로 테스트한다.
-- Kubernetes/Argo/GitLab/Nexus adapter는 mock response 기반으로 정상/실패/timeout/stale 상태를 검증한다.
-- VM ping collector는 up, down, timeout, permission failure를 구분해 테스트한다.
-- UI 테스트는 Overview rollup, 섹션별 상태 표시, stale/error 표시, 원본 링크 렌더링을 검증한다.
-- 배포 검증은 VM `docker compose ps`, `http://<VM-IP>:3000` 접근, 최초 admin 생성, integration 등록/검증, collect API 응답, ready health 응답 기준으로 한다.
-- Kubernetes source 장애는 `down`/`timeout`/`stale`로 격리한다. 장애 중 Kubernetes 세부 수집 지속 보장은 v1 범위 밖이다.
+- IPAM 스캔 로직은 ICMP ping 결과(정상, 실패, 권한 에러 등)에 따른 IP 상태 천이 검증.
+- Mock DB와 Mock Ping Executor를 활용하여 IPAM 스캔 요약 및 변경 로그 생성 트랜잭션 테스트.
 
 ## Out of Scope
-
-- Slack/메일/webhook 알림
-- Grafana 수준의 시계열 그래프와 쿼리 탐색
-- Nexus artifact/image 목록 조회
-- GitLab job 로그 상세 분석
-- VM CPU/메모리/디스크 agent 설치
-- 장기 이력 저장용 DB
-- 기존 GitLab CI/Nexus 기반 Omni 배포
-- Kubernetes cluster 내부 Omni 앱 배포
-- Argo CD Application 기반 Omni 앱 배포
-- Kubernetes 장애 중 Kubernetes 세부 리소스 수집 지속 보장
+- 알림 서비스 (Slack/이메일/Webhook 등)
+- Grafana 수준의 시계열 메트릭 시각화
+- K8s 내부 또는 Argo CD 기반의 Omni 자체 배포
