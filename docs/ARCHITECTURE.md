@@ -8,7 +8,7 @@ Omni는 인프라 리소스(VM, K8s, CI/CD 도구)와 IPAM(IP 주소 자원)의 
 ## Core Design Principles
 1. **Performance over Absolute Real-time**: 30초 주기의 백그라운드 동기화(External Tools) 및 스케줄링 스캔(IPAM)을 통해 데이터 지연을 격리합니다.
 2. **Security-by-Design**: `integration_type:integration_id:secret_name`을 AD(Additional Data)로 사용하는 AES-256-GCM 알고리즘으로 자격 증명을 암호화합니다.
-3. **Decoupled Architecture**: 수집 엔진(Collector/IPAM Scanner)과 API 서빙 레이어는 인메모리 캐시 및 데이터베이스를 통해 느슨하게 결합됩니다.
+3. **Decoupled Architecture**: 수집 엔진(Collector/IPAM ScanExecutor)과 API 서빙 레이어는 인메모리 캐시 및 데이터베이스를 통해 느슨하게 결합됩니다.
 4. **Consistency**: 이질적인 외부 상태 데이터를 표준 상태 모델(`up`, `down`, `unknown`)로 정규화합니다.
 
 ## Technology Stack
@@ -29,8 +29,8 @@ graph TD
         Runner[External Tool Runner] -->|30s Polling| Ext[Kubernetes, ArgoCD, GitLab, Nexus]
         Ext -->|Fetch & Normalize| Cache
         
-        IPAM[IPAM Scheduler/Scanner] -->|ICMP Ping Scan| VM[VMs & Subnet IPs]
-        IPAM -->|Bulk Write Status & History| DB
+        IPAM[IPAM Scheduler/ScanExecutor] -->|ICMP Ping Scan| VM[VMs & Subnet IPs]
+        IPAM -->|Lease-aware Bulk Write Status & History| DB
     end
 ```
 
@@ -41,12 +41,12 @@ graph TD
 ### 2. IPAM Data Flow (Database-backed)
 - IPAM 자원은 `Location -> Network -> Subnet -> IP Address` 계층 구조로 RDB에서 관리.
 - Subnet CIDR 등록 시 사용 가능한 전체 Host IP 레코드가 데이터베이스에 자동 생성.
-- `IPAM Scanner`는 ICMP ping을 활용해 IP 활성화 여부 백그라운드 스캔 (Auto Discovery).
-- 스캔 결과 반영 시 전체 IP 스냅샷을 저장하지 않고, 상태 변화(transition diff)와 스캔 요약(summary history)만 단일 트랜잭션으로 커밋.
+- `IPAM ScanExecutor`는 수동 재스캔과 Auto Discovery 스케줄 스캔의 공통 실행 경계이며, 내부에서 claim/skip/complete/fail 계약을 처리.
+- 스캔 결과 반영 시 전체 IP 스냅샷을 저장하지 않고, 상태 변화(transition diff)와 스캔 요약(summary history)만 lease-aware 단일 트랜잭션으로 커밋.
 
 ## Backend Layered Architecture (`internal/`)
 - **API (`api/`)**: HTTP 요청 핸들링, 라우팅 및 세션 관리.
 - **Collector (`collector/`)**: 외부 시스템 어댑터 및 In-memory 캐시.
-- **IPAM (`ipam/`)**: ICMP 스캐너, 워커 풀, Auto Discovery 스케줄러.
+- **IPAM (`ipam/`)**: `ScanExecutor`, ICMP prober, 워커 풀, Auto Discovery 스케줄러.
 - **Store (`store/`)**: PostgreSQL 접근, 트랜잭션 처리, AES-256-GCM 암/복호화.
 - **Models (`models/`)**: 도메인 객체 및 공통 타입 정의.

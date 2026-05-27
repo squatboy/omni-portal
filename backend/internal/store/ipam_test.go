@@ -3,6 +3,7 @@ package store
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -94,6 +95,9 @@ func TestValidationErrorsAreClassified(t *testing.T) {
 	}
 	if _, err := normalizeIPAMScanInterval(60); !errors.Is(err, ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+	if err := ensureIPAMScanLease(ipamScanSubnetSnapshotRow{}, time.Time{}); !errors.Is(err, ErrValidation) {
+		t.Fatalf("expected missing lease validation error, got %v", err)
 	}
 }
 

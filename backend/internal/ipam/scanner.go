@@ -10,59 +10,177 @@ import (
 	"time"
 
 	"omni-backend/internal/models"
+	"omni-backend/internal/store"
 )
 
 const WorkerCount = 64
 
-type PingExecutor interface {
-	Ping(ctx context.Context, address string) error
+type Code string
+
+const (
+	CodeValidation     Code = "validation"
+	CodeNotFound       Code = "not_found"
+	CodeAlreadyRunning Code = "already_running"
+	CodeConflict       Code = "conflict"
+	CodeInternal       Code = "internal"
+)
+
+type codedError struct {
+	code Code
+	err  error
 }
 
-type Store interface {
-	MarkIPAMScanStarted(ctx context.Context, subnetID string, startedAt time.Time) error
-	MarkIPAMScanFailed(ctx context.Context, subnetID string, completedAt time.Time, message string) (models.IPAMSubnet, error)
-	ListIPAMScanAddresses(ctx context.Context, subnetID string) ([]models.IPAMScanAddress, error)
-	BulkApplyIPAMScanResults(ctx context.Context, subnetID string, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error)
+func (e codedError) Error() string {
+	return e.err.Error()
 }
 
-type Scanner struct {
-	store Store
-	ping  PingExecutor
+func (e codedError) Unwrap() error {
+	return e.err
 }
 
-func NewScanner(store Store, ping PingExecutor) *Scanner {
-	if ping == nil {
-		ping = CommandPingExecutor{Timeout: 2 * time.Second}
+func ErrorCode(err error) Code {
+	if err == nil {
+		return ""
 	}
-	return &Scanner{store: store, ping: ping}
+	var coded codedError
+	if errors.As(err, &coded) {
+		return coded.code
+	}
+	switch {
+	case errors.Is(err, store.ErrValidation):
+		return CodeValidation
+	case errors.Is(err, store.ErrNotFound):
+		return CodeNotFound
+	case errors.Is(err, store.ErrConflict):
+		return CodeConflict
+	}
+	return CodeInternal
 }
 
-func (s *Scanner) ScanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error) {
-	startedAt := time.Now().UTC()
+func withCode(code Code, err error) error {
+	if err == nil {
+		return nil
+	}
+	return codedError{code: code, err: err}
+}
+
+type Prober interface {
+	Probe(ctx context.Context, address string) error
+}
+
+type Clock interface {
+	Now() time.Time
+}
+
+type realClock struct{}
+
+func (realClock) Now() time.Time {
+	return time.Now().UTC()
+}
+
+type ScanLease struct {
+	SubnetID  string
+	StartedAt time.Time
+}
+
+type ScanClaim struct {
+	Lease     ScanLease
+	Addresses []models.IPAMScanAddress
+}
+
+type ScanDueRequest struct {
+	Limit int
+}
+
+type DueScanReport struct {
+	Claimed   int
+	Completed int
+	Failed    int
+	Skipped   int
+}
+
+type ScanExecutor interface {
+	RescanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error)
+	ScanDue(ctx context.Context, req ScanDueRequest) (DueScanReport, error)
+}
+
+type Repository interface {
+	ClaimManualScan(ctx context.Context, subnetID string, startedAt time.Time) (ScanClaim, error)
+	ClaimDueScans(ctx context.Context, now time.Time, limit int) ([]ScanClaim, int, error)
+	CompleteScan(ctx context.Context, lease ScanLease, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error)
+	FailScan(ctx context.Context, lease ScanLease, completedAt time.Time, message string) (models.IPAMSubnet, error)
+}
+
+type Executor struct {
+	repo   Repository
+	prober Prober
+	clock  Clock
+}
+
+func NewScanExecutor(repo Repository, prober Prober, clock Clock) *Executor {
+	if prober == nil {
+		prober = CommandPingExecutor{Timeout: 2 * time.Second}
+	}
+	if clock == nil {
+		clock = realClock{}
+	}
+	return &Executor{repo: repo, prober: prober, clock: clock}
+}
+
+func (e *Executor) RescanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error) {
+	startedAt := e.clock.Now().UTC()
+	claim, err := e.repo.ClaimManualScan(ctx, subnetID, startedAt)
+	if err != nil {
+		return models.IPAMScanSummary{
+			SubnetID:  subnetID,
+			StartedAt: startedAt.Format(time.RFC3339),
+		}, err
+	}
+	return e.runClaim(ctx, claim)
+}
+
+func (e *Executor) ScanDue(ctx context.Context, req ScanDueRequest) (DueScanReport, error) {
+	now := e.clock.Now().UTC()
+	claims, skipped, err := e.repo.ClaimDueScans(ctx, now, req.Limit)
+	if err != nil {
+		return DueScanReport{}, err
+	}
+
+	report := DueScanReport{Claimed: len(claims), Skipped: skipped}
+	for _, claim := range claims {
+		if ctx.Err() != nil {
+			return report, ctx.Err()
+		}
+		if _, err := e.runClaim(ctx, claim); err != nil {
+			if ErrorCode(err) == CodeAlreadyRunning {
+				report.Skipped++
+				continue
+			}
+			report.Failed++
+			continue
+		}
+		report.Completed++
+	}
+	return report, nil
+}
+
+func (e *Executor) runClaim(ctx context.Context, claim ScanClaim) (models.IPAMScanSummary, error) {
 	summary := models.IPAMScanSummary{
-		SubnetID:  subnetID,
-		StartedAt: startedAt.Format(time.RFC3339),
+		SubnetID:  claim.Lease.SubnetID,
+		StartedAt: claim.Lease.StartedAt.Format(time.RFC3339),
 	}
-	if err := s.store.MarkIPAMScanStarted(ctx, subnetID, startedAt); err != nil {
-		return summary, err
-	}
-
-	addresses, err := s.store.ListIPAMScanAddresses(ctx, subnetID)
-	if err != nil {
-		s.markFailed(context.Background(), subnetID, err)
-		return summary, err
-	}
-
-	results := s.scanAddresses(ctx, startedAt, addresses)
+	results := e.scanAddresses(ctx, claim.Lease.StartedAt, claim.Addresses)
 	if err := ctx.Err(); err != nil {
-		s.markFailed(context.Background(), subnetID, err)
+		e.markFailed(context.Background(), claim.Lease, err)
 		return summary, err
 	}
 
-	completedAt := time.Now().UTC()
-	subnet, err := s.store.BulkApplyIPAMScanResults(ctx, subnetID, completedAt, results)
+	completedAt := e.clock.Now().UTC()
+	subnet, err := e.repo.CompleteScan(ctx, claim.Lease, completedAt, results)
 	if err != nil {
-		s.markFailed(context.Background(), subnetID, err)
+		if ErrorCode(err) != CodeConflict {
+			e.markFailed(context.Background(), claim.Lease, err)
+		}
 		return summary, err
 	}
 
@@ -82,7 +200,7 @@ func (s *Scanner) ScanSubnet(ctx context.Context, subnetID string) (models.IPAMS
 	return summary, nil
 }
 
-func (s *Scanner) scanAddresses(ctx context.Context, scannedAt time.Time, addresses []models.IPAMScanAddress) []models.IPAMScanResult {
+func (e *Executor) scanAddresses(ctx context.Context, scannedAt time.Time, addresses []models.IPAMScanAddress) []models.IPAMScanResult {
 	jobs := make(chan models.IPAMScanAddress)
 	results := make(chan models.IPAMScanResult, len(addresses))
 
@@ -96,7 +214,7 @@ func (s *Scanner) scanAddresses(ctx context.Context, scannedAt time.Time, addres
 				if ctx.Err() != nil {
 					return
 				}
-				err := s.ping.Ping(ctx, address.Address)
+				err := e.prober.Probe(ctx, address.Address)
 				results <- classifyScanResult(address, scannedAt, err == nil)
 			}
 		}()
@@ -153,15 +271,85 @@ func classifyScanResult(address models.IPAMScanAddress, scannedAt time.Time, suc
 	return result
 }
 
-func (s *Scanner) markFailed(ctx context.Context, subnetID string, scanErr error) {
-	_, _ = s.store.MarkIPAMScanFailed(ctx, subnetID, time.Now().UTC(), scanErr.Error())
+func (e *Executor) markFailed(ctx context.Context, lease ScanLease, scanErr error) {
+	_, _ = e.repo.FailScan(ctx, lease, e.clock.Now().UTC(), scanErr.Error())
+}
+
+type StoreRepository struct {
+	store *store.Store
+}
+
+func NewStoreRepository(st *store.Store) StoreRepository {
+	return StoreRepository{store: st}
+}
+
+func (r StoreRepository) ClaimManualScan(ctx context.Context, subnetID string, startedAt time.Time) (ScanClaim, error) {
+	addresses, err := r.store.ClaimManualIPAMScan(ctx, subnetID, startedAt)
+	if err != nil {
+		return ScanClaim{}, mapClaimError(err)
+	}
+	return ScanClaim{
+		Lease:     ScanLease{SubnetID: subnetID, StartedAt: startedAt.UTC()},
+		Addresses: addresses,
+	}, nil
+}
+
+func (r StoreRepository) ClaimDueScans(ctx context.Context, now time.Time, limit int) ([]ScanClaim, int, error) {
+	items, skipped, err := r.store.ClaimDueIPAMScans(ctx, now, limit)
+	if err != nil {
+		return nil, skipped, mapStoreError(err)
+	}
+	claims := make([]ScanClaim, 0, len(items))
+	for _, item := range items {
+		claims = append(claims, ScanClaim{
+			Lease:     ScanLease{SubnetID: item.SubnetID, StartedAt: item.StartedAt},
+			Addresses: item.Addresses,
+		})
+	}
+	return claims, skipped, nil
+}
+
+func (r StoreRepository) CompleteScan(ctx context.Context, lease ScanLease, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error) {
+	subnet, err := r.store.CompleteIPAMScan(ctx, lease.SubnetID, lease.StartedAt, completedAt, results)
+	if err != nil {
+		return models.IPAMSubnet{}, mapStoreError(err)
+	}
+	return subnet, nil
+}
+
+func (r StoreRepository) FailScan(ctx context.Context, lease ScanLease, completedAt time.Time, message string) (models.IPAMSubnet, error) {
+	subnet, err := r.store.FailIPAMScan(ctx, lease.SubnetID, lease.StartedAt, completedAt, message)
+	if err != nil {
+		return models.IPAMSubnet{}, mapStoreError(err)
+	}
+	return subnet, nil
+}
+
+func mapClaimError(err error) error {
+	if errors.Is(err, store.ErrConflict) {
+		return withCode(CodeAlreadyRunning, err)
+	}
+	return mapStoreError(err)
+}
+
+func mapStoreError(err error) error {
+	switch {
+	case errors.Is(err, store.ErrValidation):
+		return withCode(CodeValidation, err)
+	case errors.Is(err, store.ErrNotFound):
+		return withCode(CodeNotFound, err)
+	case errors.Is(err, store.ErrConflict):
+		return withCode(CodeConflict, err)
+	default:
+		return withCode(CodeInternal, err)
+	}
 }
 
 type CommandPingExecutor struct {
 	Timeout time.Duration
 }
 
-func (p CommandPingExecutor) Ping(ctx context.Context, address string) error {
+func (p CommandPingExecutor) Probe(ctx context.Context, address string) error {
 	if idx := strings.Index(address, "/"); idx != -1 {
 		address = address[:idx]
 	}

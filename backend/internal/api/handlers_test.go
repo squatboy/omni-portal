@@ -129,7 +129,11 @@ func TestIPAMScanHistoryViewerAccessAndNotFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create subnet: %v", err)
 	}
-	if _, err := st.MarkIPAMScanFailed(ctx, subnet.ID, time.Now().UTC(), "scan failed"); err != nil {
+	startedAt := time.Now().UTC()
+	if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, startedAt); err != nil {
+		t.Fatalf("claim scan: %v", err)
+	}
+	if _, err := st.FailIPAMScan(ctx, subnet.ID, startedAt, startedAt.Add(time.Second), "scan failed"); err != nil {
 		t.Fatalf("mark failed: %v", err)
 	}
 
@@ -203,6 +207,33 @@ func TestWriteStoreJSONErrorStatus(t *testing.T) {
 			ctx, _ := gin.CreateTestContext(rec)
 
 			writeStoreJSON(ctx, http.StatusOK, gin.H{"ok": true}, tt.err)
+
+			if rec.Code != tt.want {
+				t.Fatalf("expected status %d, got %d", tt.want, rec.Code)
+			}
+		})
+	}
+}
+
+func TestWriteIPAMJSONErrorStatus(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "validation", err: store.ErrValidation, want: http.StatusBadRequest},
+		{name: "not found", err: store.ErrNotFound, want: http.StatusNotFound},
+		{name: "conflict", err: store.ErrConflict, want: http.StatusConflict},
+		{name: "unknown error", err: errors.New("probe failed"), want: http.StatusInternalServerError},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gin.SetMode(gin.TestMode)
+			rec := httptest.NewRecorder()
+			ctx, _ := gin.CreateTestContext(rec)
+
+			writeIPAMJSON(ctx, http.StatusOK, gin.H{"ok": true}, tt.err)
 
 			if rec.Code != tt.want {
 				t.Fatalf("expected status %d, got %d", tt.want, rec.Code)

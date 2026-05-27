@@ -24,14 +24,16 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
 ## 2. 스캔 메커니즘 (Scanning Mechanism)
 
 ### 스캔 실행 및 상태 판별 규칙
-- **스캔 동작**: Scanner worker pool(크기 `64` 고정)을 통해 ICMP ping 스캔 수행.
+- **실행 경계**: `ScanExecutor`가 수동 재스캔(`RescanSubnet`)과 스케줄 스캔(`ScanDue`)의 공통 진입점임.
+- **스캔 동작**: `Prober` adapter가 OS `ping` 명령을 실행하고, worker pool(크기 `64` 고정)을 통해 ICMP ping 스캔 수행.
 - **상태 판별**:
   - **Ping 성공**: IP 상태가 `used`로 갱신되며, `consecutiveFailures`는 0으로 초기화됨.
   - **Ping 실패**: `consecutiveFailures`가 1씩 증가함.
     - **과거 성공 이력이 있는 IP**: 3회 연속 실패 시 `offline` 상태로 전환됨.
     - **성공 이력이 없는 IP**: 실패하더라도 `free` 상태 유지.
 - **스캔 라이프사이클 속성**: Subnet의 `lastScanStartedAt`, `lastScanCompletedAt`, `lastScanStatus`, `lastScanError` 필드를 사용하여 추적함.
-- **스케줄러**: IPAM scheduler는 기존 dashboard collect runner와 별도로 실행됨.
+- **실행권한(Lease)**: 스캔 시작 시 `subnetId + startedAt` lease를 잡고, 완료/실패 반영 시 같은 lease인지 확인함. 지연된 이전 스캔 결과는 최신 스캔 결과를 덮어쓰지 않음.
+- **스케줄러**: IPAM scheduler는 기존 dashboard collect runner와 별도로 실행되며, due subnet 조회/claim/skip 처리는 `ScanExecutor.ScanDue` 내부 계약으로 캡슐화됨.
 
 ---
 
@@ -41,6 +43,8 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
 
 ### 데이터 저장 구조
 스캔 결과는 대용량 업데이트(Bulk Update) 중 트랜잭션을 통해 두 테이블에 나누어 기록한다.
+- 완료 처리 트랜잭션은 IP 주소 bulk update, Subnet scan status 갱신, scan history summary/change row 기록, retention pruning을 함께 커밋한다.
+- 실패 처리 트랜잭션은 Subnet failed status, 실패 history row, retention pruning을 함께 커밋한다.
 
 1. **`ipam_scan_history` (스캔 요약)**
    - 완료된 모든 스캔에 대해 Subnet별 스캔 요약 행(Row)을 저장함.

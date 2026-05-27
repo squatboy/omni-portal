@@ -10,6 +10,7 @@ import (
 
 	"omni-backend/internal/collector"
 	"omni-backend/internal/config"
+	"omni-backend/internal/ipam"
 	"omni-backend/internal/models"
 	"omni-backend/internal/store"
 
@@ -25,7 +26,7 @@ type API struct {
 }
 
 type ipamRescanner interface {
-	ScanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error)
+	RescanSubnet(ctx context.Context, subnetID string) (models.IPAMScanSummary, error)
 }
 
 type authedUserKey struct{}
@@ -530,8 +531,8 @@ func (api *API) handleRescanIPAMSubnet(c *gin.Context) {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "ipam scanner unavailable"})
 		return
 	}
-	summary, err := api.ipamScanner.ScanSubnet(c.Request.Context(), c.Param("id"))
-	writeStoreJSON(c, http.StatusOK, summary, err)
+	summary, err := api.ipamScanner.RescanSubnet(c.Request.Context(), c.Param("id"))
+	writeIPAMJSON(c, http.StatusOK, summary, err)
 }
 
 func (api *API) handleListIPAMAddresses(c *gin.Context) {
@@ -659,6 +660,23 @@ func writeStoreJSON(c *gin.Context, successStatus int, payload any, err error) {
 		case errors.Is(err, store.ErrNotFound):
 			writeError(c, http.StatusNotFound, err)
 		case errors.Is(err, store.ErrConflict):
+			writeError(c, http.StatusConflict, err)
+		default:
+			writeError(c, http.StatusInternalServerError, err)
+		}
+		return
+	}
+	c.JSON(successStatus, payload)
+}
+
+func writeIPAMJSON(c *gin.Context, successStatus int, payload any, err error) {
+	if err != nil {
+		switch ipam.ErrorCode(err) {
+		case ipam.CodeValidation:
+			writeError(c, http.StatusBadRequest, err)
+		case ipam.CodeNotFound:
+			writeError(c, http.StatusNotFound, err)
+		case ipam.CodeAlreadyRunning, ipam.CodeConflict:
 			writeError(c, http.StatusConflict, err)
 		default:
 			writeError(c, http.StatusInternalServerError, err)

@@ -31,6 +31,12 @@ var allowedIPAMScanIntervals = map[int]struct{}{
 
 const ipamScanHistoryRetentionPerSubnet = 20
 
+type ClaimedIPAMScan struct {
+	SubnetID  string
+	StartedAt time.Time
+	Addresses []models.IPAMScanAddress
+}
+
 func (s *Store) ListIPAMLocations(ctx context.Context) ([]models.IPAMLocation, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, name, description, created_at, updated_at
@@ -429,9 +435,9 @@ func (s *Store) ListDueIPAMSubnets(ctx context.Context, now time.Time, limit int
 	return items, rows.Err()
 }
 
-func (s *Store) MarkIPAMScanStarted(ctx context.Context, subnetID string, startedAt time.Time) error {
+func (s *Store) ClaimManualIPAMScan(ctx context.Context, subnetID string, startedAt time.Time) ([]models.IPAMScanAddress, error) {
 	if strings.TrimSpace(subnetID) == "" {
-		return validationError("subnet id is required")
+		return nil, validationError("subnet id is required")
 	}
 	result, err := s.db.ExecContext(ctx, `
 		UPDATE ipam_subnets
@@ -440,18 +446,45 @@ func (s *Store) MarkIPAMScanStarted(ctx context.Context, subnetID string, starte
 			AND (last_scan_status IS DISTINCT FROM 'running' OR last_scan_started_at <= $2::timestamptz - interval '15 minutes')
 	`, subnetID, startedAt.UTC())
 	if err != nil {
-		return err
+		return nil, err
 	}
 	if changed, _ := result.RowsAffected(); changed > 0 {
-		return nil
+		return s.ListIPAMScanAddresses(ctx, subnetID)
 	}
 	if _, err := s.ipamSubnetByID(ctx, subnetID); err != nil {
-		return err
+		return nil, err
 	}
-	return fmt.Errorf("%w: subnet scan already running", ErrConflict)
+	return nil, fmt.Errorf("%w: subnet scan already running", ErrConflict)
 }
 
-func (s *Store) MarkIPAMScanFailed(ctx context.Context, subnetID string, completedAt time.Time, message string) (models.IPAMSubnet, error) {
+func (s *Store) ClaimDueIPAMScans(ctx context.Context, now time.Time, limit int) ([]ClaimedIPAMScan, int, error) {
+	subnets, err := s.ListDueIPAMSubnets(ctx, now, limit)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	items := make([]ClaimedIPAMScan, 0, len(subnets))
+	skipped := 0
+	startedAt := now.UTC()
+	for _, subnet := range subnets {
+		addresses, err := s.ClaimManualIPAMScan(ctx, subnet.ID, startedAt)
+		if errors.Is(err, ErrConflict) {
+			skipped++
+			continue
+		}
+		if err != nil {
+			return nil, skipped, err
+		}
+		items = append(items, ClaimedIPAMScan{
+			SubnetID:  subnet.ID,
+			StartedAt: startedAt,
+			Addresses: addresses,
+		})
+	}
+	return items, skipped, nil
+}
+
+func (s *Store) FailIPAMScan(ctx context.Context, subnetID string, startedAt time.Time, completedAt time.Time, message string) (models.IPAMSubnet, error) {
 	if strings.TrimSpace(subnetID) == "" {
 		return models.IPAMSubnet{}, validationError("subnet id is required")
 	}
@@ -468,6 +501,9 @@ func (s *Store) MarkIPAMScanFailed(ctx context.Context, subnetID string, complet
 
 	snapshot, err := ipamScanSubnetSnapshot(ctx, tx, subnetID)
 	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := ensureIPAMScanLease(snapshot, startedAt); err != nil {
 		return models.IPAMSubnet{}, err
 	}
 	result, err := tx.ExecContext(ctx, `
@@ -534,7 +570,7 @@ func (s *Store) ListIPAMScanAddresses(ctx context.Context, subnetID string) ([]m
 	return items, rows.Err()
 }
 
-func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error) {
+func (s *Store) CompleteIPAMScan(ctx context.Context, subnetID string, startedAt time.Time, completedAt time.Time, results []models.IPAMScanResult) (models.IPAMSubnet, error) {
 	if strings.TrimSpace(subnetID) == "" {
 		return models.IPAMSubnet{}, validationError("subnet id is required")
 	}
@@ -546,6 +582,9 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 
 	snapshot, err := ipamScanSubnetSnapshot(ctx, tx, subnetID)
 	if err != nil {
+		return models.IPAMSubnet{}, err
+	}
+	if err := ensureIPAMScanLease(snapshot, startedAt); err != nil {
 		return models.IPAMSubnet{}, err
 	}
 	previous, err := ipamScanAddressSnapshots(ctx, tx, subnetID)
@@ -794,17 +833,19 @@ type ipamScanSubnetSnapshotRow struct {
 	name      string
 	cidr      string
 	startedAt *time.Time
+	status    *string
 }
 
 func ipamScanSubnetSnapshot(ctx context.Context, tx *sql.Tx, subnetID string) (ipamScanSubnetSnapshotRow, error) {
 	var snapshot ipamScanSubnetSnapshotRow
 	var startedAt sql.NullTime
+	var status sql.NullString
 	err := tx.QueryRowContext(ctx, `
-		SELECT name, cidr::text, last_scan_started_at
+		SELECT name, cidr::text, last_scan_started_at, last_scan_status
 		FROM ipam_subnets
 		WHERE id=$1
 		FOR UPDATE
-	`, subnetID).Scan(&snapshot.name, &snapshot.cidr, &startedAt)
+	`, subnetID).Scan(&snapshot.name, &snapshot.cidr, &startedAt, &status)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ipamScanSubnetSnapshotRow{}, ErrNotFound
 	}
@@ -815,7 +856,24 @@ func ipamScanSubnetSnapshot(ctx context.Context, tx *sql.Tx, subnetID string) (i
 		value := startedAt.Time
 		snapshot.startedAt = &value
 	}
+	if status.Valid {
+		value := status.String
+		snapshot.status = &value
+	}
 	return snapshot, nil
+}
+
+func ensureIPAMScanLease(snapshot ipamScanSubnetSnapshotRow, startedAt time.Time) error {
+	if startedAt.IsZero() {
+		return validationError("scan lease started_at is required")
+	}
+	if snapshot.status == nil || *snapshot.status != "running" || snapshot.startedAt == nil {
+		return fmt.Errorf("%w: subnet scan lease is no longer active", ErrConflict)
+	}
+	if snapshot.startedAt.UTC().Sub(startedAt.UTC()).Abs() > time.Microsecond {
+		return fmt.Errorf("%w: subnet scan lease is stale", ErrConflict)
+	}
+	return nil
 }
 
 type ipamScanAddressSnapshotRow struct {
