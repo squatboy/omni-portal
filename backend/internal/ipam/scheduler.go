@@ -2,31 +2,22 @@ package ipam
 
 import (
 	"context"
-	"errors"
 	"log"
 	"time"
-
-	"omni-backend/internal/models"
-	"omni-backend/internal/store"
 )
 
 const defaultSchedulerInterval = time.Minute
 
-type SchedulerStore interface {
-	ListDueIPAMSubnets(ctx context.Context, now time.Time, limit int) ([]models.IPAMSubnet, error)
-}
-
 type Scheduler struct {
-	store    SchedulerStore
-	scanner  *Scanner
+	executor ScanExecutor
 	interval time.Duration
 }
 
-func NewScheduler(store SchedulerStore, scanner *Scanner, interval time.Duration) *Scheduler {
+func NewScheduler(executor ScanExecutor, interval time.Duration) *Scheduler {
 	if interval <= 0 {
 		interval = defaultSchedulerInterval
 	}
-	return &Scheduler{store: store, scanner: scanner, interval: interval}
+	return &Scheduler{executor: executor, interval: interval}
 }
 
 func (s *Scheduler) Start(ctx context.Context) {
@@ -49,20 +40,12 @@ func (s *Scheduler) run(ctx context.Context) {
 }
 
 func (s *Scheduler) scanDue(ctx context.Context) {
-	subnets, err := s.store.ListDueIPAMSubnets(ctx, time.Now().UTC(), 10)
+	report, err := s.executor.ScanDue(ctx, ScanDueRequest{Limit: 10})
 	if err != nil {
-		log.Printf("ipam scheduler due subnet lookup failed: %v", err)
+		log.Printf("ipam scheduled scan failed: %v", err)
 		return
 	}
-	for _, subnet := range subnets {
-		if ctx.Err() != nil {
-			return
-		}
-		if _, err := s.scanner.ScanSubnet(ctx, subnet.ID); err != nil {
-			if errors.Is(err, store.ErrConflict) {
-				continue
-			}
-			log.Printf("ipam scheduled scan failed subnet=%s: %v", subnet.ID, err)
-		}
+	if report.Failed > 0 {
+		log.Printf("ipam scheduled scan completed with failures: claimed=%d completed=%d failed=%d skipped=%d", report.Claimed, report.Completed, report.Failed, report.Skipped)
 	}
 }

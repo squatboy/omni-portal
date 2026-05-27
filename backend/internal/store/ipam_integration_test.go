@@ -141,21 +141,18 @@ func TestIPAMPostgresBulkApplyScanResults(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create subnet: %v", err)
 	}
-	if err := st.MarkIPAMScanStarted(ctx, subnet.ID, time.Now().UTC()); err != nil {
-		t.Fatalf("mark started: %v", err)
-	}
-
-	addresses, err := st.ListIPAMScanAddresses(ctx, subnet.ID)
+	startedAt := time.Now().UTC()
+	addresses, err := st.ClaimManualIPAMScan(ctx, subnet.ID, startedAt)
 	if err != nil {
-		t.Fatalf("list scan addresses: %v", err)
+		t.Fatalf("claim manual scan: %v", err)
 	}
 	if len(addresses) != 2 {
 		t.Fatalf("expected 2 scan addresses, got %d", len(addresses))
 	}
 
-	scannedAt := time.Now().UTC()
+	scannedAt := startedAt.Add(time.Minute)
 	seenAt := scannedAt
-	updated, err := st.BulkApplyIPAMScanResults(ctx, subnet.ID, scannedAt, []models.IPAMScanResult{
+	updated, err := st.CompleteIPAMScan(ctx, subnet.ID, startedAt, scannedAt, []models.IPAMScanResult{
 		{AddressID: addresses[0].ID, Status: models.IPAMAddressUsed, LastScannedAt: scannedAt, LastSeenAt: &seenAt},
 		{AddressID: addresses[1].ID, Status: models.IPAMAddressFree, LastScannedAt: scannedAt, ConsecutiveFailures: 1},
 	})
@@ -202,8 +199,12 @@ func TestIPAMPostgresBulkApplyScanResults(t *testing.T) {
 		t.Fatalf("expected free to used transition, got %#v", detail.Changes[0])
 	}
 
-	secondSeenAt := scannedAt.Add(time.Minute)
-	if _, err := st.BulkApplyIPAMScanResults(ctx, subnet.ID, secondSeenAt, []models.IPAMScanResult{
+	secondStartedAt := scannedAt.Add(time.Minute)
+	if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, secondStartedAt); err != nil {
+		t.Fatalf("claim second manual scan: %v", err)
+	}
+	secondSeenAt := secondStartedAt.Add(time.Minute)
+	if _, err := st.CompleteIPAMScan(ctx, subnet.ID, secondStartedAt, secondSeenAt, []models.IPAMScanResult{
 		{AddressID: addresses[0].ID, Status: models.IPAMAddressUsed, LastScannedAt: secondSeenAt, LastSeenAt: &secondSeenAt},
 		{AddressID: addresses[1].ID, Status: models.IPAMAddressFree, LastScannedAt: secondSeenAt, ConsecutiveFailures: 2},
 	}); err != nil {
@@ -223,6 +224,29 @@ func TestIPAMPostgresBulkApplyScanResults(t *testing.T) {
 	}
 	if len(detail.Changes) != 0 {
 		t.Fatalf("expected unchanged statuses to skip change rows, got %#v", detail.Changes)
+	}
+
+	staleStartedAt := secondSeenAt.Add(-20 * time.Minute)
+	currentStartedAt := secondSeenAt.Add(time.Minute)
+	if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, staleStartedAt); err != nil {
+		t.Fatalf("claim stale manual scan: %v", err)
+	}
+	if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, currentStartedAt); err != nil {
+		t.Fatalf("claim current manual scan: %v", err)
+	}
+	staleSeenAt := currentStartedAt.Add(time.Minute)
+	if _, err := st.CompleteIPAMScan(ctx, subnet.ID, staleStartedAt, staleSeenAt, []models.IPAMScanResult{
+		{AddressID: addresses[0].ID, Status: models.IPAMAddressFree, LastScannedAt: staleSeenAt, ConsecutiveFailures: 3},
+		{AddressID: addresses[1].ID, Status: models.IPAMAddressUsed, LastScannedAt: staleSeenAt, LastSeenAt: &staleSeenAt},
+	}); !errors.Is(err, ErrConflict) {
+		t.Fatalf("expected stale completion conflict, got %v", err)
+	}
+	items, err = st.ListIPAMAddresses(ctx, subnet.ID)
+	if err != nil {
+		t.Fatalf("list addresses after stale completion: %v", err)
+	}
+	if items[0].Status != models.IPAMAddressUsed || items[1].Status != models.IPAMAddressFree {
+		t.Fatalf("expected stale completion not to overwrite address statuses, got %#v", items)
 	}
 }
 
@@ -277,9 +301,13 @@ func TestIPAMPostgresScanHistoryRetentionAndFailedRows(t *testing.T) {
 
 	baseTime := time.Now().UTC().Add(-time.Hour)
 	for i := 0; i < 21; i++ {
-		completedAt := baseTime.Add(time.Duration(i) * time.Minute)
+		startedAt := baseTime.Add(time.Duration(i) * time.Minute)
+		completedAt := startedAt.Add(30 * time.Second)
 		seenAt := completedAt
-		if _, err := st.BulkApplyIPAMScanResults(ctx, subnet.ID, completedAt, []models.IPAMScanResult{
+		if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, startedAt); err != nil {
+			t.Fatalf("claim scan %d: %v", i, err)
+		}
+		if _, err := st.CompleteIPAMScan(ctx, subnet.ID, startedAt, completedAt, []models.IPAMScanResult{
 			{AddressID: addresses[0].ID, Status: models.IPAMAddressUsed, LastScannedAt: completedAt, LastSeenAt: &seenAt},
 			{AddressID: addresses[1].ID, Status: models.IPAMAddressFree, LastScannedAt: completedAt},
 		}); err != nil {
@@ -296,7 +324,11 @@ func TestIPAMPostgresScanHistoryRetentionAndFailedRows(t *testing.T) {
 	}
 
 	failedAt := baseTime.Add(30 * time.Minute)
-	updated, err := st.MarkIPAMScanFailed(ctx, subnet.ID, failedAt, "ping failed")
+	failedStartedAt := failedAt.Add(-time.Minute)
+	if _, err := st.ClaimManualIPAMScan(ctx, subnet.ID, failedStartedAt); err != nil {
+		t.Fatalf("claim failed scan: %v", err)
+	}
+	updated, err := st.FailIPAMScan(ctx, subnet.ID, failedStartedAt, failedAt, "ping failed")
 	if err != nil {
 		t.Fatalf("mark failed: %v", err)
 	}

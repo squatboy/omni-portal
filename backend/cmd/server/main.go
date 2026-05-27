@@ -40,8 +40,8 @@ func main() {
 
 	cache := collector.NewCache()
 	runner := collector.NewRunner(cache, st)
-	ipamScanner := ipamservice.NewScanner(st, nil)
-	ipamScheduler := ipamservice.NewScheduler(st, ipamScanner, 0)
+	ipamExecutor := ipamservice.NewScanExecutor(ipamservice.NewStoreRepository(st), nil, nil)
+	ipamScheduler := ipamservice.NewScheduler(ipamExecutor, 0)
 
 	log.Println("Starting collector runner...")
 	runner.Start(ctx)
@@ -49,7 +49,7 @@ func main() {
 	log.Println("Starting IPAM scheduler...")
 	ipamScheduler.Start(ctx)
 
-	router := api.SetupRouter(cache, runner, st, cfg, ipamScanner)
+	router := api.SetupRouter(cache, runner, st, cfg, ipamExecutor)
 
 	srv := &http.Server{
 		Addr:    ":" + cfg.Port,
