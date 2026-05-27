@@ -596,7 +596,7 @@ func (s *Store) BulkApplyIPAMScanResults(ctx context.Context, subnetID string, c
 		default:
 			counts.Free++
 		}
-		if before.status != result.Status {
+		if before.status != result.Status || (before.consecutiveFailures != result.ConsecutiveFailures && result.Status != models.IPAMAddressFree) {
 			changes = append(changes, models.IPAMScanHistoryChange{
 				Address:                     before.address,
 				PreviousStatus:              before.status,
