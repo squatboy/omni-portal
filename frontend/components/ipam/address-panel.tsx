@@ -280,22 +280,29 @@ export function NextAvailableIPDialog({
       const parsedLimit = typeof limit === "number" ? limit : (parseInt(limit, 10) || 5)
       const res = await api.getNextAvailableIPs(subnet.id, parsedLimit)
       setIps(res.addresses || [])
-    } catch (err: any) {
-      setError(err?.message || "Failed to fetch available IPs")
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to fetch available IPs"
+      setError(message)
     } finally {
       setLoading(false)
     }
-  }, [subnet?.id, limit])
+  }, [subnet.id, limit])
 
   React.useEffect(() => {
+    let t: NodeJS.Timeout
     if (isOpen) {
-      fetchIPs()
+      t = setTimeout(() => {
+        fetchIPs()
+      }, 0)
     } else {
-      setIps([])
-      setLimit(5)
-      setError(null)
-      setCopiedIndex(null)
+      t = setTimeout(() => {
+        setIps([])
+        setLimit(5)
+        setError(null)
+        setCopiedIndex(null)
+      }, 0)
     }
+    return () => clearTimeout(t)
   }, [isOpen, fetchIPs])
 
   const copyToClipboard = async (ip: string, index: number) => {
@@ -303,7 +310,7 @@ export function NextAvailableIPDialog({
       await navigator.clipboard.writeText(ip)
       setCopiedIndex(index)
       setTimeout(() => setCopiedIndex(null), 2000)
-    } catch (err) {
+    } catch {
       // ignore
     }
   }
