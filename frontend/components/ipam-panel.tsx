@@ -10,6 +10,7 @@ export {
   countIPAMAddresses,
   ipamAddressButtonLabel,
   scanHistoryCountLabel,
+  selectIPAMSearchResult,
   sortIPAMAddressesByIPv4,
   statusTransitionLabel,
   topIPv4SubnetRows,

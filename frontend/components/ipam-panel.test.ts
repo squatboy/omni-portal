@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest"
 
+import { searchMockIPAMResults } from "@/lib/api"
 import {
   countIPAMAddresses,
   ipamAddressButtonLabel,
   scanHistoryCountLabel,
+  selectIPAMSearchResult,
   sortIPAMAddressesByIPv4,
   statusTransitionLabel,
   topIPv4SubnetRows,
@@ -11,8 +13,11 @@ import {
 } from "./ipam-panel"
 import type {
   IPAMAddress,
+  IPAMSearchResult,
   IPAMScanHistory,
   IPAMScanHistoryChange,
+  IPAMLocation,
+  IPAMNetwork,
   IPAMSubnet,
 } from "@/lib/types"
 
@@ -154,5 +159,69 @@ describe("IPAM helpers", () => {
     }
 
     expect(statusTransitionLabel(change)).toBe("free -> used")
+  })
+
+  it("returns mock search results with hierarchy metadata", () => {
+    const results = searchMockIPAMResults("10.40.0.1")
+
+    expect(results[0]).toMatchObject({
+      matchType: "ip",
+      queryAddress: "10.40.0.1",
+      subnet: { id: "subnet-platform-core" },
+      network: { id: "net-seoul-platform" },
+      location: { id: "loc-seoul" },
+    })
+    expect(results[0].address?.id).toBe("subnet-platform-core-1")
+  })
+
+  it("selects the search subnet and opens the address sheet only when present", () => {
+    const location: IPAMLocation = {
+      id: "location-1",
+      name: "Seoul DC",
+    }
+    const network: IPAMNetwork = {
+      id: "network-1",
+      locationId: location.id,
+      name: "Platform",
+    }
+    const subnet: IPAMSubnet = {
+      id: "subnet-a",
+      networkId: network.id,
+      locationId: location.id,
+      name: "Core",
+      cidr: "10.0.0.0/24",
+      autoDiscovery: true,
+      scanIntervalSeconds: 3600,
+    }
+    const selectedSubnets: string[] = []
+    const openedAddresses: IPAMAddress[] = []
+    const resultWithAddress: IPAMSearchResult = {
+      id: "addr-1",
+      matchType: "hostname",
+      address: address("10", subnet.id, "used"),
+      subnet,
+      network: { id: network.id, name: network.name },
+      location: { id: location.id, name: location.name },
+    }
+    const subnetOnlyResult: IPAMSearchResult = {
+      id: "subnet:subnet-a:10.0.0.200",
+      matchType: "ip",
+      queryAddress: "10.0.0.200",
+      address: null,
+      subnet,
+      network: { id: network.id, name: network.name },
+      location: { id: location.id, name: location.name },
+    }
+    const handlers = {
+      onSelectSubnet: (subnetId: string) => selectedSubnets.push(subnetId),
+      onOpenAddress: (openedAddress: IPAMAddress) =>
+        openedAddresses.push(openedAddress),
+    }
+
+    selectIPAMSearchResult(resultWithAddress, handlers)
+    selectIPAMSearchResult(subnetOnlyResult, handlers)
+
+    expect(selectedSubnets).toEqual(["subnet-a", "subnet-a"])
+    expect(openedAddresses).toEqual([resultWithAddress.address])
   })
 })

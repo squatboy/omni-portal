@@ -3,6 +3,7 @@ import type {
   AuthMe,
   GitLabIntegration,
   IPAMAddress,
+  IPAMSearchResult,
   IPAMScanHistory,
   IPAMScanHistoryDetail,
   IPAMScanSummary,
@@ -32,7 +33,9 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
       error?: string | { message?: string }
     } | null
     const message =
-      typeof payload?.error === "string" ? payload.error : payload?.error?.message
+      typeof payload?.error === "string"
+        ? payload.error
+        : payload?.error?.message
     throw new Error(message ?? `Request failed: ${response.status}`)
   }
 
@@ -84,6 +87,137 @@ function buildIPAMSummary(): IPAMSummary {
     subnets: store.ipamSubnets.length,
     addresses: counts,
   }
+}
+
+function stripCIDRSuffix(value: string) {
+  return value.trim().split("/")[0]
+}
+
+function ipv4ToNumber(value: string) {
+  const parts = value.trim().split(".").map(Number)
+  if (
+    parts.length !== 4 ||
+    parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)
+  ) {
+    return null
+  }
+  return parts.reduce((acc, part) => acc * 256 + part, 0)
+}
+
+function subnetRange(cidr: string) {
+  const [base, prefixText] = cidr.split("/")
+  const baseNumber = ipv4ToNumber(base)
+  const prefix = Number(prefixText)
+  if (
+    baseNumber === null ||
+    !Number.isInteger(prefix) ||
+    prefix < 0 ||
+    prefix > 32
+  ) {
+    return null
+  }
+  const size = 2 ** (32 - prefix)
+  const start = Math.floor(baseNumber / size) * size
+  return { start, end: start + size - 1 }
+}
+
+function ipInSubnet(ip: string, cidr: string) {
+  const ipNumber = ipv4ToNumber(ip)
+  const range = subnetRange(cidr)
+  return ipNumber !== null && range !== null
+    ? ipNumber >= range.start && ipNumber <= range.end
+    : false
+}
+
+function normalizeIPAMSearchLimit(limit: number) {
+  if (!Number.isInteger(limit) || limit <= 0) return 20
+  return Math.min(limit, 50)
+}
+
+export function searchMockIPAMResults(
+  q: string,
+  limit = 20
+): IPAMSearchResult[] {
+  const query = q.trim()
+  if (!query) return []
+
+  const store = getMockStore()
+  const queryIpNumber = ipv4ToNumber(query)
+  const queryLower = query.toLowerCase()
+  const normalizedLimit = normalizeIPAMSearchLimit(limit)
+  const locationById = new Map(
+    store.ipamLocations.map((item) => [item.id, item])
+  )
+  const networkById = new Map(store.ipamNetworks.map((item) => [item.id, item]))
+  const subnetById = new Map(store.ipamSubnets.map((item) => [item.id, item]))
+  const candidates: Array<{
+    result: IPAMSearchResult
+    rank: number
+    sortIp: number
+  }> = []
+  const matchedSubnetIds = new Set<string>()
+
+  for (const address of store.ipamAddresses) {
+    const subnet = subnetById.get(address.subnetId)
+    const network = subnet ? networkById.get(subnet.networkId) : undefined
+    const location = network ? locationById.get(network.locationId) : undefined
+    if (!subnet || !network || !location) continue
+
+    const addressIp = stripCIDRSuffix(address.address)
+    const isExactIp = queryIpNumber !== null && addressIp === query
+    const hostname = address.hostname ?? ""
+    const hostnameLower = hostname.toLowerCase()
+    const isExactHostname = hostnameLower === queryLower
+    const isHostnameMatch =
+      hostnameLower.length > 0 && hostnameLower.includes(queryLower)
+    if (!isExactIp && !isHostnameMatch) continue
+
+    matchedSubnetIds.add(subnet.id)
+    candidates.push({
+      result: {
+        id: address.id,
+        matchType: isExactIp ? "ip" : "hostname",
+        queryAddress: isExactIp ? query : undefined,
+        address,
+        subnet,
+        network: { id: network.id, name: network.name },
+        location: { id: location.id, name: location.name },
+      },
+      rank: isExactIp ? 0 : isExactHostname ? 1 : 2,
+      sortIp: ipv4ToNumber(addressIp) ?? Number.MAX_SAFE_INTEGER,
+    })
+  }
+
+  if (queryIpNumber !== null) {
+    for (const subnet of store.ipamSubnets) {
+      if (matchedSubnetIds.has(subnet.id) || !ipInSubnet(query, subnet.cidr)) {
+        continue
+      }
+      const network = networkById.get(subnet.networkId)
+      const location = network
+        ? locationById.get(network.locationId)
+        : undefined
+      if (!network || !location) continue
+      candidates.push({
+        result: {
+          id: `subnet:${subnet.id}:${query}`,
+          matchType: "ip",
+          queryAddress: query,
+          address: null,
+          subnet,
+          network: { id: network.id, name: network.name },
+          location: { id: location.id, name: location.name },
+        },
+        rank: 3,
+        sortIp: queryIpNumber,
+      })
+    }
+  }
+
+  return candidates
+    .sort((a, b) => a.rank - b.rank || a.sortIp - b.sortIp)
+    .slice(0, normalizedLimit)
+    .map((candidate) => candidate.result)
 }
 
 function updateMockItem<T extends { id: string }>(
@@ -194,10 +328,13 @@ export const api = {
       : request<KubernetesIntegration[]>("/api/manage/integrations/kubernetes"),
   saveKubernetes: (payload: KubernetesIntegration & { token?: string }) => {
     if (!isMockMode()) {
-      return request<KubernetesIntegration>("/api/manage/integrations/kubernetes", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      })
+      return request<KubernetesIntegration>(
+        "/api/manage/integrations/kubernetes",
+        {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }
+      )
     }
     const store = getMockStore()
     const { token, ...rest } = payload
@@ -228,9 +365,12 @@ export const api = {
         }),
   deleteKubernetes: (id: string) => {
     if (!isMockMode()) {
-      return request<{ ok: true }>(`/api/manage/integrations/kubernetes/${id}`, {
-        method: "DELETE",
-      })
+      return request<{ ok: true }>(
+        `/api/manage/integrations/kubernetes/${id}`,
+        {
+          method: "DELETE",
+        }
+      )
     }
     const store = getMockStore()
     store.kubernetes = store.kubernetes.filter((item) => item.id !== id)
@@ -428,6 +568,12 @@ export const api = {
     isMockMode()
       ? mockResponse(buildIPAMSummary())
       : request<IPAMSummary>("/api/ipam/summary"),
+  searchIPAM: (q: string, limit = 20) =>
+    isMockMode()
+      ? mockResponse(searchMockIPAMResults(q, limit))
+      : request<IPAMSearchResult[]>(
+          `/api/ipam/search${queryString({ q, limit: String(limit) })}`
+        ),
   listIPAMLocations: () =>
     isMockMode()
       ? mockResponse(getMockStore().ipamLocations)
@@ -641,7 +787,9 @@ export const api = {
             .map((item) => item.address)
             .slice(0, limit),
         })
-      : request<{ addresses: string[] }>(`/api/ipam/subnets/${subnetId}/next-available?limit=${limit}`),
+      : request<{ addresses: string[] }>(
+          `/api/ipam/subnets/${subnetId}/next-available?limit=${limit}`
+        ),
   saveIPAMAddress: (payload: IPAMAddress) => {
     if (payload.status) {
       if (payload.status === "used" || payload.status === "reserved") {

@@ -88,6 +88,7 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 	ipam.Use(api.requireStore())
 	{
 		ipam.GET("/summary", api.handleIPAMSummary)
+		ipam.GET("/search", api.handleSearchIPAM)
 		ipam.GET("/scan-history", api.handleListIPAMScanHistory)
 		ipam.GET("/scan-history/:id", api.handleIPAMScanHistoryDetail)
 		ipam.GET("/locations", api.handleListIPAMLocations)
@@ -413,6 +414,20 @@ func (api *API) handleDeleteUser(c *gin.Context) {
 func (api *API) handleIPAMSummary(c *gin.Context) {
 	summary, err := api.store.IPAMSummary(c.Request.Context())
 	writeStoreJSON(c, http.StatusOK, summary, err)
+}
+
+func (api *API) handleSearchIPAM(c *gin.Context) {
+	limit := 20
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			limit = parsed
+		}
+	}
+	if limit > 50 {
+		limit = 50
+	}
+	items, err := api.store.SearchIPAM(c.Request.Context(), c.Query("q"), limit)
+	writeStoreJSON(c, http.StatusOK, items, err)
 }
 
 func (api *API) handleListIPAMScanHistory(c *gin.Context) {
