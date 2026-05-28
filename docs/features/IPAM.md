@@ -92,10 +92,11 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
 
 ### 레이아웃 및 내비게이션
 - **Sidebar**: IPAM Collapsible 섹션 내에 `Home`과 `Scan History` 두 가지 메뉴를 제공함.
-- **IPAM Home**: 
+- **IPAM Home**:
   - Location, Network, Subnet 세 가지 탭 구조 제공.
   - **좌측 영역**: 기본 통계 및 Recharts 기반 `Top IPv4 subnets by number of hosts` 차트 노출.
   - **우측 영역**: Collapsible 구조로 구현된 `Location ➔ Network ➔ Subnet ➔ IP 상태 카운트` 트리 뷰 제공.
+  - **전역 검색**: CardHeader action에서 shadcn CommandDialog 기반 검색을 열고, IP 또는 hostname으로 주소/서브넷을 탐색함.
 
 ### 관리 기능 및 폼(Form)
 - **컴포넌트**: 리소스 생성/수정은 shadcn Sheet 컴포넌트를 사용한 폼으로 처리.
@@ -112,7 +113,7 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
   - `used`: 초록색 상태 표시 (`--status-ok` 변수 활용).
   - `offline`: 빨간색 상태 표시 (destructive 테마).
   - `reserved`: 주황색 상태 표시 (`--status-warn` 변수 활용).
-- **IP 상세 Sheet**: 
+- **IP 상세 Sheet**:
   - 버튼 클릭 시 detail Sheet가 열리며, admin 권한이 있으면 hostname, description 및 status를 수정할 수 있음.
   - 수동으로 오버라이드된 IP에는 `Manual Override` 배지가 노출됨.
 
@@ -132,6 +133,8 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
 - IP 상세 Button grid는 IPv4 숫자순으로 정렬하고, 버튼 라벨은 마지막 octet만 `.1` 형식으로 표시한다. 모든 버튼의 가로 길이는 IP 3자릿수 label(예: `.200`)에 맞추어 `4rem` (`w-16`) 고정 너비로 통일하고 가운데 정렬한다.
 - used 상태 badge와 IP 버튼은 `--status-ok` 기반 초록 상태 표시를 사용하고, offline은 destructive/red 표시를 유지하며, reserved는 `--status-warn` 기반 주황색 표시를 사용한다.
 - IP 버튼 클릭 시 Sheet detail을 열고, admin은 hostname/description/status를 수정할 수 있다.
+- Home 전역 검색은 `Search IP or hostname...` 입력을 debounce한 뒤 `/api/ipam/search`를 호출한다.
+- 검색 결과 row는 IP, hostname, status badge, `Location / Network / Subnet` 경로를 표시한다.
 - Scan History는 최근 scan summary를 table row로 보여주고 row 확장 시 count, error, status transition 목록을 보여준다.
 - 변경된 IP가 없으면 `No status changes.` 빈 상태를 표시한다.
 

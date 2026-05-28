@@ -30,19 +30,20 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { topIPv4SubnetRows, visibleIPAMActions } from "./utils"
+import {
+  selectIPAMSearchResult,
+  topIPv4SubnetRows,
+  visibleIPAMActions,
+} from "./utils"
 import { EmptyLine } from "./shared"
 import { SummaryCards, IPAMTree } from "./ipam-tree"
-import {
-  LocationTable,
-  NetworkTable,
-  SubnetTable,
-} from "./resource-tables"
+import { LocationTable, NetworkTable, SubnetTable } from "./resource-tables"
 import {
   DeleteDialog,
   ResourceSheetPanel,
   resourceSheetKey,
 } from "./resource-sheet"
+import { IPAMSearchDialog } from "./search-dialog"
 import { SubnetAddressDetails, AddressSheetPanel } from "./address-panel"
 import type {
   AddressIndex,
@@ -243,11 +244,7 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
                       content={<ChartTooltipContent hideLabel />}
                       cursor={false}
                     />
-                    <Bar
-                      dataKey="hosts"
-                      fill="var(--color-hosts)"
-                      radius={4}
-                    />
+                    <Bar dataKey="hosts" fill="var(--color-hosts)" radius={4} />
                   </BarChart>
                 </ChartContainer>
               ) : (
@@ -272,7 +269,15 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
           <CardDescription>
             Location, network, subnet, and address state in one view.
           </CardDescription>
-          <CardAction>
+          <CardAction className="flex items-center gap-2">
+            <IPAMSearchDialog
+              onSelect={(result) =>
+                selectIPAMSearchResult(result, {
+                  onSelectSubnet: setSelectedSubnetId,
+                  onOpenAddress: setAddressSheet,
+                })
+              }
+            />
             {refreshing ? (
               <Badge variant="secondary">
                 <Loader2 data-icon="inline-start" className="animate-spin" />
@@ -310,9 +315,7 @@ export function IPAMPanel({ canManage }: { canManage: boolean }) {
                 subnets={subnets}
                 canManage={actions.update}
                 onEdit={(item) => setResourceSheet({ kind: "location", item })}
-                onDelete={(item) =>
-                  setDeleteTarget({ kind: "location", item })
-                }
+                onDelete={(item) => setDeleteTarget({ kind: "location", item })}
               />
             </TabsContent>
             <TabsContent value="network">

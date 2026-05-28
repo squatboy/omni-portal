@@ -1,6 +1,7 @@
 package store
 
 import (
+	"context"
 	"errors"
 	"testing"
 	"time"
@@ -83,6 +84,61 @@ func TestNormalizeIPAMScanInterval(t *testing.T) {
 	}
 	if _, err := normalizeIPAMScanInterval(60); err == nil {
 		t.Fatalf("expected unsupported interval error")
+	}
+}
+
+func TestParseIPAMSearchIPv4(t *testing.T) {
+	tests := []struct {
+		name  string
+		query string
+		want  string
+		ok    bool
+	}{
+		{name: "exact ipv4", query: "192.168.10.25", want: "192.168.10.25", ok: true},
+		{name: "trimmed exact ipv4", query: " 10.0.0.1 ", want: "10.0.0.1", ok: true},
+		{name: "cidr is not exact ip", query: "10.0.0.1/32", ok: false},
+		{name: "hostname", query: "app-01", ok: false},
+		{name: "ipv6", query: "2001:db8::1", ok: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := parseIPAMSearchIPv4(tt.query)
+			if ok != tt.ok {
+				t.Fatalf("expected ok=%v, got %v", tt.ok, ok)
+			}
+			if got != tt.want {
+				t.Fatalf("expected %q, got %q", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestNormalizeIPAMSearchLimit(t *testing.T) {
+	tests := []struct {
+		limit int
+		want  int
+	}{
+		{limit: 0, want: 20},
+		{limit: -1, want: 20},
+		{limit: 5, want: 5},
+		{limit: 80, want: 50},
+	}
+
+	for _, tt := range tests {
+		if got := normalizeIPAMSearchLimit(tt.limit); got != tt.want {
+			t.Fatalf("limit %d: expected %d, got %d", tt.limit, tt.want, got)
+		}
+	}
+}
+
+func TestSearchIPAMEmptyQueryReturnsEmptyList(t *testing.T) {
+	items, err := new(Store).SearchIPAM(context.Background(), " \t", 20)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(items) != 0 {
+		t.Fatalf("expected empty search result, got %#v", items)
 	}
 }
 

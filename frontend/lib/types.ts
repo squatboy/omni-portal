@@ -135,6 +135,16 @@ export type IPAMAddress = {
   updatedAt?: string
 }
 
+export type IPAMSearchResult = {
+  id: string
+  matchType: "ip" | "hostname"
+  queryAddress?: string | null
+  address: IPAMAddress | null
+  subnet: IPAMSubnet
+  network: Pick<IPAMNetwork, "id" | "name">
+  location: Pick<IPAMLocation, "id" | "name">
+}
+
 export type IPAMScanSummary = {
   subnetId: string
   total: number

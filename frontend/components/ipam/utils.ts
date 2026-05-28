@@ -2,6 +2,7 @@ import type {
   IPAMAddress,
   IPAMScanHistory,
   IPAMScanHistoryChange,
+  IPAMSearchResult,
   IPAMSubnet,
 } from "@/lib/types"
 import type { AddressIndex } from "./types"
@@ -75,6 +76,19 @@ export function sortIPAMAddressesByIPv4(addresses: IPAMAddress[]) {
     if (right !== null) return 1
     return a.address.localeCompare(b.address)
   })
+}
+
+export function selectIPAMSearchResult(
+  result: IPAMSearchResult,
+  handlers: {
+    onSelectSubnet: (subnetId: string) => void
+    onOpenAddress: (address: IPAMAddress) => void
+  }
+) {
+  handlers.onSelectSubnet(result.subnet.id)
+  if (result.address) {
+    handlers.onOpenAddress(result.address)
+  }
 }
 
 export function scanHistoryCountLabel(history: IPAMScanHistory) {

@@ -357,6 +357,113 @@ func TestIPAMPostgresScanHistoryRetentionAndFailedRows(t *testing.T) {
 	}
 }
 
+func TestIPAMPostgresSearchByAddressAndHostname(t *testing.T) {
+	databaseURL := os.Getenv("OMNI_IPAM_TEST_DATABASE_URL")
+	if databaseURL == "" {
+		t.Skip("set OMNI_IPAM_TEST_DATABASE_URL to run PostgreSQL-backed IPAM integration tests")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	st, err := Open(ctx, databaseURL, []byte("0123456789abcdef0123456789abcdef"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer st.Close()
+
+	if err := st.Migrate(ctx); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	suffix := time.Now().UnixNano()
+	actorID := "test-ipam"
+	location, err := st.CreateIPAMLocation(ctx, actorID, models.IPAMLocation{
+		Name: fmt.Sprintf("ipam-search-%d", suffix),
+	})
+	if err != nil {
+		t.Fatalf("create location: %v", err)
+	}
+	defer st.DeleteIPAMLocation(context.Background(), location.ID)
+
+	network, err := st.CreateIPAMNetwork(ctx, actorID, models.IPAMNetwork{
+		LocationID: location.ID,
+		Name:       "network-a",
+	})
+	if err != nil {
+		t.Fatalf("create network: %v", err)
+	}
+	subnet, err := st.CreateIPAMSubnet(ctx, actorID, models.IPAMSubnet{
+		NetworkID: network.ID,
+		Name:      "subnet-a",
+		CIDR:      "10.215.0.0/29",
+	})
+	if err != nil {
+		t.Fatalf("create subnet: %v", err)
+	}
+	addresses, err := st.ListIPAMAddresses(ctx, subnet.ID)
+	if err != nil {
+		t.Fatalf("list addresses: %v", err)
+	}
+	if len(addresses) < 3 {
+		t.Fatalf("expected generated addresses, got %d", len(addresses))
+	}
+
+	hostname := "Host-A"
+	addresses[0].Hostname = &hostname
+	if _, err := st.UpdateIPAMAddress(ctx, actorID, addresses[0]); err != nil {
+		t.Fatalf("update exact hostname: %v", err)
+	}
+	partialHostname := "host-alpha"
+	addresses[1].Hostname = &partialHostname
+	if _, err := st.UpdateIPAMAddress(ctx, actorID, addresses[1]); err != nil {
+		t.Fatalf("update partial hostname: %v", err)
+	}
+
+	ipResults, err := st.SearchIPAM(ctx, addresses[2].Address, 20)
+	if err != nil {
+		t.Fatalf("search by address: %v", err)
+	}
+	if len(ipResults) != 1 {
+		t.Fatalf("expected one IP result, got %#v", ipResults)
+	}
+	if ipResults[0].MatchType != models.IPAMSearchMatchIP || ipResults[0].Address == nil {
+		t.Fatalf("expected IP result with address row, got %#v", ipResults[0])
+	}
+	if ipResults[0].Subnet.ID != subnet.ID || ipResults[0].Network.ID != network.ID || ipResults[0].Location.ID != location.ID {
+		t.Fatalf("expected subnet/network/location context, got %#v", ipResults[0])
+	}
+
+	missingAddress := "10.215.0.6"
+	if _, err := st.db.ExecContext(ctx, `DELETE FROM ipam_addresses WHERE subnet_id=$1 AND address=$2::inet`, subnet.ID, missingAddress); err != nil {
+		t.Fatalf("delete address row: %v", err)
+	}
+	missingResults, err := st.SearchIPAM(ctx, missingAddress, 20)
+	if err != nil {
+		t.Fatalf("search missing address row: %v", err)
+	}
+	if len(missingResults) != 1 {
+		t.Fatalf("expected one missing-address result, got %#v", missingResults)
+	}
+	if missingResults[0].Address != nil || missingResults[0].QueryAddress == nil || *missingResults[0].QueryAddress != missingAddress {
+		t.Fatalf("expected null address with queryAddress, got %#v", missingResults[0])
+	}
+
+	hostnameResults, err := st.SearchIPAM(ctx, "host-a", 1)
+	if err != nil {
+		t.Fatalf("search by hostname: %v", err)
+	}
+	if len(hostnameResults) != 1 {
+		t.Fatalf("expected one limited hostname result, got %#v", hostnameResults)
+	}
+	if hostnameResults[0].MatchType != models.IPAMSearchMatchHostname || hostnameResults[0].Address == nil {
+		t.Fatalf("expected hostname result with address, got %#v", hostnameResults[0])
+	}
+	if hostnameResults[0].Address.Hostname == nil || *hostnameResults[0].Address.Hostname != hostname {
+		t.Fatalf("expected exact hostname match first, got %#v", hostnameResults[0].Address)
+	}
+}
+
 func latestHistoryForSubnet(history []models.IPAMScanHistory, subnetID string) *models.IPAMScanHistory {
 	for i := range history {
 		if history[i].SubnetID == subnetID {

@@ -388,6 +388,28 @@ type IPAMAddress struct {
 	UpdatedAt           string            `json:"updatedAt,omitempty"`
 }
 
+type IPAMSearchMatchType string
+
+const (
+	IPAMSearchMatchIP       IPAMSearchMatchType = "ip"
+	IPAMSearchMatchHostname IPAMSearchMatchType = "hostname"
+)
+
+type IPAMSearchResource struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type IPAMSearchResult struct {
+	ID           string              `json:"id"`
+	MatchType    IPAMSearchMatchType `json:"matchType"`
+	QueryAddress *string             `json:"queryAddress,omitempty"`
+	Address      *IPAMAddress        `json:"address"`
+	Subnet       IPAMSubnet          `json:"subnet"`
+	Network      IPAMSearchResource  `json:"network"`
+	Location     IPAMSearchResource  `json:"location"`
+}
+
 type IPAMScanAddress struct {
 	ID                  string
 	SubnetID            string

@@ -350,6 +350,18 @@ func (s *Store) ListIPAMAddresses(ctx context.Context, subnetID string) ([]model
 	return items, rows.Err()
 }
 
+func (s *Store) SearchIPAM(ctx context.Context, query string, limit int) ([]models.IPAMSearchResult, error) {
+	query = strings.TrimSpace(query)
+	if query == "" {
+		return []models.IPAMSearchResult{}, nil
+	}
+	limit = normalizeIPAMSearchLimit(limit)
+	if address, ok := parseIPAMSearchIPv4(query); ok {
+		return s.searchIPAMByAddress(ctx, address, limit)
+	}
+	return s.searchIPAMByHostname(ctx, query, limit)
+}
+
 func (s *Store) UpdateIPAMAddress(ctx context.Context, actorID string, item models.IPAMAddress) (models.IPAMAddress, error) {
 	if strings.TrimSpace(item.ID) == "" {
 		return models.IPAMAddress{}, validationError("address id is required")
@@ -807,6 +819,77 @@ func (s *Store) IPAMScanHistoryDetail(ctx context.Context, id string) (models.IP
 	return models.IPAMScanHistoryDetail{History: history, Changes: changes}, nil
 }
 
+func (s *Store) searchIPAMByAddress(ctx context.Context, address string, limit int) ([]models.IPAMSearchResult, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT
+			a.id, a.subnet_id, a.address::text, a.status, a.hostname, a.description,
+			a.last_scanned_at, a.last_seen_at, a.consecutive_failures, a.created_at, a.updated_at, a.is_override,
+			s.id, s.network_id, n.location_id, s.name, s.cidr::text, s.description,
+			s.auto_discovery, s.scan_interval_seconds, s.last_scan_started_at,
+			s.last_scan_completed_at, s.last_scan_status, s.last_scan_error,
+			s.created_at, s.updated_at,
+			n.id, n.name,
+			l.id, l.name
+		FROM ipam_subnets s
+		JOIN ipam_networks n ON n.id = s.network_id
+		JOIN ipam_locations l ON l.id = n.location_id
+		LEFT JOIN ipam_addresses a ON a.subnet_id = s.id AND a.address = $1::inet
+		WHERE s.cidr >>= $1::inet
+		ORDER BY l.name, n.name, s.name
+		LIMIT $2
+	`, address, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.IPAMSearchResult{}
+	for rows.Next() {
+		item, err := scanIPAMSearchResult(rows, models.IPAMSearchMatchIP, address)
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) searchIPAMByHostname(ctx context.Context, query string, limit int) ([]models.IPAMSearchResult, error) {
+	pattern := "%" + query + "%"
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT
+			a.id, a.subnet_id, a.address::text, a.status, a.hostname, a.description,
+			a.last_scanned_at, a.last_seen_at, a.consecutive_failures, a.created_at, a.updated_at, a.is_override,
+			s.id, s.network_id, n.location_id, s.name, s.cidr::text, s.description,
+			s.auto_discovery, s.scan_interval_seconds, s.last_scan_started_at,
+			s.last_scan_completed_at, s.last_scan_status, s.last_scan_error,
+			s.created_at, s.updated_at,
+			n.id, n.name,
+			l.id, l.name
+		FROM ipam_addresses a
+		JOIN ipam_subnets s ON s.id = a.subnet_id
+		JOIN ipam_networks n ON n.id = s.network_id
+		JOIN ipam_locations l ON l.id = n.location_id
+		WHERE a.hostname IS NOT NULL AND a.hostname ILIKE $1
+		ORDER BY (lower(a.hostname) = lower($2)) DESC, lower(a.hostname), a.address
+		LIMIT $3
+	`, pattern, query, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []models.IPAMSearchResult{}
+	for rows.Next() {
+		item, err := scanIPAMSearchResult(rows, models.IPAMSearchMatchHostname, "")
+		if err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
 func (s *Store) ipamLocationByID(ctx context.Context, id string) (models.IPAMLocation, error) {
 	var item models.IPAMLocation
 	var createdAt, updatedAt time.Time
@@ -1164,6 +1247,28 @@ func normalizeIPAMScanInterval(interval int) (int, error) {
 	return interval, nil
 }
 
+func normalizeIPAMSearchLimit(limit int) int {
+	if limit <= 0 {
+		return 20
+	}
+	if limit > 50 {
+		return 50
+	}
+	return limit
+}
+
+func parseIPAMSearchIPv4(query string) (string, bool) {
+	ip := net.ParseIP(strings.TrimSpace(query))
+	if ip == nil {
+		return "", false
+	}
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return "", false
+	}
+	return net.IP(ipv4).String(), true
+}
+
 func validationError(message string) error {
 	return fmt.Errorf("%w: %s", ErrValidation, message)
 }
@@ -1367,6 +1472,99 @@ func scanIPAMAddress(row ipamAddressScanner) (models.IPAMAddress, error) {
 	item.LastSeenAt = formatNullTime(lastSeenAt)
 	item.CreatedAt = createdAt.Format(time.RFC3339)
 	item.UpdatedAt = updatedAt.Format(time.RFC3339)
+	return item, nil
+}
+
+func scanIPAMSearchResult(row ipamSubnetScanner, matchType models.IPAMSearchMatchType, queryAddress string) (models.IPAMSearchResult, error) {
+	var addressID, addressSubnetID, addressValue, addressStatus sql.NullString
+	var hostname, addressDescription sql.NullString
+	var lastScannedAt, lastSeenAt, addressCreatedAt, addressUpdatedAt sql.NullTime
+	var consecutiveFailures sql.NullInt64
+	var isOverride sql.NullBool
+
+	var subnet models.IPAMSubnet
+	var subnetDescription *string
+	var subnetLastScanStartedAt, subnetLastScanCompletedAt sql.NullTime
+	var subnetLastScanStatus, subnetLastScanError sql.NullString
+	var subnetCreatedAt, subnetUpdatedAt time.Time
+	var network models.IPAMSearchResource
+	var location models.IPAMSearchResource
+	err := row.Scan(
+		&addressID,
+		&addressSubnetID,
+		&addressValue,
+		&addressStatus,
+		&hostname,
+		&addressDescription,
+		&lastScannedAt,
+		&lastSeenAt,
+		&consecutiveFailures,
+		&addressCreatedAt,
+		&addressUpdatedAt,
+		&isOverride,
+		&subnet.ID,
+		&subnet.NetworkID,
+		&subnet.LocationID,
+		&subnet.Name,
+		&subnet.CIDR,
+		&subnetDescription,
+		&subnet.AutoDiscovery,
+		&subnet.ScanIntervalSeconds,
+		&subnetLastScanStartedAt,
+		&subnetLastScanCompletedAt,
+		&subnetLastScanStatus,
+		&subnetLastScanError,
+		&subnetCreatedAt,
+		&subnetUpdatedAt,
+		&network.ID,
+		&network.Name,
+		&location.ID,
+		&location.Name,
+	)
+	if err != nil {
+		return models.IPAMSearchResult{}, err
+	}
+
+	subnet.Description = subnetDescription
+	subnet.LastScanStartedAt = formatNullTime(subnetLastScanStartedAt)
+	subnet.LastScanCompletedAt = formatNullTime(subnetLastScanCompletedAt)
+	subnet.LastScanStatus = stringFromNull(subnetLastScanStatus)
+	subnet.LastScanError = stringFromNull(subnetLastScanError)
+	subnet.CreatedAt = subnetCreatedAt.Format(time.RFC3339)
+	subnet.UpdatedAt = subnetUpdatedAt.Format(time.RFC3339)
+
+	item := models.IPAMSearchResult{
+		ID:        subnet.ID,
+		MatchType: matchType,
+		Subnet:    subnet,
+		Network:   network,
+		Location:  location,
+	}
+	if queryAddress != "" {
+		item.QueryAddress = &queryAddress
+	}
+	if addressID.Valid {
+		address := models.IPAMAddress{
+			ID:                  addressID.String,
+			SubnetID:            addressSubnetID.String,
+			Address:             addressValue.String,
+			Status:              models.IPAMAddressStatus(addressStatus.String),
+			Hostname:            stringFromNull(hostname),
+			Description:         stringFromNull(addressDescription),
+			IsOverride:          isOverride.Valid && isOverride.Bool,
+			LastScannedAt:       formatNullTime(lastScannedAt),
+			LastSeenAt:          formatNullTime(lastSeenAt),
+			ConsecutiveFailures: int(consecutiveFailures.Int64),
+		}
+		if addressCreatedAt.Valid {
+			address.CreatedAt = addressCreatedAt.Time.Format(time.RFC3339)
+		}
+		if addressUpdatedAt.Valid {
+			address.UpdatedAt = addressUpdatedAt.Time.Format(time.RFC3339)
+		}
+		item.ID = address.ID
+		item.Address = &address
+	}
 	return item, nil
 }
 
