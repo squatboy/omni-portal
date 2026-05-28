@@ -55,10 +55,6 @@ IPAM은 `Location -> Network -> Subnet -> IP` 계층으로 IPv4 주소 자원을
    - 전후 상태 값과 함께 `lastSeenAt`, `consecutiveFailures`의 변경 전후 값도 기록함.
    - *주의: 데이터 효율성을 위해 전체 IP 스냅샷은 보관하지 않는다.*
 
-### 이력 보존 정책 (Retention Policy)
-- **최근 20개 제한**: 각 Subnet별로 최근 20개의 히스토리 행만 유지함.
-- **자동 물리 삭제**: 새로운 히스토리 행이 추가될 때, 해당 Subnet의 오래된 초과 히스토리(20개 초과분)는 자동으로 데이터베이스에서 물리 삭제(Hard Delete)됨.
-
 ### Frontend 표현 및 UX
 - **메뉴 노출**: Sidebar에 Collapsible 섹션 아래 `Scan History` 메뉴 제공 (모든 로그인 사용자 접근 가능).
 - **이력 목록**: 최근 스캔 요약 목록을 테이블 형식으로 제공함.

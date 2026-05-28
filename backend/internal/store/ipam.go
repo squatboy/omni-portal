@@ -29,7 +29,6 @@ var allowedIPAMScanIntervals = map[int]struct{}{
 	86400: {},
 }
 
-const ipamScanHistoryRetentionPerSubnet = 20
 
 type ClaimedIPAMScan struct {
 	SubnetID  string
@@ -569,9 +568,6 @@ func (s *Store) FailIPAMScan(ctx context.Context, subnetID string, startedAt tim
 	}); err != nil {
 		return models.IPAMSubnet{}, err
 	}
-	if err := pruneIPAMScanHistory(ctx, tx, subnetID); err != nil {
-		return models.IPAMSubnet{}, err
-	}
 	if err := tx.Commit(); err != nil {
 		return models.IPAMSubnet{}, err
 	}
@@ -734,9 +730,6 @@ func (s *Store) CompleteIPAMScan(ctx context.Context, subnetID string, startedAt
 		return models.IPAMSubnet{}, err
 	}
 	if err := insertIPAMScanHistoryChanges(ctx, tx, historyID, changes); err != nil {
-		return models.IPAMSubnet{}, err
-	}
-	if err := pruneIPAMScanHistory(ctx, tx, subnetID); err != nil {
 		return models.IPAMSubnet{}, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -1132,25 +1125,6 @@ func insertIPAMScanHistoryChanges(ctx context.Context, tx *sql.Tx, historyID str
 	return nil
 }
 
-func pruneIPAMScanHistory(ctx context.Context, tx *sql.Tx, subnetID string) error {
-	_, err := tx.ExecContext(ctx, `
-		DELETE FROM ipam_scan_history
-		WHERE id IN (
-			SELECT id
-			FROM (
-				SELECT id,
-					row_number() OVER (
-						PARTITION BY subnet_id
-						ORDER BY completed_at DESC, created_at DESC
-					) AS rn
-				FROM ipam_scan_history
-				WHERE subnet_id=$1
-			) ranked
-			WHERE rn > $2
-		)
-	`, subnetID, ipamScanHistoryRetentionPerSubnet)
-	return err
-}
 
 func ipamLocationIDForNetwork(ctx context.Context, tx *sql.Tx, networkID string) (string, error) {
 	var locationID string

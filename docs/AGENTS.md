@@ -11,6 +11,7 @@ This directory is for omni project's documents. Documentation must always reflec
         - Plan document naming: if the prefix is "ing", it indicates work in progress; if it is "done", it indicates the plan has been completed.
     - `resource-status.md`: Rules and logic for determining the health status of infrastructure resources and tools.
     - `features/` : Feature-specific documentation
+    - `user-guide/` : User-Friendly Feature-by-Feature Guide documentation
 
 ---
 
