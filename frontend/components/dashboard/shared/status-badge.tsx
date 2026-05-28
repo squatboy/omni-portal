@@ -13,14 +13,23 @@ export function StatusDot({
   stale?: boolean
 }) {
   const color = statusColor(status, stale)
+  const isMuted = color === "var(--status-muted)"
   return (
-    <span
-      className="size-2 shrink-0 rounded-full"
-      style={{
-        backgroundColor: color,
-        boxShadow: color !== "var(--status-muted)" ? `0 0 6px ${color}` : undefined,
-      }}
-    />
+    <span className="relative flex size-2 shrink-0">
+      {!isMuted && (
+        <span
+          className="absolute inline-flex h-full w-full rounded-full animate-ping opacity-75"
+          style={{ backgroundColor: color }}
+        />
+      )}
+      <span
+        className="relative inline-flex rounded-full size-2"
+        style={{
+          backgroundColor: color,
+          boxShadow: !isMuted ? `0 0 6px ${color}` : undefined,
+        }}
+      />
+    </span>
   )
 }
 
