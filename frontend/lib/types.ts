@@ -62,6 +62,24 @@ export type GitLabIntegration = {
   tokenConfigured: boolean
 }
 
+export type GitHubRepository = {
+  id: string
+  name: string
+  fullName: string
+  defaultBranch: string
+  link?: string | null
+  active: boolean
+}
+
+export type GitHubIntegration = {
+  id: string
+  name: string
+  baseUrl: string
+  repositories: GitHubRepository[]
+  active: boolean
+  tokenConfigured: boolean
+}
+
 export type NexusIntegration = {
   id: string
   name: string

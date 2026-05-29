@@ -1,7 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Check, Edit, Eye, EyeOff, Loader2, TestTube2, Trash2 } from "lucide-react"
+import {
+  Check,
+  Edit,
+  Eye,
+  EyeOff,
+  Loader2,
+  TestTube2,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { type TestResult } from "@/lib/api"
@@ -216,7 +224,7 @@ export function FormActions({ onTest }: { onTest: () => Promise<TestResult> }) {
       {result && (
         <Badge
           variant={result.ok ? "outline" : "destructive"}
-          className={`h-7 whitespace-nowrap rounded-md px-2 text-xs font-medium ${
+          className={`h-7 rounded-md px-2 text-xs font-medium whitespace-nowrap ${
             result.ok
               ? "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400"
               : ""
@@ -322,6 +330,26 @@ export function parseProjects(value: string) {
         id: "",
         name,
         path,
+        defaultBranch,
+        link: link || null,
+        active: true,
+      }
+    })
+}
+
+export function parseRepositories(value: string) {
+  return value
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const parts = line.split("|").map((part) => part.trim())
+      const [name, rawFullName, defaultBranch = "main", link = ""] = parts
+      const fullName = rawFullName || name
+      return {
+        id: "",
+        name,
+        fullName,
         defaultBranch,
         link: link || null,
         active: true,

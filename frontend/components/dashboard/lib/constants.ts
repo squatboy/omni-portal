@@ -1,5 +1,12 @@
 import * as React from "react"
-import { Boxes, GitBranch, Package, Server, Workflow } from "lucide-react"
+import {
+  Boxes,
+  GitBranch,
+  GitBranchPlus,
+  Package,
+  Server,
+  Workflow,
+} from "lucide-react"
 
 import type { CollectSource, SourceStatus } from "@/lib/collect/types"
 import type { SourceKey } from "./types"
@@ -12,6 +19,7 @@ export const sourceLabels: Record<CollectSource, string> = {
   kubernetes: "Kubernetes",
   argocd: "Argo CD",
   gitlab: "GitLab",
+  github: "GitHub",
   nexus: "Nexus",
 }
 
@@ -33,6 +41,7 @@ export const sourceIcons: Record<
   kubernetes: Boxes,
   argocd: Workflow,
   gitlab: GitBranch,
+  github: GitBranchPlus,
   nexus: Package,
 }
 
@@ -41,5 +50,6 @@ export const sourceOrder: SourceKey[] = [
   "vms",
   "argocd",
   "gitlab",
+  "github",
   "nexus",
 ]

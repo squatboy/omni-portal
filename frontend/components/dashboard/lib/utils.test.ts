@@ -48,6 +48,7 @@ describe("dashboard status helpers", () => {
       kubernetes: "timeout",
       argocd: "permission_error",
       gitlab: "down",
+      github: "down",
       nexus: "down",
     })
     vi.stubGlobal(
@@ -67,13 +68,11 @@ describe("dashboard status helpers", () => {
   it("rejects non-snapshot 502 responses", async () => {
     vi.stubGlobal(
       "fetch",
-      vi
-        .fn()
-        .mockResolvedValue(
-          new Response(JSON.stringify({ error: "bad gateway" }), {
-            status: 502,
-          })
-        )
+      vi.fn().mockResolvedValue(
+        new Response(JSON.stringify({ error: "bad gateway" }), {
+          status: 502,
+        })
+      )
     )
 
     await expect(loadSnapshot()).rejects.toThrow(
@@ -93,6 +92,7 @@ function createSnapshot(
     kubernetes: statuses.kubernetes ?? "ok",
     argocd: statuses.argocd ?? "ok",
     gitlab: statuses.gitlab ?? "ok",
+    github: statuses.github ?? "ok",
     nexus: statuses.nexus ?? "ok",
   }
 
@@ -127,6 +127,7 @@ function createSnapshot(
     }),
     argocd: envelope("argocd", runtimeStatuses.argocd, { applications: [] }),
     gitlab: envelope("gitlab", runtimeStatuses.gitlab, { projects: [] }),
+    github: envelope("github", runtimeStatuses.github, { repositories: [] }),
     nexus: envelope("nexus", runtimeStatuses.nexus, {
       items: [],
       url: "",

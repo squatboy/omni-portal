@@ -45,6 +45,7 @@ const appViews: AppView[] = [
   "vms",
   "argocd",
   "gitlab",
+  "github",
   "nexus",
   "manage-vm",
   "manage-integrations",
@@ -268,14 +269,25 @@ export function OmniDashboard() {
                       variant="outline"
                       size="icon-sm"
                       aria-label="Toggle theme"
-                      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+                      onClick={() =>
+                        setTheme(resolvedTheme === "dark" ? "light" : "dark")
+                      }
                     >
                       {!mounted ? (
-                        <Sun data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                        <Sun
+                          data-icon="inline-start"
+                          className="h-[1.2rem] w-[1.2rem]"
+                        />
                       ) : resolvedTheme === "dark" ? (
-                        <Sun data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                        <Sun
+                          data-icon="inline-start"
+                          className="h-[1.2rem] w-[1.2rem]"
+                        />
                       ) : (
-                        <Moon data-icon="inline-start" className="h-[1.2rem] w-[1.2rem]" />
+                        <Moon
+                          data-icon="inline-start"
+                          className="h-[1.2rem] w-[1.2rem]"
+                        />
                       )}
                     </Button>
                   </TooltipTrigger>
@@ -301,7 +313,9 @@ export function OmniDashboard() {
                       />
                     </Button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">Refresh collection</TooltipContent>
+                  <TooltipContent side="bottom">
+                    Refresh collection
+                  </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>

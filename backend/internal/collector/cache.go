@@ -12,6 +12,7 @@ type Cache struct {
 	kubernetes models.CollectEnvelope[models.KubernetesData]
 	argocd     models.CollectEnvelope[models.ArgoCdData]
 	gitlab     models.CollectEnvelope[models.GitLabData]
+	github     models.CollectEnvelope[models.GitHubData]
 	nexus      models.CollectEnvelope[models.NexusData]
 	overview   models.CollectEnvelope[models.OverviewData]
 }
@@ -22,6 +23,7 @@ func NewCache() *Cache {
 		kubernetes: models.CollectEnvelope[models.KubernetesData]{Source: models.SourceKubernetes, Status: models.StatusUnknown},
 		argocd:     models.CollectEnvelope[models.ArgoCdData]{Source: models.SourceArgoCD, Status: models.StatusUnknown},
 		gitlab:     models.CollectEnvelope[models.GitLabData]{Source: models.SourceGitLab, Status: models.StatusUnknown},
+		github:     models.CollectEnvelope[models.GitHubData]{Source: models.SourceGitHub, Status: models.StatusUnknown},
 		nexus:      models.CollectEnvelope[models.NexusData]{Source: models.SourceNexus, Status: models.StatusUnknown},
 		overview:   models.CollectEnvelope[models.OverviewData]{Source: models.SourceOverview, Status: models.StatusUnknown},
 	}
@@ -79,6 +81,19 @@ func (c *Cache) SetGitLab(data models.CollectEnvelope[models.GitLabData]) {
 	c.updateOverview()
 }
 
+func (c *Cache) GetGitHub() models.CollectEnvelope[models.GitHubData] {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.github
+}
+
+func (c *Cache) SetGitHub(data models.CollectEnvelope[models.GitHubData]) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.github = data
+	c.updateOverview()
+}
+
 func (c *Cache) GetNexus() models.CollectEnvelope[models.NexusData] {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -107,6 +122,7 @@ func (c *Cache) GetSnapshot() models.DashboardSnapshot {
 		Kubernetes: c.kubernetes,
 		ArgoCD:     c.argocd,
 		GitLab:     c.gitlab,
+		GitHub:     c.github,
 		Nexus:      c.nexus,
 	}
 }
@@ -119,6 +135,7 @@ func (c *Cache) updateOverview() {
 		{Source: c.kubernetes.Source, Status: c.kubernetes.Status, AttemptedAt: c.kubernetes.AttemptedAt, CollectedAt: c.kubernetes.CollectedAt, Stale: c.kubernetes.Stale, Error: c.kubernetes.Error},
 		{Source: c.argocd.Source, Status: c.argocd.Status, AttemptedAt: c.argocd.AttemptedAt, CollectedAt: c.argocd.CollectedAt, Stale: c.argocd.Stale, Error: c.argocd.Error},
 		{Source: c.gitlab.Source, Status: c.gitlab.Status, AttemptedAt: c.gitlab.AttemptedAt, CollectedAt: c.gitlab.CollectedAt, Stale: c.gitlab.Stale, Error: c.gitlab.Error},
+		{Source: c.github.Source, Status: c.github.Status, AttemptedAt: c.github.AttemptedAt, CollectedAt: c.github.CollectedAt, Stale: c.github.Stale, Error: c.github.Error},
 		{Source: c.nexus.Source, Status: c.nexus.Status, AttemptedAt: c.nexus.AttemptedAt, CollectedAt: c.nexus.CollectedAt, Stale: c.nexus.Stale, Error: c.nexus.Error},
 	}
 

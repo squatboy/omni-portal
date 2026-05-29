@@ -1,21 +1,21 @@
 package store
 
 import (
-        "context"
-        "crypto/aes"
-        "crypto/cipher"
-        "crypto/rand"
-        "crypto/sha256"
-        "database/sql"
-        "encoding/base64"
-        "encoding/hex"
-        "errors"
-        "fmt"
-        "io"
-        "log"
-        "strings"
-        "time"
+	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/base64"
+	"encoding/hex"
+	"errors"
+	"fmt"
+	"io"
+	"log"
 	"omni-backend/internal/models"
+	"strings"
+	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/lib/pq"
@@ -295,60 +295,85 @@ func (s *Store) CollectSettings(ctx context.Context) (models.CollectSettings, er
 
 	kubernetes, err := s.ListKubernetesIntegrations(ctx)
 	if err != nil {
-	        return settings, err
+		return settings, err
 	}
 	for _, item := range kubernetes {
-	        if !item.Active {
-	                continue
-	        }
-	        token, err := s.getCredential(ctx, "kubernetes", item.ID, "bearer_token")
-	        if err != nil {
-	                log.Printf("failed to get bearer_token for kubernetes integration %s (%s): %v", item.Name, item.ID, err)
-	                continue
-	        }
-	        settings.Kubernetes = append(settings.Kubernetes, models.KubernetesCollectTarget{
-	                ID: item.ID, Name: item.Name, APIURL: item.APIURL, Token: token,
-	                Namespaces: item.Namespaces,
-	        })	}
+		if !item.Active {
+			continue
+		}
+		token, err := s.getCredential(ctx, "kubernetes", item.ID, "bearer_token")
+		if err != nil {
+			log.Printf("failed to get bearer_token for kubernetes integration %s (%s): %v", item.Name, item.ID, err)
+			continue
+		}
+		settings.Kubernetes = append(settings.Kubernetes, models.KubernetesCollectTarget{
+			ID: item.ID, Name: item.Name, APIURL: item.APIURL, Token: token,
+			Namespaces: item.Namespaces,
+		})
+	}
 
 	argocd, err := s.ListArgoCDIntegrations(ctx)
 	if err != nil {
-	        return settings, err
+		return settings, err
 	}
 	for _, item := range argocd {
-	        if !item.Active {
-	                continue
-	        }
-	        token, err := s.getCredential(ctx, "argocd", item.ID, "token")
-	        if err != nil {
-	                log.Printf("failed to get token for argocd integration %s (%s): %v", item.Name, item.ID, err)
-	                continue
-	        }
-	        settings.ArgoCD = append(settings.ArgoCD, models.ArgoCDCollectTarget{ID: item.ID, Name: item.Name, BaseURL: item.BaseURL, Token: token})
+		if !item.Active {
+			continue
+		}
+		token, err := s.getCredential(ctx, "argocd", item.ID, "token")
+		if err != nil {
+			log.Printf("failed to get token for argocd integration %s (%s): %v", item.Name, item.ID, err)
+			continue
+		}
+		settings.ArgoCD = append(settings.ArgoCD, models.ArgoCDCollectTarget{ID: item.ID, Name: item.Name, BaseURL: item.BaseURL, Token: token})
 	}
 
 	gitlab, err := s.ListGitLabIntegrations(ctx)
 	if err != nil {
-	        return settings, err
+		return settings, err
 	}
 	for _, item := range gitlab {
-	        if !item.Active {
-	                continue
-	        }
-	        token, err := s.getCredential(ctx, "gitlab", item.ID, "token")
-	        if err != nil {
-	                log.Printf("failed to get token for gitlab integration %s (%s): %v", item.Name, item.ID, err)
-	                continue
-	        }
-	        projects := make([]models.GitLabProjectTarget, 0, len(item.Projects))
-	        for _, project := range item.Projects {
-	                if project.Active {
-	                        projects = append(projects, models.GitLabProjectTarget{
-	                                Name: project.Name, Path: project.Path, DefaultBranch: project.DefaultBranch, Link: project.Link,
-	                        })
-	                }
-	        }
-	        settings.GitLab = append(settings.GitLab, models.GitLabCollectTarget{ID: item.ID, Name: item.Name, BaseURL: item.BaseURL, Token: token, Projects: projects})
+		if !item.Active {
+			continue
+		}
+		token, err := s.getCredential(ctx, "gitlab", item.ID, "token")
+		if err != nil {
+			log.Printf("failed to get token for gitlab integration %s (%s): %v", item.Name, item.ID, err)
+			continue
+		}
+		projects := make([]models.GitLabProjectTarget, 0, len(item.Projects))
+		for _, project := range item.Projects {
+			if project.Active {
+				projects = append(projects, models.GitLabProjectTarget{
+					Name: project.Name, Path: project.Path, DefaultBranch: project.DefaultBranch, Link: project.Link,
+				})
+			}
+		}
+		settings.GitLab = append(settings.GitLab, models.GitLabCollectTarget{ID: item.ID, Name: item.Name, BaseURL: item.BaseURL, Token: token, Projects: projects})
+	}
+
+	github, err := s.ListGitHubIntegrations(ctx)
+	if err != nil {
+		return settings, err
+	}
+	for _, item := range github {
+		if !item.Active {
+			continue
+		}
+		token, err := s.getCredential(ctx, "github", item.ID, "token")
+		if err != nil {
+			log.Printf("failed to get token for github integration %s (%s): %v", item.Name, item.ID, err)
+			continue
+		}
+		repositories := make([]models.GitHubRepositoryTarget, 0, len(item.Repositories))
+		for _, repository := range item.Repositories {
+			if repository.Active {
+				repositories = append(repositories, models.GitHubRepositoryTarget{
+					Name: repository.Name, FullName: repository.FullName, DefaultBranch: repository.DefaultBranch, Link: repository.Link,
+				})
+			}
+		}
+		settings.GitHub = append(settings.GitHub, models.GitHubCollectTarget{ID: item.ID, Name: item.Name, BaseURL: item.BaseURL, Token: token, Repositories: repositories})
 	}
 	nexus, err := s.ListNexusIntegrations(ctx)
 	if err != nil {
@@ -363,47 +388,47 @@ func (s *Store) CollectSettings(ctx context.Context) (models.CollectSettings, er
 }
 
 func (s *Store) ListKubernetesIntegrations(ctx context.Context) ([]models.KubernetesIntegration, error) {
-        rows, err := s.db.QueryContext(ctx, `
+	rows, err := s.db.QueryContext(ctx, `
                 SELECT k.id, k.name, k.api_url, k.namespaces, k.active,
                         EXISTS(SELECT 1 FROM integration_credentials c WHERE c.integration_type='kubernetes' AND c.integration_id=k.id AND c.secret_name='bearer_token')
                 FROM kubernetes_integrations k
                 ORDER BY k.name
         `)
-        if err != nil {
-                return nil, err
-        }
-        defer rows.Close()
-        items := []models.KubernetesIntegration{}
-        for rows.Next() {
-                var item models.KubernetesIntegration
-                if err := rows.Scan(&item.ID, &item.Name, &item.APIURL, pq.Array(&item.Namespaces), &item.Active, &item.TokenConfigured); err != nil {
-                        return nil, err
-                }
-                items = append(items, item)
-        }
-        return items, rows.Err()
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []models.KubernetesIntegration{}
+	for rows.Next() {
+		var item models.KubernetesIntegration
+		if err := rows.Scan(&item.ID, &item.Name, &item.APIURL, pq.Array(&item.Namespaces), &item.Active, &item.TokenConfigured); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
 }
 func (s *Store) SaveKubernetesIntegration(ctx context.Context, actorID string, item models.KubernetesIntegration, token string) (models.KubernetesIntegration, error) {
-        if item.ID == "" {
-                item.ID = newID("k8s")
-                _, err := s.db.ExecContext(ctx, `
+	if item.ID == "" {
+		item.ID = newID("k8s")
+		_, err := s.db.ExecContext(ctx, `
                         INSERT INTO kubernetes_integrations (id, name, api_url, namespaces, active, created_by, updated_by)
                         VALUES ($1,$2,$3,$4,$5,$6,$6)
                 `, item.ID, item.Name, item.APIURL, pq.Array(item.Namespaces), item.Active, actorID)
-                if err != nil {
-                        return models.KubernetesIntegration{}, err
-                }
-        } else {
-                _, err := s.db.ExecContext(ctx, `
+		if err != nil {
+			return models.KubernetesIntegration{}, err
+		}
+	} else {
+		_, err := s.db.ExecContext(ctx, `
                         UPDATE kubernetes_integrations
                         SET name=$2, api_url=$3, namespaces=$4, active=$5, updated_at=now(), updated_by=$6
                         WHERE id=$1
                 `, item.ID, item.Name, item.APIURL, pq.Array(item.Namespaces), item.Active, actorID)
-                if err != nil {
-                        return models.KubernetesIntegration{}, err
-                }
-                }
-                if strings.TrimSpace(token) != "" {
+		if err != nil {
+			return models.KubernetesIntegration{}, err
+		}
+	}
+	if strings.TrimSpace(token) != "" {
 		if err := s.setCredential(ctx, "kubernetes", item.ID, "bearer_token", token); err != nil {
 			return models.KubernetesIntegration{}, err
 		}
@@ -519,6 +544,69 @@ func (s *Store) SaveGitLabIntegration(ctx context.Context, actorID string, item 
 	return item, nil
 }
 
+func (s *Store) ListGitHubIntegrations(ctx context.Context) ([]models.GitHubIntegration, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT g.id, g.name, g.base_url, g.active,
+			EXISTS(SELECT 1 FROM integration_credentials c WHERE c.integration_type='github' AND c.integration_id=g.id AND c.secret_name='token')
+		FROM github_integrations g
+		ORDER BY g.name
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []models.GitHubIntegration{}
+	for rows.Next() {
+		var item models.GitHubIntegration
+		if err := rows.Scan(&item.ID, &item.Name, &item.BaseURL, &item.Active, &item.TokenConfigured); err != nil {
+			return nil, err
+		}
+		repositories, err := s.listGitHubRepositories(ctx, item.ID)
+		if err != nil {
+			return nil, err
+		}
+		item.Repositories = repositories
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) SaveGitHubIntegration(ctx context.Context, actorID string, item models.GitHubIntegration, token string) (models.GitHubIntegration, error) {
+	if item.ID == "" {
+		item.ID = newID("github")
+		_, err := s.db.ExecContext(ctx, `INSERT INTO github_integrations (id, name, base_url, active, created_by, updated_by) VALUES ($1,$2,$3,$4,$5,$5)`, item.ID, item.Name, item.BaseURL, item.Active, actorID)
+		if err != nil {
+			return models.GitHubIntegration{}, err
+		}
+	} else {
+		_, err := s.db.ExecContext(ctx, `UPDATE github_integrations SET name=$2, base_url=$3, active=$4, updated_at=now(), updated_by=$5 WHERE id=$1`, item.ID, item.Name, item.BaseURL, item.Active, actorID)
+		if err != nil {
+			return models.GitHubIntegration{}, err
+		}
+		_, _ = s.db.ExecContext(ctx, `DELETE FROM github_repositories WHERE integration_id=$1`, item.ID)
+	}
+	for _, repository := range item.Repositories {
+		if repository.ID == "" {
+			repository.ID = newID("ghr")
+		}
+		_, err := s.db.ExecContext(ctx, `
+			INSERT INTO github_repositories (id, integration_id, name, full_name, default_branch, link, active, created_by, updated_by)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8)
+		`, repository.ID, item.ID, repository.Name, repository.FullName, repository.DefaultBranch, repository.Link, repository.Active, actorID)
+		if err != nil {
+			return models.GitHubIntegration{}, err
+		}
+	}
+	if strings.TrimSpace(token) != "" {
+		if err := s.setCredential(ctx, "github", item.ID, "token", token); err != nil {
+			return models.GitHubIntegration{}, err
+		}
+		item.TokenConfigured = true
+	}
+	item.Repositories, _ = s.listGitHubRepositories(ctx, item.ID)
+	return item, nil
+}
+
 func (s *Store) ListNexusIntegrations(ctx context.Context) ([]models.NexusIntegration, error) {
 	rows, err := s.db.QueryContext(ctx, `SELECT id, name, url, active FROM nexus_integrations ORDER BY name`)
 	if err != nil {
@@ -551,6 +639,7 @@ func (s *Store) DeleteIntegration(ctx context.Context, table, id string) error {
 		"kubernetes": "kubernetes_integrations",
 		"argocd":     "argocd_integrations",
 		"gitlab":     "gitlab_integrations",
+		"github":     "github_integrations",
 		"nexus":      "nexus_integrations",
 	}
 	tableName, ok := allowed[table]
@@ -571,6 +660,23 @@ func (s *Store) listGitLabProjects(ctx context.Context, integrationID string) ([
 	for rows.Next() {
 		var item models.GitLabProjectItem
 		if err := rows.Scan(&item.ID, &item.Name, &item.Path, &item.DefaultBranch, &item.Link, &item.Active); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+	return items, rows.Err()
+}
+
+func (s *Store) listGitHubRepositories(ctx context.Context, integrationID string) ([]models.GitHubRepositoryItem, error) {
+	rows, err := s.db.QueryContext(ctx, `SELECT id, name, full_name, default_branch, link, active FROM github_repositories WHERE integration_id=$1 ORDER BY name`, integrationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []models.GitHubRepositoryItem{}
+	for rows.Next() {
+		var item models.GitHubRepositoryItem
+		if err := rows.Scan(&item.ID, &item.Name, &item.FullName, &item.DefaultBranch, &item.Link, &item.Active); err != nil {
 			return nil, err
 		}
 		items = append(items, item)

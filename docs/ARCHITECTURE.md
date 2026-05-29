@@ -26,7 +26,7 @@ graph TD
     API -->|Query/Mutation & IPAM| DB[(PostgreSQL)]
     
     subgraph Background Runners
-        Runner[External Tool Runner] -->|30s Polling| Ext[Kubernetes, ArgoCD, GitLab, Nexus]
+        Runner[External Tool Runner] -->|30s Polling| Ext[Kubernetes, ArgoCD, GitLab, GitHub, Nexus]
         Ext -->|Fetch & Normalize| Cache
         
         IPAM[IPAM Scheduler/ScanExecutor] -->|ICMP Ping Scan| VM[VMs & Subnet IPs]
