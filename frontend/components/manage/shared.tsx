@@ -324,11 +324,10 @@ export function parseProjects(value: string) {
     .filter(Boolean)
     .map((line) => {
       const parts = line.split("|").map((part) => part.trim())
-      const [name, rawPath, defaultBranch = "main", link = ""] = parts
-      const path = rawPath || name
+      const [path, defaultBranch = "main", link = ""] = parts
       return {
         id: "",
-        name,
+        name: path,
         path,
         defaultBranch,
         link: link || null,
@@ -344,11 +343,10 @@ export function parseRepositories(value: string) {
     .filter(Boolean)
     .map((line) => {
       const parts = line.split("|").map((part) => part.trim())
-      const [name, rawFullName, defaultBranch = "main", link = ""] = parts
-      const fullName = rawFullName || name
+      const [fullName, defaultBranch = "main", link = ""] = parts
       return {
         id: "",
-        name,
+        name: fullName,
         fullName,
         defaultBranch,
         link: link || null,

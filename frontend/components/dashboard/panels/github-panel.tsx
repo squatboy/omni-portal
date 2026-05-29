@@ -56,9 +56,6 @@ export function GitHubPanel({
                 <TableCell>
                   <div className="flex min-w-52 flex-col gap-1">
                     <span className="truncate font-medium">
-                      {repository.name}
-                    </span>
-                    <span className="truncate font-mono text-xs text-muted-foreground">
                       {repository.fullName}
                     </span>
                   </div>
@@ -94,7 +91,7 @@ export function GitHubPanel({
                 <TableCell>
                   <ExternalLinkButton
                     href={repository.link || "#"}
-                    label={repository.name}
+                    label={repository.fullName}
                   />
                 </TableCell>
               </TableRow>

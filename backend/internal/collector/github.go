@@ -236,9 +236,7 @@ func normalizeGitHubRepository(repo models.GitHubRepositoryTarget) models.GitHub
 	if strings.TrimSpace(repo.FullName) == "" {
 		repo.FullName = strings.TrimSpace(repo.Name)
 	}
-	if strings.TrimSpace(repo.Name) == "" {
-		repo.Name = repo.FullName
-	}
+	repo.Name = repo.FullName
 	if strings.TrimSpace(repo.DefaultBranch) == "" {
 		repo.DefaultBranch = "main"
 	}

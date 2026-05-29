@@ -216,9 +216,7 @@ func normalizeGitLabProject(p models.GitLabProjectTarget) models.GitLabProjectTa
 	if strings.TrimSpace(p.Path) == "" {
 		p.Path = strings.TrimSpace(p.Name)
 	}
-	if strings.TrimSpace(p.Name) == "" {
-		p.Name = p.Path
-	}
+	p.Name = p.Path
 	if strings.TrimSpace(p.DefaultBranch) == "" {
 		p.DefaultBranch = "main"
 	}

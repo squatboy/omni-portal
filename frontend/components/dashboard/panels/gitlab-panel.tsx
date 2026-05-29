@@ -51,10 +51,7 @@ export function GitLabPanel({
               <TableRow key={project.path}>
                 <TableCell>
                   <div className="flex min-w-52 flex-col gap-1">
-                    <span className="truncate font-medium">{project.name}</span>
-                    <span className="truncate font-mono text-xs text-muted-foreground">
-                      {project.path}
-                    </span>
+                    <span className="truncate font-medium">{project.path}</span>
                   </div>
                 </TableCell>
                 <TableCell>
@@ -89,7 +86,7 @@ export function GitLabPanel({
                 <TableCell>
                   <ExternalLinkButton
                     href={project.link || "#"}
-                    label={project.name}
+                    label={project.path}
                   />
                 </TableCell>
               </TableRow>

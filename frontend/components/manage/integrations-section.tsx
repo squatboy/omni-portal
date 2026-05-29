@@ -226,7 +226,7 @@ function GitLabForm({
         label="Projects"
         value={value.projectsText}
         onChange={(projectsText) => onChange({ ...value, projectsText })}
-        placeholder="frontend-app|my-group/frontend-app|main"
+        placeholder="my-group/frontend-app|main|https://gitlab.example.com/my-group/frontend-app"
       />
       <SecretInput
         configured={value.tokenConfigured}
@@ -285,7 +285,7 @@ function GitHubForm({
         onChange={(repositoriesText) =>
           onChange({ ...value, repositoriesText })
         }
-        placeholder="Omni Portal|sth/omni-portal|main|https://github.com/sth/omni-portal"
+        placeholder="sth/omni-portal|main|https://github.com/sth/omni-portal"
       />
       <SecretInput
         configured={value.tokenConfigured}
@@ -724,7 +724,7 @@ export function IntegrationsSection() {
                 token: "",
                 projectsText: (item.projects ?? [])
                   .map((p) =>
-                    [p.name, p.path, p.defaultBranch, p.link ?? ""].join("|")
+                    [p.path, p.defaultBranch, p.link ?? ""].join("|")
                   )
                   .join("\n"),
               })
@@ -788,7 +788,6 @@ export function IntegrationsSection() {
                 repositoriesText: (item.repositories ?? [])
                   .map((repository) =>
                     [
-                      repository.name,
                       repository.fullName,
                       repository.defaultBranch,
                       repository.link ?? "",
