@@ -15,6 +15,13 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable } from "@/components/ui/data-table"
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible"
+import { Button } from "@/components/ui/button"
+import { ChevronDown, ChevronUp, Plus } from "lucide-react"
+import {
   ActiveToggle,
   FormActions,
   parseProjects,
@@ -369,12 +376,53 @@ function NexusForm({
 
 // ─── Shared list + card ────────────────────────────────────────────────────────
 
+function CollapsibleFormSection({
+  title = "Add Integration",
+  children,
+}: {
+  title?: string
+  children: React.ReactNode
+}) {
+  const [isOpen, setIsOpen] = React.useState(false)
+
+  return (
+    <Collapsible
+      open={isOpen}
+      onOpenChange={setIsOpen}
+      className="border rounded-lg p-3 bg-muted/40"
+    >
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex w-full items-center justify-between font-semibold text-xs text-muted-foreground p-1 h-auto hover:bg-transparent"
+        >
+          <span className="flex items-center gap-1.5">
+            <Plus className="h-3.5 w-3.5" />
+            {title}
+          </span>
+          {isOpen ? (
+            <ChevronUp className="h-3.5 w-3.5" />
+          ) : (
+            <ChevronDown className="h-3.5 w-3.5" />
+          )}
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-3 animate-slide-down">
+        {children}
+      </CollapsibleContent>
+    </Collapsible>
+  )
+}
+
 function IntegrationCard({
   title,
+  icon,
   configured,
   children,
 }: {
   title: string
+  icon?: string
   configured: number
   children: React.ReactNode
 }) {
@@ -382,7 +430,16 @@ function IntegrationCard({
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between gap-3">
-          <span>{title}</span>
+          <span className="flex items-center gap-2">
+            {icon && (
+              <img
+                src={icon}
+                alt={`${title} icon`}
+                className="h-5 w-5 object-contain"
+              />
+            )}
+            <span>{title}</span>
+          </span>
           <Badge variant="outline">{configured} configured</Badge>
         </CardTitle>
       </CardHeader>
@@ -625,17 +682,19 @@ export function IntegrationsSection() {
 
   return (
     <div className="grid gap-4 xl:grid-cols-2">
-      <IntegrationCard title="Kubernetes" configured={kubernetes.length}>
-        <KubernetesForm
-          value={kubernetesForm}
-          onChange={setKubernetesForm}
-          onSubmit={() =>
-            void saveKubernetes(kubernetesForm, false).catch((e) =>
-              showMessage(e.message)
-            )
-          }
-          onTest={() => api.testKubernetes(kubernetesForm)}
-        />
+      <IntegrationCard title="Kubernetes" icon="/kubernetes.svg" configured={kubernetes.length}>
+        <CollapsibleFormSection title="Add Kubernetes Integration">
+          <KubernetesForm
+            value={kubernetesForm}
+            onChange={setKubernetesForm}
+            onSubmit={() =>
+              void saveKubernetes(kubernetesForm, false).catch((e) =>
+                showMessage(e.message)
+              )
+            }
+            onTest={() => api.testKubernetes(kubernetesForm)}
+          />
+        </CollapsibleFormSection>
         <IntegrationList
           items={kubernetes}
           editingId={editingKubernetesId}
@@ -670,17 +729,19 @@ export function IntegrationsSection() {
         />
       </IntegrationCard>
 
-      <IntegrationCard title="ArgoCD" configured={argocd.length}>
-        <ArgoCDForm
-          value={argocdForm}
-          onChange={setArgoCDForm}
-          onSubmit={() =>
-            void saveArgoCD(argocdForm, false).catch((e) =>
-              showMessage(e.message)
-            )
-          }
-          onTest={() => api.testArgoCD(argocdForm)}
-        />
+      <IntegrationCard title="ArgoCD" icon="/argo-cd.svg" configured={argocd.length}>
+        <CollapsibleFormSection title="Add ArgoCD Integration">
+          <ArgoCDForm
+            value={argocdForm}
+            onChange={setArgoCDForm}
+            onSubmit={() =>
+              void saveArgoCD(argocdForm, false).catch((e) =>
+                showMessage(e.message)
+              )
+            }
+            onTest={() => api.testArgoCD(argocdForm)}
+          />
+        </CollapsibleFormSection>
         <IntegrationList
           items={argocd}
           editingId={editingArgoCDId}
@@ -715,22 +776,24 @@ export function IntegrationsSection() {
         />
       </IntegrationCard>
 
-      <IntegrationCard title="GitLab" configured={gitlab.length}>
-        <GitLabForm
-          value={gitlabForm}
-          onChange={setGitLabForm}
-          onSubmit={() =>
-            void saveGitLab(gitlabForm, false).catch((e) =>
-              showMessage(e.message)
-            )
-          }
-          onTest={() =>
-            api.testGitLab({
-              ...gitlabForm,
-              projects: parseProjects(gitlabForm.projectsText, gitlabForm.branchText),
-            })
-          }
-        />
+      <IntegrationCard title="GitLab" icon="/gitlab.svg" configured={gitlab.length}>
+        <CollapsibleFormSection title="Add GitLab Integration">
+          <GitLabForm
+            value={gitlabForm}
+            onChange={setGitLabForm}
+            onSubmit={() =>
+              void saveGitLab(gitlabForm, false).catch((e) =>
+                showMessage(e.message)
+              )
+            }
+            onTest={() =>
+              api.testGitLab({
+                ...gitlabForm,
+                projects: parseProjects(gitlabForm.projectsText, gitlabForm.branchText),
+              })
+            }
+          />
+        </CollapsibleFormSection>
         <IntegrationList
           items={gitlab}
           editingId={editingGitLabId}
@@ -775,22 +838,24 @@ export function IntegrationsSection() {
         />
       </IntegrationCard>
 
-      <IntegrationCard title="GitHub" configured={github.length}>
-        <GitHubForm
-          value={githubForm}
-          onChange={setGitHubForm}
-          onSubmit={() =>
-            void saveGitHub(githubForm, false).catch((e) =>
-              showMessage(e.message)
-            )
-          }
-          onTest={() =>
-            api.testGitHub({
-              ...githubForm,
-              repositories: parseRepositories(githubForm.repositoriesText, githubForm.branchText),
-            })
-          }
-        />
+      <IntegrationCard title="GitHub" icon="/github.svg" configured={github.length}>
+        <CollapsibleFormSection title="Add GitHub Integration">
+          <GitHubForm
+            value={githubForm}
+            onChange={setGitHubForm}
+            onSubmit={() =>
+              void saveGitHub(githubForm, false).catch((e) =>
+                showMessage(e.message)
+              )
+            }
+            onTest={() =>
+              api.testGitHub({
+                ...githubForm,
+                repositories: parseRepositories(githubForm.repositoriesText, githubForm.branchText),
+              })
+            }
+          />
+        </CollapsibleFormSection>
         <IntegrationList
           items={github}
           editingId={editingGitHubId}
@@ -838,17 +903,19 @@ export function IntegrationsSection() {
         />
       </IntegrationCard>
 
-      <IntegrationCard title="Nexus" configured={nexus.length}>
-        <NexusForm
-          value={nexusForm}
-          onChange={setNexusForm}
-          onSubmit={() =>
-            void saveNexus(nexusForm, false).catch((e) =>
-              showMessage(e.message)
-            )
-          }
-          onTest={() => api.testNexus(nexusForm)}
-        />
+      <IntegrationCard title="Nexus" icon="/nexus.svg" configured={nexus.length}>
+        <CollapsibleFormSection title="Add Nexus Integration">
+          <NexusForm
+            value={nexusForm}
+            onChange={setNexusForm}
+            onSubmit={() =>
+              void saveNexus(nexusForm, false).catch((e) =>
+                showMessage(e.message)
+              )
+            }
+            onTest={() => api.testNexus(nexusForm)}
+          />
+        </CollapsibleFormSection>
         <IntegrationList
           items={nexus}
           editingId={editingNexusId}
