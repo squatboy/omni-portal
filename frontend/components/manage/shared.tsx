@@ -317,39 +317,45 @@ export function splitList(value: string) {
     .filter(Boolean)
 }
 
-export function parseProjects(value: string) {
-  return value
+export function parseProjects(projectsText: string, branchText: string) {
+  const branches = (branchText || "")
+    .split("\n")
+    .map((b) => b.trim())
+    .filter(Boolean)
+  return (projectsText || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
-      const parts = line.split("|").map((part) => part.trim())
-      const [path, defaultBranch = "main", link = ""] = parts
+    .map((line, index) => {
+      const defaultBranch = branches[index] || branches[0] || "main"
       return {
         id: "",
-        name: path,
-        path,
+        name: line,
+        path: line,
         defaultBranch,
-        link: link || null,
+        link: null,
         active: true,
       }
     })
 }
 
-export function parseRepositories(value: string) {
-  return value
+export function parseRepositories(repositoriesText: string, branchText: string) {
+  const branches = (branchText || "")
+    .split("\n")
+    .map((b) => b.trim())
+    .filter(Boolean)
+  return (repositoriesText || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
-      const parts = line.split("|").map((part) => part.trim())
-      const [fullName, defaultBranch = "main", link = ""] = parts
+    .map((line, index) => {
+      const defaultBranch = branches[index] || branches[0] || "main"
       return {
         id: "",
-        name: fullName,
-        fullName,
+        name: line,
+        fullName: line,
         defaultBranch,
-        link: link || null,
+        link: null,
         active: true,
       }
     })
