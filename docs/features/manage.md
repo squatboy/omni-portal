@@ -21,7 +21,7 @@
   - `POST /api/manage/integrations/github/test`는 저장과 분리된 수동 연결 검증만 수행함.
   - `DELETE /api/manage/integrations/github/:id`로 연동과 하위 repository 설정을 삭제함.
   - Token은 `integration_credentials`에 `integration_type='github'`, `secret_name='token'`으로 AES-GCM 저장함.
-  - Repository 입력은 한 줄당 `owner/repo|branch|link` 형식을 사용하며 branch가 비어 있으면 `main`으로 처리함 (개별 표시용 Name 입력은 명세에서 제거되어, `owner/repo` 값이 자동으로 Name으로 사용됨).
+  - Repository 및 Project 입력은 각 줄에 github repository/ gitlab project 경로명 만 작성하고, 해당 줄에 상응하는 브랜치는 우측의 분리된 Branch 필드에 작성함.
   - fine-grained PAT 최소 권한은 repository `Contents: read`, `Actions: read` 기준임.
 - **동적 다중 연동 지원**: 다중 Kubernetes 클러스터 및 연동 도구(GitLab, GitHub, ArgoCD 등)를 원활하게 등록할 수 있도록 snapshot 응답 포맷을 설계함. 연동 실패 상세는 에러 봉투(envelope)에 담고, snapshot은 부분 실패 시 `207 Multi-Status`, 전체 runtime source 실패 시 `502 Bad Gateway`로 반환함.
 - **리소스별 개별 갱신 (Granular API Reloading)**: 특정 툴의 저장 또는 삭제 작업 시 모든 연동 정보를 일괄 재조회하지 않고, 변경된 리소스 전용 로딩 로직만 호출하여 클라이언트 성능 및 API 트래픽을 최적화함.

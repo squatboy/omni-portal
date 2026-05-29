@@ -64,3 +64,4 @@ kubernetes-ca.crt
 vendor/
 go.work
 go.work.sum
+backend/server
