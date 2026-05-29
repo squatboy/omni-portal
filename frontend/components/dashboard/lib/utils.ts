@@ -11,6 +11,7 @@ function normalizeSnapshot(snapshot: DashboardSnapshot): DashboardSnapshot {
   const vmsData = snapshot.vms?.data
   const argocdData = snapshot.argocd?.data
   const gitlabData = snapshot.gitlab?.data
+  const githubData = snapshot.github?.data
   const nexusData = snapshot.nexus?.data
   const overviewData = snapshot.overview?.data
 
@@ -64,6 +65,13 @@ function normalizeSnapshot(snapshot: DashboardSnapshot): DashboardSnapshot {
         projects: ensureArray(gitlabData?.projects),
       },
     },
+    github: {
+      ...snapshot.github,
+      data: {
+        ...githubData,
+        repositories: ensureArray(githubData?.repositories),
+      },
+    },
     nexus: {
       ...snapshot.nexus,
       data: {
@@ -103,6 +111,7 @@ function isDashboardSnapshot(value: unknown): value is DashboardSnapshot {
     isCollectEnvelope(value.kubernetes) &&
     isCollectEnvelope(value.argocd) &&
     isCollectEnvelope(value.gitlab) &&
+    isCollectEnvelope(value.github) &&
     isCollectEnvelope(value.nexus)
   )
 }
@@ -134,6 +143,7 @@ export function allRuntimeSourcesFailed(snapshot: DashboardSnapshot) {
     snapshot.kubernetes,
     snapshot.argocd,
     snapshot.gitlab,
+    snapshot.github,
     snapshot.nexus,
   ]
   return runtimeSources.every(

@@ -4,7 +4,7 @@ import { IntegrationsSection } from "./manage/integrations-section"
 import { VMSection } from "./manage/vm-section"
 import { UsersSection } from "./manage/users-section"
 
-export { parseProjects } from "./manage/shared"
+export { parseProjects, parseRepositories } from "./manage/shared"
 
 export type ManageSection = "vm" | "integrations" | "users"
 

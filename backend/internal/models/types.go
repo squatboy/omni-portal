@@ -10,6 +10,7 @@ const (
 	SourceKubernetes CollectSource = "kubernetes"
 	SourceArgoCD     CollectSource = "argocd"
 	SourceGitLab     CollectSource = "gitlab"
+	SourceGitHub     CollectSource = "github"
 	SourceNexus      CollectSource = "nexus"
 )
 
@@ -64,6 +65,7 @@ type DashboardSnapshot struct {
 	Kubernetes CollectEnvelope[KubernetesData] `json:"kubernetes"`
 	ArgoCD     CollectEnvelope[ArgoCdData]     `json:"argocd"`
 	GitLab     CollectEnvelope[GitLabData]     `json:"gitlab"`
+	GitHub     CollectEnvelope[GitHubData]     `json:"github"`
 	Nexus      CollectEnvelope[NexusData]      `json:"nexus"`
 }
 
@@ -209,6 +211,42 @@ type GitLabData struct {
 	Projects []GitLabProjectStatus `json:"projects"`
 }
 
+type GitHubRepositoryTarget struct {
+	Name          string  `json:"name"`
+	FullName      string  `json:"fullName"`
+	DefaultBranch string  `json:"defaultBranch"`
+	Link          *string `json:"link,omitempty"`
+}
+
+type GitHubCommit struct {
+	Sha         string `json:"sha"`
+	Message     string `json:"message"`
+	AuthorName  string `json:"authorName"`
+	CommittedAt string `json:"committedAt"`
+	Link        string `json:"link"`
+}
+
+type GitHubWorkflowRun struct {
+	ID         int64   `json:"id"`
+	Name       string  `json:"name"`
+	Status     string  `json:"status"`
+	Conclusion *string `json:"conclusion"`
+	Branch     string  `json:"branch"`
+	UpdatedAt  string  `json:"updatedAt"`
+	Link       string  `json:"link"`
+}
+
+type GitHubRepositoryStatus struct {
+	GitHubRepositoryTarget
+	IntegrationName   string             `json:"integrationName,omitempty"`
+	LatestCommit      *GitHubCommit      `json:"latestCommit"`
+	LatestWorkflowRun *GitHubWorkflowRun `json:"latestWorkflowRun"`
+}
+
+type GitHubData struct {
+	Repositories []GitHubRepositoryStatus `json:"repositories"`
+}
+
 type NexusData struct {
 	Items      []NexusStatus `json:"items"`
 	Url        string        `json:"url"`
@@ -244,6 +282,14 @@ type GitLabCollectTarget struct {
 	Projects []GitLabProjectTarget
 }
 
+type GitHubCollectTarget struct {
+	ID           string
+	Name         string
+	BaseURL      string
+	Token        string
+	Repositories []GitHubRepositoryTarget
+}
+
 type ArgoCDCollectTarget struct {
 	ID      string
 	Name    string
@@ -262,6 +308,7 @@ type CollectSettings struct {
 	Kubernetes []KubernetesCollectTarget
 	ArgoCD     []ArgoCDCollectTarget
 	GitLab     []GitLabCollectTarget
+	GitHub     []GitHubCollectTarget
 	Nexus      []NexusCollectTarget
 }
 
@@ -310,6 +357,24 @@ type GitLabProjectItem struct {
 	ID            string  `json:"id"`
 	Name          string  `json:"name"`
 	Path          string  `json:"path"`
+	DefaultBranch string  `json:"defaultBranch"`
+	Link          *string `json:"link,omitempty"`
+	Active        bool    `json:"active"`
+}
+
+type GitHubIntegration struct {
+	ID              string                 `json:"id"`
+	Name            string                 `json:"name"`
+	BaseURL         string                 `json:"baseUrl"`
+	Repositories    []GitHubRepositoryItem `json:"repositories"`
+	Active          bool                   `json:"active"`
+	TokenConfigured bool                   `json:"tokenConfigured"`
+}
+
+type GitHubRepositoryItem struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	FullName      string  `json:"fullName"`
 	DefaultBranch string  `json:"defaultBranch"`
 	Link          *string `json:"link,omitempty"`
 	Active        bool    `json:"active"`

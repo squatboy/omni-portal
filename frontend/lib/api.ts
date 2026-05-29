@@ -1,6 +1,7 @@
 import type {
   ArgoCDIntegration,
   AuthMe,
+  GitHubIntegration,
   GitLabIntegration,
   IPAMAddress,
   IPAMSearchResult,
@@ -470,6 +471,54 @@ export const api = {
     }
     const store = getMockStore()
     store.gitlab = store.gitlab.filter((item) => item.id !== id)
+    return mockResponse({ ok: true })
+  },
+  listGitHub: () =>
+    isMockMode()
+      ? mockResponse(getMockStore().github)
+      : request<GitHubIntegration[]>("/api/manage/integrations/github"),
+  saveGitHub: (payload: GitHubIntegration & { token?: string }) => {
+    if (!isMockMode()) {
+      return request<GitHubIntegration>("/api/manage/integrations/github", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      })
+    }
+    const store = getMockStore()
+    const { token, ...rest } = payload
+    const existing = store.github.find((item) => item.id === rest.id)
+    const next = {
+      ...rest,
+      id: rest.id || generateId("github"),
+      tokenConfigured: resolveTokenConfigured(
+        token,
+        rest.tokenConfigured,
+        existing?.tokenConfigured
+      ),
+    }
+    const index = store.github.findIndex((item) => item.id === next.id)
+    if (index >= 0) {
+      store.github[index] = next
+    } else {
+      store.github.push(next)
+    }
+    return mockResponse(next)
+  },
+  testGitHub: (payload: GitHubIntegration & { token?: string }) =>
+    isMockMode()
+      ? mockResponse({ ok: true, status: "ok", error: null })
+      : request<TestResult>("/api/manage/integrations/github/test", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        }),
+  deleteGitHub: (id: string) => {
+    if (!isMockMode()) {
+      return request<{ ok: true }>(`/api/manage/integrations/github/${id}`, {
+        method: "DELETE",
+      })
+    }
+    const store = getMockStore()
+    store.github = store.github.filter((item) => item.id !== id)
     return mockResponse({ ok: true })
   },
   listNexus: () =>

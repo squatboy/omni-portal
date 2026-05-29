@@ -1,7 +1,15 @@
 "use client"
 
 import * as React from "react"
-import { Check, Edit, Eye, EyeOff, Loader2, TestTube2, Trash2 } from "lucide-react"
+import {
+  Check,
+  Edit,
+  Eye,
+  EyeOff,
+  Loader2,
+  TestTube2,
+  Trash2,
+} from "lucide-react"
 import { toast } from "sonner"
 
 import { type TestResult } from "@/lib/api"
@@ -216,7 +224,7 @@ export function FormActions({ onTest }: { onTest: () => Promise<TestResult> }) {
       {result && (
         <Badge
           variant={result.ok ? "outline" : "destructive"}
-          className={`h-7 whitespace-nowrap rounded-md px-2 text-xs font-medium ${
+          className={`h-7 rounded-md px-2 text-xs font-medium whitespace-nowrap ${
             result.ok
               ? "border-green-500/20 bg-green-500/10 text-green-600 dark:text-green-400"
               : ""
@@ -309,21 +317,45 @@ export function splitList(value: string) {
     .filter(Boolean)
 }
 
-export function parseProjects(value: string) {
-  return value
+export function parseProjects(projectsText: string, branchText: string) {
+  const branches = (branchText || "")
+    .split("\n")
+    .map((b) => b.trim())
+    .filter(Boolean)
+  return (projectsText || "")
     .split("\n")
     .map((line) => line.trim())
     .filter(Boolean)
-    .map((line) => {
-      const parts = line.split("|").map((part) => part.trim())
-      const [name, rawPath, defaultBranch = "main", link = ""] = parts
-      const path = rawPath || name
+    .map((line, index) => {
+      const defaultBranch = branches[index] || branches[0] || "main"
       return {
         id: "",
-        name,
-        path,
+        name: line,
+        path: line,
         defaultBranch,
-        link: link || null,
+        link: null,
+        active: true,
+      }
+    })
+}
+
+export function parseRepositories(repositoriesText: string, branchText: string) {
+  const branches = (branchText || "")
+    .split("\n")
+    .map((b) => b.trim())
+    .filter(Boolean)
+  return (repositoriesText || "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const defaultBranch = branches[index] || branches[0] || "main"
+      return {
+        id: "",
+        name: line,
+        fullName: line,
+        defaultBranch,
+        link: null,
         active: true,
       }
     })

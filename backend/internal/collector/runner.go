@@ -53,6 +53,13 @@ func (r *Runner) Start(ctx context.Context) {
 		}
 		r.cache.SetGitLab(CollectGitLab(ctx, settings.GitLab))
 	})
+	go r.runLoop(ctx, "github", 30*time.Second, func(ctx context.Context) {
+		settings, err := r.settings(ctx)
+		if err != nil {
+			return
+		}
+		r.cache.SetGitHub(CollectGitHub(ctx, settings.GitHub))
+	})
 	go r.runLoop(ctx, "kubernetes", 30*time.Second, func(ctx context.Context) {
 		settings, err := r.settings(ctx)
 		if err != nil {
@@ -68,7 +75,7 @@ func (r *Runner) CollectOnce(ctx context.Context) {
 		return
 	}
 	var wg sync.WaitGroup
-	wg.Add(5)
+	wg.Add(6)
 
 	go func() {
 		defer wg.Done()
@@ -85,6 +92,10 @@ func (r *Runner) CollectOnce(ctx context.Context) {
 	go func() {
 		defer wg.Done()
 		r.cache.SetGitLab(CollectGitLab(ctx, settings.GitLab))
+	}()
+	go func() {
+		defer wg.Done()
+		r.cache.SetGitHub(CollectGitHub(ctx, settings.GitHub))
 	}()
 	go func() {
 		defer wg.Done()

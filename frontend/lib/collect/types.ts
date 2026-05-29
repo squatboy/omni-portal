@@ -4,6 +4,7 @@ export type CollectSource =
   | "kubernetes"
   | "argocd"
   | "gitlab"
+  | "github"
   | "nexus"
 
 export type SourceStatus =
@@ -175,6 +176,50 @@ export type GitLabData = {
   projects: GitLabProjectStatus[]
 }
 
+export type GitHubRepositoryTarget = {
+  name: string
+  fullName: string
+  defaultBranch: string
+  link?: string
+}
+
+export type GitHubRepositoryStatus = GitHubRepositoryTarget & {
+  integrationName?: string
+  latestCommit: {
+    sha: string
+    message: string
+    authorName: string
+    committedAt: string
+    link: string
+  } | null
+  latestWorkflowRun: {
+    id: number
+    name: string
+    status:
+      | "queued"
+      | "in_progress"
+      | "waiting"
+      | "requested"
+      | "completed"
+      | string
+    conclusion:
+      | "success"
+      | "failure"
+      | "cancelled"
+      | "timed_out"
+      | "action_required"
+      | string
+      | null
+    branch: string
+    updatedAt: string
+    link: string
+  } | null
+}
+
+export type GitHubData = {
+  repositories: GitHubRepositoryStatus[]
+}
+
 export type NexusData = {
   items: {
     id: string
@@ -200,6 +245,10 @@ export type CollectInventoryConfig = {
     baseUrl: string
     projects: GitLabProjectTarget[]
   }
+  github: {
+    baseUrl: string
+    repositories: GitHubRepositoryTarget[]
+  }
   nexus: {
     url: string
   }
@@ -211,6 +260,7 @@ export type CollectPayloadBySource = {
   kubernetes: KubernetesData
   argocd: ArgoCdData
   gitlab: GitLabData
+  github: GitHubData
   nexus: NexusData
 }
 

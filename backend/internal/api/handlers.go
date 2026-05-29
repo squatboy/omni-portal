@@ -73,6 +73,10 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 			envelope := cache.GetGitLab()
 			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
 		})
+		collect.GET("/github", func(c *gin.Context) {
+			envelope := cache.GetGitHub()
+			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
+		})
 		collect.GET("/nexus", func(c *gin.Context) {
 			envelope := cache.GetNexus()
 			c.JSON(collectEnvelopeHTTPStatus(envelope.Status, envelope.Error), envelope)
@@ -119,6 +123,11 @@ func SetupRouter(cache *collector.Cache, runner *collector.Runner, st *store.Sto
 		manage.POST("/integrations/gitlab", api.handleSaveGitLab)
 		manage.DELETE("/integrations/gitlab/:id", api.handleDeleteGitLab)
 		manage.POST("/integrations/gitlab/test", api.handleTestGitLab)
+
+		manage.GET("/integrations/github", api.handleListGitHub)
+		manage.POST("/integrations/github", api.handleSaveGitHub)
+		manage.DELETE("/integrations/github/:id", api.handleDeleteGitHub)
+		manage.POST("/integrations/github/test", api.handleTestGitHub)
 
 		manage.GET("/integrations/nexus", api.handleListNexus)
 		manage.POST("/integrations/nexus", api.handleSaveNexus)
@@ -340,6 +349,44 @@ func (api *API) handleTestGitLab(c *gin.Context) {
 		projects = append(projects, models.GitLabProjectTarget{Name: project.Name, Path: project.Path, DefaultBranch: project.DefaultBranch, Link: project.Link})
 	}
 	result := collector.CollectGitLab(c.Request.Context(), []models.GitLabCollectTarget{{ID: req.ID, Name: req.Name, BaseURL: req.BaseURL, Token: req.Token, Projects: projects}})
+	writeTestResult(c, result.Status, result.Error)
+}
+
+func (api *API) handleListGitHub(c *gin.Context) {
+	items, err := api.store.ListGitHubIntegrations(c.Request.Context())
+	writeJSON(c, items, err)
+}
+
+func (api *API) handleSaveGitHub(c *gin.Context) {
+	user, _ := api.currentUser(c)
+	var req struct {
+		models.GitHubIntegration
+		Token string `json:"token"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	item, err := api.store.SaveGitHubIntegration(c.Request.Context(), user.ID, req.GitHubIntegration, req.Token)
+	writeJSON(c, item, err)
+}
+
+func (api *API) handleDeleteGitHub(c *gin.Context) {
+	writeJSON(c, gin.H{"ok": true}, api.store.DeleteIntegration(c.Request.Context(), "github", c.Param("id")))
+}
+
+func (api *API) handleTestGitHub(c *gin.Context) {
+	var req struct {
+		models.GitHubIntegration
+		Token string `json:"token"`
+	}
+	if !bindJSON(c, &req) {
+		return
+	}
+	repositories := make([]models.GitHubRepositoryTarget, 0, len(req.Repositories))
+	for _, repository := range req.Repositories {
+		repositories = append(repositories, models.GitHubRepositoryTarget{Name: repository.Name, FullName: repository.FullName, DefaultBranch: repository.DefaultBranch, Link: repository.Link})
+	}
+	result := collector.CollectGitHub(c.Request.Context(), []models.GitHubCollectTarget{{ID: req.ID, Name: req.Name, BaseURL: req.BaseURL, Token: req.Token, Repositories: repositories}})
 	writeTestResult(c, result.Status, result.Error)
 }
 
@@ -738,6 +785,7 @@ func snapshotHTTPStatus(snapshot models.DashboardSnapshot) int {
 		{status: snapshot.Kubernetes.Status, err: snapshot.Kubernetes.Error},
 		{status: snapshot.ArgoCD.Status, err: snapshot.ArgoCD.Error},
 		{status: snapshot.GitLab.Status, err: snapshot.GitLab.Error},
+		{status: snapshot.GitHub.Status, err: snapshot.GitHub.Error},
 		{status: snapshot.Nexus.Status, err: snapshot.Nexus.Error},
 	}
 

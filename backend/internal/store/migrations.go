@@ -73,6 +73,29 @@ var migrations = []string{
 		created_by text,
 		updated_by text
 	)`,
+	`CREATE TABLE IF NOT EXISTS github_integrations (
+		id text PRIMARY KEY,
+		name text NOT NULL,
+		base_url text NOT NULL,
+		active boolean NOT NULL DEFAULT true,
+		created_at timestamptz NOT NULL DEFAULT now(),
+		updated_at timestamptz NOT NULL DEFAULT now(),
+		created_by text,
+		updated_by text
+	)`,
+	`CREATE TABLE IF NOT EXISTS github_repositories (
+		id text PRIMARY KEY,
+		integration_id text NOT NULL REFERENCES github_integrations(id) ON DELETE CASCADE,
+		name text NOT NULL,
+		full_name text NOT NULL,
+		default_branch text NOT NULL DEFAULT 'main',
+		link text,
+		active boolean NOT NULL DEFAULT true,
+		created_at timestamptz NOT NULL DEFAULT now(),
+		updated_at timestamptz NOT NULL DEFAULT now(),
+		created_by text,
+		updated_by text
+	)`,
 	`CREATE TABLE IF NOT EXISTS argocd_integrations (
 		id text PRIMARY KEY,
 		name text NOT NULL,
@@ -106,6 +129,7 @@ var migrations = []string{
 	)`,
 	`CREATE INDEX IF NOT EXISTS sessions_user_id_idx ON sessions(user_id)`,
 	`CREATE INDEX IF NOT EXISTS gitlab_projects_integration_id_idx ON gitlab_projects(integration_id)`,
+	`CREATE INDEX IF NOT EXISTS github_repositories_integration_id_idx ON github_repositories(integration_id)`,
 	`ALTER TABLE kubernetes_integrations DROP COLUMN IF EXISTS cluster_name`,
 	`ALTER TABLE kubernetes_integrations DROP COLUMN IF EXISTS app_namespaces`,
 	`CREATE TABLE IF NOT EXISTS ipam_locations (

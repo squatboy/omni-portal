@@ -2,6 +2,7 @@ import type { DashboardSnapshot } from "@/components/dashboard/lib/types"
 import type {
   ArgoCdData,
   CollectEnvelope,
+  GitHubData,
   GitLabData,
   KubernetesData,
   NexusData,
@@ -11,6 +12,7 @@ import type {
 } from "@/lib/collect/types"
 import type {
   ArgoCDIntegration,
+  GitHubIntegration,
   GitLabIntegration,
   IPAMAddress,
   IPAMLocation,
@@ -24,7 +26,9 @@ import type {
   VMResource,
 } from "@/lib/types"
 
-const mockUserCreatedAt = new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString()
+const mockUserCreatedAt = new Date(
+  Date.now() - 1000 * 60 * 60 * 24
+).toISOString()
 
 export const mockUser: User = {
   id: "user-admin",
@@ -61,6 +65,7 @@ type MockStore = {
   kubernetes: KubernetesIntegration[]
   argocd: ArgoCDIntegration[]
   gitlab: GitLabIntegration[]
+  github: GitHubIntegration[]
   nexus: NexusIntegration[]
   users: User[]
   ipamLocations: IPAMLocation[]
@@ -203,6 +208,25 @@ function createDefaultMockStore(): MockStore {
         tokenConfigured: true,
       },
     ],
+    github: [
+      {
+        id: "github-main",
+        name: "Omni GitHub",
+        baseUrl: "https://github.com",
+        repositories: [
+          {
+            id: "github-omni-portal",
+            name: "omni-portal",
+            fullName: "sth/omni-portal",
+            defaultBranch: "main",
+            link: "https://github.com/sth/omni-portal",
+            active: true,
+          },
+        ],
+        active: true,
+        tokenConfigured: true,
+      },
+    ],
     nexus: [
       {
         id: "nexus-main",
@@ -338,10 +362,10 @@ function createMockIPAMAddresses(
       index % 9 === 0
         ? "reserved"
         : index % 7 === 0
-        ? "offline"
-        : index % 5 === 0
-        ? "free"
-        : "used"
+          ? "offline"
+          : index % 5 === 0
+            ? "free"
+            : "used"
     const isOverride = status === "reserved"
 
     return {
@@ -399,6 +423,14 @@ export function createMockSnapshot(): DashboardSnapshot {
       attemptedAt: tenMinutesAgo,
       collectedAt: tenMinutesAgo,
       stale: true,
+      error: null,
+    },
+    {
+      source: "github",
+      status: "progressing",
+      attemptedAt: fiveMinutesAgo,
+      collectedAt: fiveMinutesAgo,
+      stale: false,
       error: null,
     },
     {
@@ -631,6 +663,42 @@ export function createMockSnapshot(): DashboardSnapshot {
     },
   }
 
+  const github: CollectEnvelope<GitHubData, "github"> = {
+    source: "github",
+    status: "progressing",
+    attemptedAt: fiveMinutesAgo,
+    collectedAt: fiveMinutesAgo,
+    stale: false,
+    error: null,
+    data: {
+      repositories: [
+        {
+          integrationName: "Omni GitHub",
+          name: "omni-portal",
+          fullName: "sth/omni-portal",
+          defaultBranch: "main",
+          link: "https://github.com/sth/omni-portal",
+          latestCommit: {
+            sha: "b71d5aa",
+            message: "feat: add github collector",
+            authorName: "Platform Team",
+            committedAt: fiveMinutesAgo,
+            link: "https://github.com/sth/omni-portal/commit/b71d5aa",
+          },
+          latestWorkflowRun: {
+            id: 9231,
+            name: "CI",
+            status: "in_progress",
+            conclusion: null,
+            branch: "main",
+            updatedAt: fiveMinutesAgo,
+            link: "https://github.com/sth/omni-portal/actions/runs/9231",
+          },
+        },
+      ],
+    },
+  }
+
   const nexus: CollectEnvelope<NexusData, "nexus"> = {
     source: "nexus",
     status: "down",
@@ -662,6 +730,7 @@ export function createMockSnapshot(): DashboardSnapshot {
     kubernetes,
     argocd,
     gitlab,
+    github,
     nexus,
   }
 }

@@ -35,7 +35,7 @@ func TestCollectSnapshotRoute(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &snapshot); err != nil {
 		t.Fatalf("expected JSON snapshot response: %v", err)
 	}
-	for _, key := range []string{"overview", "vms", "kubernetes", "argocd", "gitlab", "nexus"} {
+	for _, key := range []string{"overview", "vms", "kubernetes", "argocd", "gitlab", "github", "nexus"} {
 		if _, ok := snapshot[key]; !ok {
 			t.Fatalf("expected snapshot key %q", key)
 		}
@@ -340,6 +340,7 @@ func TestCollectSnapshotRouteHTTPStatus(t *testing.T) {
 			models.SourceKubernetes: models.StatusDown,
 			models.SourceArgoCD:     models.StatusTimeout,
 			models.SourceGitLab:     models.StatusPermissionError,
+			models.SourceGitHub:     models.StatusDown,
 			models.SourceNexus:      models.StatusDown,
 		}), want: http.StatusBadGateway},
 	}
@@ -378,6 +379,33 @@ func TestCollectSourceRouteHTTPStatus(t *testing.T) {
 
 	if rec.Code != http.StatusBadGateway {
 		t.Fatalf("expected status %d, got %d", http.StatusBadGateway, rec.Code)
+	}
+}
+
+func TestCollectGitHubRouteHTTPStatus(t *testing.T) {
+	cache := collector.NewCache()
+	cache.SetGitHub(models.CollectEnvelope[models.GitHubData]{
+		Source: models.SourceGitHub,
+		Status: models.StatusOk,
+		Data:   models.GitHubData{Repositories: []models.GitHubRepositoryStatus{}},
+	})
+	gin.SetMode(gin.TestMode)
+	ginRouter := SetupRouter(cache, nil, nil, nil)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/collect/github", nil)
+	rec := httptest.NewRecorder()
+
+	ginRouter.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status %d, got %d", http.StatusOK, rec.Code)
+	}
+	var envelope models.CollectEnvelope[models.GitHubData]
+	if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode github envelope: %v", err)
+	}
+	if envelope.Source != models.SourceGitHub {
+		t.Fatalf("expected github source, got %q", envelope.Source)
 	}
 }
 
@@ -444,12 +472,14 @@ func collectCacheWithStatuses(t *testing.T, statuses map[models.CollectSource]mo
 	kubernetesStatus := statusFor(models.SourceKubernetes)
 	argoCDStatus := statusFor(models.SourceArgoCD)
 	gitLabStatus := statusFor(models.SourceGitLab)
+	gitHubStatus := statusFor(models.SourceGitHub)
 	nexusStatus := statusFor(models.SourceNexus)
 
 	cache.SetVMs(models.CollectEnvelope[models.VmsData]{Source: models.SourceVMs, Status: vmStatus, Error: errorFor(vmStatus)})
 	cache.SetKubernetes(models.CollectEnvelope[models.KubernetesData]{Source: models.SourceKubernetes, Status: kubernetesStatus, Error: errorFor(kubernetesStatus)})
 	cache.SetArgoCD(models.CollectEnvelope[models.ArgoCdData]{Source: models.SourceArgoCD, Status: argoCDStatus, Error: errorFor(argoCDStatus)})
 	cache.SetGitLab(models.CollectEnvelope[models.GitLabData]{Source: models.SourceGitLab, Status: gitLabStatus, Error: errorFor(gitLabStatus)})
+	cache.SetGitHub(models.CollectEnvelope[models.GitHubData]{Source: models.SourceGitHub, Status: gitHubStatus, Error: errorFor(gitHubStatus)})
 	cache.SetNexus(models.CollectEnvelope[models.NexusData]{Source: models.SourceNexus, Status: nexusStatus, Error: errorFor(nexusStatus)})
 	return cache
 }

@@ -16,21 +16,25 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import type { CollectEnvelope, GitLabData } from "@/lib/collect/types"
+import type {
+  CollectEnvelope,
+  GitHubData,
+  SourceStatus,
+} from "@/lib/collect/types"
 import { formatDateTime } from "../lib/utils"
 import { ExternalLinkButton } from "../shared/common"
 import { StatusBadge } from "../shared/status-badge"
 
-export function GitLabPanel({
+export function GitHubPanel({
   envelope,
 }: {
-  envelope: CollectEnvelope<GitLabData, "gitlab">
+  envelope: CollectEnvelope<GitHubData, "github">
 }) {
   return (
     <Card size="sm" className="rounded-md">
       <CardHeader>
-        <CardTitle>GitLab Projects</CardTitle>
-        <CardDescription>App repositories only</CardDescription>
+        <CardTitle>GitHub Repositories</CardTitle>
+        <CardDescription>Repository commits and workflow runs</CardDescription>
         <CardAction>
           <StatusBadge status={envelope.status} stale={envelope.stale} />
         </CardAction>
@@ -39,54 +43,55 @@ export function GitLabPanel({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Project</TableHead>
+              <TableHead>Repository</TableHead>
               <TableHead>Commit</TableHead>
-              <TableHead>Pipeline</TableHead>
+              <TableHead>Workflow Run</TableHead>
               <TableHead>Updated</TableHead>
               <TableHead>Link</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {envelope.data.projects.map((project) => (
-              <TableRow key={project.path}>
+            {envelope.data.repositories.map((repository) => (
+              <TableRow key={repository.fullName}>
                 <TableCell>
                   <div className="flex min-w-52 flex-col gap-1">
-                    <span className="truncate font-medium">{project.path}</span>
+                    <span className="truncate font-medium">
+                      {repository.fullName}
+                    </span>
                   </div>
                 </TableCell>
                 <TableCell>
                   <div className="flex min-w-56 flex-col gap-1">
                     <span className="truncate">
-                      {project.latestCommit?.title ?? "No commit snapshot"}
+                      {repository.latestCommit?.message ?? "No commit snapshot"}
                     </span>
                     <span className="font-mono text-xs text-muted-foreground">
-                      {project.latestCommit?.sha ?? "unknown"}
+                      {repository.latestCommit?.sha ?? "unknown"}
                     </span>
                   </div>
                 </TableCell>
                 <TableCell>
-                  {project.latestPipeline ? (
+                  {repository.latestWorkflowRun ? (
                     <StatusBadge
-                      status={
-                        project.latestPipeline.status === "success"
-                          ? "ok"
-                          : "stale"
+                      status={workflowRunStatus(repository.latestWorkflowRun)}
+                      label={
+                        repository.latestWorkflowRun.conclusion ??
+                        repository.latestWorkflowRun.status
                       }
-                      label={project.latestPipeline.status}
                     />
                   ) : (
                     "-"
                   )}
                 </TableCell>
                 <TableCell className="font-mono text-xs">
-                  {project.latestPipeline
-                    ? formatDateTime(project.latestPipeline.updatedAt)
+                  {repository.latestWorkflowRun
+                    ? formatDateTime(repository.latestWorkflowRun.updatedAt)
                     : "-"}
                 </TableCell>
                 <TableCell>
                   <ExternalLinkButton
-                    href={project.link || "#"}
-                    label={project.path}
+                    href={repository.link || "#"}
+                    label={repository.fullName}
                   />
                 </TableCell>
               </TableRow>
@@ -96,4 +101,26 @@ export function GitLabPanel({
       </CardContent>
     </Card>
   )
+}
+
+function workflowRunStatus(
+  run: NonNullable<GitHubData["repositories"][number]["latestWorkflowRun"]>
+): SourceStatus {
+  if (
+    run.status === "queued" ||
+    run.status === "in_progress" ||
+    run.status === "waiting" ||
+    run.status === "requested"
+  ) {
+    return "progressing"
+  }
+  if (
+    run.conclusion === "failure" ||
+    run.conclusion === "cancelled" ||
+    run.conclusion === "timed_out" ||
+    run.conclusion === "action_required"
+  ) {
+    return "stale"
+  }
+  return "ok"
 }

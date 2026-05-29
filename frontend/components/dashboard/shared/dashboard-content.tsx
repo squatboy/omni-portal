@@ -2,6 +2,7 @@ import * as React from "react"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ArgoPanel } from "../panels/argo-panel"
+import { GitHubPanel } from "../panels/github-panel"
 import { GitLabPanel } from "../panels/gitlab-panel"
 import { KubernetesPanel } from "../panels/kubernetes-panel"
 import { NexusPanel } from "../panels/nexus-panel"
@@ -25,6 +26,7 @@ export function DashboardContent({
   const vms = snapshot.vms.data
   const argocd = snapshot.argocd.data
   const gitlab = snapshot.gitlab.data
+  const github = snapshot.github.data
   const nexus = snapshot.nexus.data
 
   const readyNodes = kubernetes.nodes.filter((node) => node.ready).length
@@ -37,6 +39,9 @@ export function DashboardContent({
   ).length
   const successfulPipelines = gitlab.projects.filter(
     (project) => project.latestPipeline?.status === "success"
+  ).length
+  const successfulWorkflowRuns = github.repositories.filter(
+    (repository) => repository.latestWorkflowRun?.conclusion === "success"
   ).length
 
   return (
@@ -65,14 +70,22 @@ export function DashboardContent({
         />
         <MetricCard
           title="CI / External"
-          value={`${successfulPipelines}/${gitlab.projects.length}`}
+          value={`${successfulPipelines + successfulWorkflowRuns}/${
+            gitlab.projects.length + github.repositories.length
+          }`}
           detail={nexus.reachable ? "Nexus reachable" : "Nexus unreachable"}
           status={
-            snapshot.gitlab.status === "ok" && snapshot.nexus.status === "ok"
+            snapshot.gitlab.status === "ok" &&
+            snapshot.github.status === "ok" &&
+            snapshot.nexus.status === "ok"
               ? "ok"
               : "stale"
           }
-          stale={snapshot.gitlab.stale || snapshot.nexus.stale}
+          stale={
+            snapshot.gitlab.stale ||
+            snapshot.github.stale ||
+            snapshot.nexus.stale
+          }
         />
       </section>
 
@@ -81,13 +94,17 @@ export function DashboardContent({
         onValueChange={(value) => onTabChange(value as DashboardTab)}
         className="flex min-w-0 flex-col gap-4"
       >
-        <TabsList variant="line" className="w-full justify-start overflow-x-auto overflow-y-hidden">
+        <TabsList
+          variant="line"
+          className="w-full justify-start overflow-x-auto overflow-y-hidden"
+        >
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="kubernetes">Kubernetes</TabsTrigger>
           <TabsTrigger value="pods">Pods</TabsTrigger>
           <TabsTrigger value="vms">VM Inventory</TabsTrigger>
           <TabsTrigger value="argocd">Argo CD</TabsTrigger>
           <TabsTrigger value="gitlab">GitLab</TabsTrigger>
+          <TabsTrigger value="github">GitHub</TabsTrigger>
           <TabsTrigger value="nexus">Nexus</TabsTrigger>
         </TabsList>
 
@@ -112,6 +129,9 @@ export function DashboardContent({
           </TabsContent>
           <TabsContent value="gitlab" className="mt-0">
             <GitLabPanel envelope={snapshot.gitlab} />
+          </TabsContent>
+          <TabsContent value="github" className="mt-0">
+            <GitHubPanel envelope={snapshot.github} />
           </TabsContent>
           <TabsContent value="nexus" className="mt-0">
             <NexusPanel envelope={snapshot.nexus} />

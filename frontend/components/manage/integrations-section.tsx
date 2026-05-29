@@ -6,22 +6,19 @@ import { type ColumnDef } from "@tanstack/react-table"
 import { api, type TestResult } from "@/lib/api"
 import type {
   ArgoCDIntegration,
+  GitHubIntegration,
   GitLabIntegration,
   KubernetesIntegration,
   NexusIntegration,
 } from "@/lib/types"
 import { Badge } from "@/components/ui/badge"
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DataTable } from "@/components/ui/data-table"
 import {
   ActiveToggle,
   FormActions,
   parseProjects,
+  parseRepositories,
   RowActions,
   SecretInput,
   showMessage,
@@ -50,17 +47,34 @@ const emptyArgoCD: ArgoCDIntegration & { token: string } = {
   token: "",
 }
 
-const emptyGitLab: GitLabIntegration & { token: string; projectsText: string } =
-  {
-    id: "",
-    name: "",
-    baseUrl: "",
-    projects: [],
-    active: true,
-    tokenConfigured: false,
-    token: "",
-    projectsText: "",
-  }
+const emptyGitLab: GitLabIntegration & { token: string; projectsText: string; branchText: string } =
+{
+  id: "",
+  name: "",
+  baseUrl: "",
+  projects: [],
+  active: true,
+  tokenConfigured: false,
+  token: "",
+  projectsText: "",
+  branchText: "",
+}
+
+const emptyGitHub: GitHubIntegration & {
+  token: string
+  repositoriesText: string
+  branchText: string
+} = {
+  id: "",
+  name: "",
+  baseUrl: "https://github.com",
+  repositories: [],
+  active: true,
+  tokenConfigured: false,
+  token: "",
+  repositoriesText: "",
+  branchText: "",
+}
 
 const emptyNexus: NexusIntegration = {
   id: "",
@@ -182,9 +196,9 @@ function GitLabForm({
   onTest,
   activeId = "gitlab-active",
 }: {
-  value: GitLabIntegration & { token: string; projectsText: string }
+  value: GitLabIntegration & { token: string; projectsText: string; branchText: string }
   onChange: (
-    v: GitLabIntegration & { token: string; projectsText: string }
+    v: GitLabIntegration & { token: string; projectsText: string; branchText: string }
   ) => void
   onSubmit: () => void
   onTest: () => Promise<TestResult>
@@ -211,12 +225,89 @@ function GitLabForm({
         placeholder="https://gitlab.example.com"
         required
       />
-      <TextInput
-        label="Projects"
-        value={value.projectsText}
-        onChange={(projectsText) => onChange({ ...value, projectsText })}
-        placeholder="frontend-app|my-group/frontend-app|main"
+      <div className="grid grid-cols-2 gap-3">
+        <TextInput
+          label="Projects"
+          value={value.projectsText}
+          onChange={(projectsText) => onChange({ ...value, projectsText })}
+          placeholder="my-group/example-project"
+          required
+        />
+        <TextInput
+          label="Branch"
+          value={value.branchText}
+          onChange={(branchText) => onChange({ ...value, branchText })}
+          placeholder="main"
+        />
+      </div>
+      <SecretInput
+        configured={value.tokenConfigured}
+        value={value.token}
+        onChange={(token) => onChange({ ...value, token })}
       />
+      <ActiveToggle
+        id={activeId}
+        checked={value.active}
+        onChange={(active) => onChange({ ...value, active })}
+      />
+      <FormActions onTest={onTest} />
+    </form>
+  )
+}
+
+function GitHubForm({
+  value,
+  onChange,
+  onSubmit,
+  onTest,
+  activeId = "github-active",
+}: {
+  value: GitHubIntegration & { token: string; repositoriesText: string; branchText: string }
+  onChange: (
+    v: GitHubIntegration & { token: string; repositoriesText: string; branchText: string }
+  ) => void
+  onSubmit: () => void
+  onTest: () => Promise<TestResult>
+  activeId?: string
+}) {
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(e) => {
+        e.preventDefault()
+        onSubmit()
+      }}
+    >
+      <TextInput
+        label="Name"
+        value={value.name}
+        onChange={(name) => onChange({ ...value, name })}
+        required
+      />
+      <TextInput
+        label="Base URL"
+        value={value.baseUrl}
+        onChange={(baseUrl) => onChange({ ...value, baseUrl })}
+        placeholder="https://github.com"
+        required
+      />
+      <div className="grid grid-cols-2 gap-3">
+        <TextInput
+          label="Repositories"
+          value={value.repositoriesText}
+          onChange={(repositoriesText) =>
+            onChange({ ...value, repositoriesText })
+          }
+          placeholder="user/example-repo"
+          required
+        />
+        <TextInput
+          label="Branch"
+          value={value.branchText}
+          onChange={(branchText) => onChange({ ...value, branchText })}
+          placeholder="main"
+        />
+      </div>
       <SecretInput
         configured={value.tokenConfigured}
         value={value.token}
@@ -394,6 +485,7 @@ export function IntegrationsSection() {
   )
   const [argocd, setArgoCD] = React.useState<ArgoCDIntegration[]>([])
   const [gitlab, setGitLab] = React.useState<GitLabIntegration[]>([])
+  const [github, setGitHub] = React.useState<GitHubIntegration[]>([])
   const [nexus, setNexus] = React.useState<NexusIntegration[]>([])
 
   const [kubernetesForm, setKubernetesForm] = React.useState<
@@ -403,8 +495,11 @@ export function IntegrationsSection() {
     ArgoCDIntegration & { token: string }
   >(emptyArgoCD)
   const [gitlabForm, setGitLabForm] = React.useState<
-    GitLabIntegration & { token: string; projectsText: string }
+    GitLabIntegration & { token: string; projectsText: string; branchText: string }
   >(emptyGitLab)
+  const [githubForm, setGitHubForm] = React.useState<
+    GitHubIntegration & { token: string; repositoriesText: string; branchText: string }
+  >(emptyGitHub)
   const [nexusForm, setNexusForm] = React.useState<NexusIntegration>(emptyNexus)
 
   const [editingKubernetesId, setEditingKubernetesId] = React.useState<
@@ -425,8 +520,15 @@ export function IntegrationsSection() {
     null
   )
   const [editGitLabForm, setEditGitLabForm] = React.useState<
-    GitLabIntegration & { token: string; projectsText: string }
+    GitLabIntegration & { token: string; projectsText: string; branchText: string }
   >(emptyGitLab)
+
+  const [editingGitHubId, setEditingGitHubId] = React.useState<string | null>(
+    null
+  )
+  const [editGitHubForm, setEditGitHubForm] = React.useState<
+    GitHubIntegration & { token: string; repositoriesText: string; branchText: string }
+  >(emptyGitHub)
 
   const [editingNexusId, setEditingNexusId] = React.useState<string | null>(
     null
@@ -446,6 +548,10 @@ export function IntegrationsSection() {
     const next = await api.listGitLab()
     setGitLab(next ?? [])
   }, [])
+  const loadGitHub = React.useCallback(async () => {
+    const next = await api.listGitHub()
+    setGitHub(next ?? [])
+  }, [])
   const loadNexus = React.useCallback(async () => {
     const next = await api.listNexus()
     setNexus(next ?? [])
@@ -457,11 +563,12 @@ export function IntegrationsSection() {
         loadKubernetes(),
         loadArgoCD(),
         loadGitLab(),
+        loadGitHub(),
         loadNexus(),
       ])
     }, 0)
     return () => window.clearTimeout(id)
-  }, [loadKubernetes, loadArgoCD, loadGitLab, loadNexus])
+  }, [loadKubernetes, loadArgoCD, loadGitLab, loadGitHub, loadNexus])
 
   async function saveKubernetes(
     form: KubernetesIntegration & { token: string },
@@ -484,16 +591,29 @@ export function IntegrationsSection() {
   }
 
   async function saveGitLab(
-    form: GitLabIntegration & { token: string; projectsText: string },
+    form: GitLabIntegration & { token: string; projectsText: string; branchText: string },
     isEdit = false
   ) {
     await api.saveGitLab({
       ...form,
-      projects: parseProjects(form.projectsText),
+      projects: parseProjects(form.projectsText, form.branchText),
     })
     if (!isEdit) setGitLabForm(emptyGitLab)
     showMessage("GitLab integration saved.")
     await loadGitLab()
+  }
+
+  async function saveGitHub(
+    form: GitHubIntegration & { token: string; repositoriesText: string; branchText: string },
+    isEdit = false
+  ) {
+    await api.saveGitHub({
+      ...form,
+      repositories: parseRepositories(form.repositoriesText, form.branchText),
+    })
+    if (!isEdit) setGitHubForm(emptyGitHub)
+    showMessage("GitHub integration saved.")
+    await loadGitHub()
   }
 
   async function saveNexus(form: NexusIntegration, isEdit = false) {
@@ -607,7 +727,7 @@ export function IntegrationsSection() {
           onTest={() =>
             api.testGitLab({
               ...gitlabForm,
-              projects: parseProjects(gitlabForm.projectsText),
+              projects: parseProjects(gitlabForm.projectsText, gitlabForm.branchText),
             })
           }
         />
@@ -623,11 +743,8 @@ export function IntegrationsSection() {
               setEditGitLabForm({
                 ...item,
                 token: "",
-                projectsText: (item.projects ?? [])
-                  .map((p) =>
-                    [p.name, p.path, p.defaultBranch, p.link ?? ""].join("|")
-                  )
-                  .join("\n"),
+                projectsText: (item.projects ?? []).map((p) => p.path).join("\n"),
+                branchText: (item.projects ?? []).map((p) => p.defaultBranch).join("\n"),
               })
             }
           }}
@@ -649,10 +766,73 @@ export function IntegrationsSection() {
               onTest={() =>
                 api.testGitLab({
                   ...editGitLabForm,
-                  projects: parseProjects(editGitLabForm.projectsText),
+                  projects: parseProjects(editGitLabForm.projectsText, editGitLabForm.branchText),
                 })
               }
               activeId={`gitlab-active-${item.id}`}
+            />
+          )}
+        />
+      </IntegrationCard>
+
+      <IntegrationCard title="GitHub" configured={github.length}>
+        <GitHubForm
+          value={githubForm}
+          onChange={setGitHubForm}
+          onSubmit={() =>
+            void saveGitHub(githubForm, false).catch((e) =>
+              showMessage(e.message)
+            )
+          }
+          onTest={() =>
+            api.testGitHub({
+              ...githubForm,
+              repositories: parseRepositories(githubForm.repositoriesText, githubForm.branchText),
+            })
+          }
+        />
+        <IntegrationList
+          items={github}
+          editingId={editingGitHubId}
+          onEdit={(item) => {
+            if (editingGitHubId === item.id) {
+              setEditingGitHubId(null)
+              setEditGitHubForm(emptyGitHub)
+            } else {
+              setEditingGitHubId(item.id)
+              setEditGitHubForm({
+                ...item,
+                token: "",
+                repositoriesText: (item.repositories ?? []).map((repository) => repository.fullName).join("\n"),
+                branchText: (item.repositories ?? []).map((repository) => repository.defaultBranch).join("\n"),
+              })
+            }
+          }}
+          onDelete={(id) =>
+            void api
+              .deleteGitHub(id)
+              .then(loadGitHub)
+              .catch((e) => showMessage(e.message))
+          }
+          renderEditForm={(item) => (
+            <GitHubForm
+              value={editGitHubForm}
+              onChange={setEditGitHubForm}
+              onSubmit={() =>
+                void saveGitHub(editGitHubForm, true)
+                  .then(() => setEditingGitHubId(null))
+                  .catch((e) => showMessage(e.message))
+              }
+              onTest={() =>
+                api.testGitHub({
+                  ...editGitHubForm,
+                  repositories: parseRepositories(
+                    editGitHubForm.repositoriesText,
+                    editGitHubForm.branchText
+                  ),
+                })
+              }
+              activeId={`github-active-${item.id}`}
             />
           )}
         />

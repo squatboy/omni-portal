@@ -2,6 +2,7 @@ import type {
   ArgoCdData,
   CollectEnvelope,
   CollectSource,
+  GitHubData,
   GitLabData,
   KubernetesData,
   NexusData,
@@ -16,6 +17,7 @@ export type DashboardTab =
   | "vms"
   | "argocd"
   | "gitlab"
+  | "github"
   | "nexus"
   | "health"
 
@@ -25,6 +27,7 @@ export type DashboardSnapshot = {
   kubernetes: CollectEnvelope<KubernetesData, "kubernetes">
   argocd: CollectEnvelope<ArgoCdData, "argocd">
   gitlab: CollectEnvelope<GitLabData, "gitlab">
+  github: CollectEnvelope<GitHubData, "github">
   nexus: CollectEnvelope<NexusData, "nexus">
 }
 
